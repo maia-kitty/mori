@@ -1,0 +1,16 @@
+# Generated and machine-local state
+.cache/
+.local/
+*.log
+*.lock
+
+# Secrets and credentials
+*.secret
+*.secrets
+*.env
+credentials*
+secrets*
+
+# Editor and OS files
+.DS_Store
+*~

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "source": "~/.config/fastfetch/mori-cachyos.txt",
+    "color": {
+      "1": "green"
+    }
+  },
+  "display": {
+    "key": { "width": 9 },
+    "color": {
+      "keys": "8",
+      "output": "6"
+    }
+  },
+  "modules": [
+    { "type": "os", "key": "os"},
+    { "type": "kernel", "key": "kernel"},
+    { "type": "uptime", "key": "uptime"},
+    { "type": "shell", "key": "shell"},
+    { "type": "wm", "key": "wm"},
+    { "type": "terminal", "key": "term"}
+  ]
+}

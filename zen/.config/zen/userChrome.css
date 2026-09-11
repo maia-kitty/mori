@@ -1,0 +1,107 @@
+/* Mori Everforest theme for Zen Browser.
+ * Ported from the DMS Matugen Zen template with fixed dark colors. */
+
+:root {
+  --zen-primary-color: #a7c080 !important;
+  --toolbarbutton-icon-fill: #a7c080 !important;
+  --toolbar-field-color: #d3c6aa !important;
+  --tab-selected-textcolor: #a7c080 !important;
+  --toolbar-color: #d3c6aa !important;
+  --arrowpanel-color: #d3c6aa !important;
+  --arrowpanel-background: #2e383c !important;
+  --sidebar-text-color: #d3c6aa !important;
+  --zen-main-browser-background: #272e33 !important;
+  --zen-main-browser-background-toolbar: #272e33 !important;
+}
+
+#zen-browser-background {
+  --zen-main-browser-background: #272e33 !important;
+  --zen-background-opacity: 1 !important;
+}
+
+#zen-toolbar-background {
+  --zen-main-browser-background-toolbar: #272e33 !important;
+  --zen-background-opacity: 1 !important;
+}
+
+.sidebar-placesTree,
+#zen-workspaces-button,
+.urlbar-background {
+  background-color: #2e383c !important;
+}
+
+#TabsToolbar,
+#zen-appcontent-navbar-container {
+  background-color: #272e33 !important;
+}
+
+.urlbar-input::selection {
+  color: #272e33 !important;
+  background-color: #a7c080 !important;
+}
+
+.urlbarView-url {
+  color: #9da9a0 !important;
+}
+
+toolbar .toolbarbutton-1 {
+  &:not([disabled]) {
+    &:is([open], [checked])
+      > :is(
+        .toolbarbutton-icon,
+        .toolbarbutton-text,
+        .toolbarbutton-badge-stack
+      ) {
+      fill: #a7c080 !important;
+    }
+  }
+}
+
+.identity-color-blue {
+  --identity-tab-color: #7fbbb3 !important;
+  --identity-icon-color: #7fbbb3 !important;
+}
+
+.identity-color-turquoise {
+  --identity-tab-color: #83c092 !important;
+  --identity-icon-color: #83c092 !important;
+}
+
+.identity-color-green {
+  --identity-tab-color: #a7c080 !important;
+  --identity-icon-color: #a7c080 !important;
+}
+
+.identity-color-yellow {
+  --identity-tab-color: #dbbc7f !important;
+  --identity-icon-color: #dbbc7f !important;
+}
+
+.identity-color-orange {
+  --identity-tab-color: #e69875 !important;
+  --identity-icon-color: #e69875 !important;
+}
+
+.identity-color-red {
+  --identity-tab-color: #e67e80 !important;
+  --identity-icon-color: #e67e80 !important;
+}
+
+.identity-color-pink,
+.identity-color-purple {
+  --identity-tab-color: #d699b6 !important;
+  --identity-icon-color: #d699b6 !important;
+}
+
+#PanelUI-menu-button .toolbarbutton-icon,
+#downloads-button .toolbarbutton-icon,
+#unified-extensions-button .toolbarbutton-icon,
+#PanelUI-menu-button .toolbarbutton-badge-stack,
+#downloads-button .toolbarbutton-badge-stack,
+#unified-extensions-button .toolbarbutton-badge-stack,
+toolbar .toolbarbutton-1 > .toolbarbutton-icon {
+  fill: #a7c080 !important;
+  color: #a7c080 !important;
+}
+
+

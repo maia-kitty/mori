@@ -73,6 +73,12 @@ The wallpaper picker requires `awww`. Mori starts `awww-daemon`, and selections
 are sent to the selected output with `awww img`. The daemon caches each output's
 last image and restores it automatically after Mori starts on the next login.
 
+## Philosophy
+
+Mori is less about reproducing a perfect setup and more about making the desktop
+feel intentional. It can stay opinionated, unfinished, and specific to its
+owner; changing it as my workflow changes is part of the project.
+
 ## CalDAV calendar
 
 Click the date and time in the Quickshell bar to open the calendar and daily

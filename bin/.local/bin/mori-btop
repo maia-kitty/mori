@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+window_id="$(niri msg --json windows | jq -r '[.[] | select(.app_id == "btop") | .id] | first // empty')"
+
+if [ -n "$window_id" ]; then
+    exec niri msg action focus-window --id "$window_id"
+fi
+
+exec kitty --class btop --title btop btop

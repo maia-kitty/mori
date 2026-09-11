@@ -66,11 +66,12 @@ Item {
             radius: 0
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.fg
+            border.color: Theme.purple
 
-            Column {
+            ScrollableColumn {
                 id: notificationList
                 anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 12
@@ -114,7 +115,7 @@ Item {
                             font.pixelSize: Theme.fontSize
 
                             TapHandler {
-                                onTapped: root.notifications.forEach(notification => notification.dismiss())
+                                onTapped: root.notifications.slice().forEach(notification => notification.dismiss())
                             }
                         }
                     }

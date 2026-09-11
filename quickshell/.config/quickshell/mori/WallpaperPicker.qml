@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
@@ -17,6 +16,9 @@ Item {
     implicitHeight: icon.implicitHeight
 
     function close() { popup.visible = false }
+    function localPath(fileUrl) {
+        return decodeURIComponent(fileUrl.toString()).replace(/^file:\/\//, "")
+    }
     function wallpaperFor(screen) {
         return screen && wallpapers[screen.name] ? wallpapers[screen.name] : ""
     }
@@ -24,9 +26,30 @@ Item {
         if (!selectedScreen)
             return
 
+        const path = localPath(fileUrl)
         const updatedWallpapers = Object.assign({}, wallpapers)
-        updatedWallpapers[selectedScreen.name] = fileUrl
+        updatedWallpapers[selectedScreen.name] = path
         wallpapers = updatedWallpapers
+        wallpaperSetter.exec([
+            "awww", "img",
+            "--outputs", selectedScreen.name,
+            "--transition-type", "fade",
+            "--transition-duration", "0.8",
+            path
+        ])
+    }
+    function refreshWallpapers() {
+        if (!wallpaperQuery.running)
+            wallpaperQuery.exec(["awww", "query"])
+    }
+    function parseAwwwQuery(output) {
+        const current = {}
+        for (const line of output.split(/\r?\n/)) {
+            const match = line.match(/^: ([^:]+): .*currently displaying: image: (.+)$/)
+            if (match)
+                current[match[1]] = match[2]
+        }
+        wallpapers = current
     }
     function openFolderPicker() {
         const currentPath = decodeURIComponent(wallpaperFolder.toString()).replace("file://", "")
@@ -44,6 +67,7 @@ Item {
         } else {
             popupCoordinator.showPopup(root)
             popup.visible = true
+            refreshWallpapers()
         }
     }
 
@@ -102,23 +126,15 @@ Item {
         }
     }
 
-    // A native background layer avoids taking ownership of an external daemon.
-    Variants {
-        model: Quickshell.screens
-        PanelWindow {
-            required property var modelData
-            screen: modelData
-            visible: root.wallpaperFor(modelData).toString().length > 0
-            anchors { top: true; bottom: true; left: true; right: true }
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Background
-            color: Theme.bg
-            Image {
-                anchors.fill: parent
-                source: root.wallpaperFor(modelData)
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-            }
+    Process {
+        id: wallpaperSetter
+    }
+
+    Process {
+        id: wallpaperQuery
+
+        stdout: StdioCollector {
+            onStreamFinished: root.parseAwwwQuery(this.text)
         }
     }
 
@@ -145,7 +161,7 @@ Item {
             shown: popup.visible
             color: Theme.bg
             border.width: 2
-            border.color: Theme.fg
+            border.color: Theme.green
 
             Column {
                 anchors.fill: parent
@@ -239,7 +255,7 @@ Item {
                         height: grid.cellHeight - 6
                         color: hover.hovered ? Theme.bggreen : Theme.bg2
                         border.width: 2
-                        border.color: root.wallpaperFor(root.selectedScreen).toString() === fileUrl.toString() || hover.hovered ? Theme.green : Theme.bg4
+                        border.color: root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl) || hover.hovered ? Theme.green : Theme.bg4
 
                         Image {
                             id: preview

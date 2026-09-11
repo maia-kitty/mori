@@ -98,7 +98,7 @@ Item {
             radius: 0
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.fg
+            border.color: Theme.red
 
             Column {
                 id: menuItems

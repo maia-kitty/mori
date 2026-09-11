@@ -11,12 +11,6 @@ RowLayout {
     spacing: 6
 
     readonly property var sink: Pipewire.defaultAudioSink
-    readonly property var outputs: Pipewire.nodes.values.filter(node =>
-        node.isSink && !node.isStream && node.audio)
-    readonly property var applications: Pipewire.nodes.values.filter(node =>
-        // Playback streams accept an application's audio, so PipeWire exposes
-        // them as sink streams. Source streams are microphone inputs.
-        node.isStream && node.isSink && node.audio)
     required property var panelWindow
     required property var popupCoordinator
 
@@ -31,11 +25,16 @@ RowLayout {
 
     function close() { devicePopup.visible = false }
 
+    function setVolume(node, value) {
+        if (node && node.ready && node.audio)
+            node.audio.volume = Math.max(0, Math.min(1, value))
+    }
+
     function adjustVolume(delta) {
         if (!root.sink || !root.sink.audio)
             return
 
-        root.sink.audio.volume = Math.max(0, Math.min(1, root.sink.audio.volume + delta))
+        setVolume(root.sink, root.sink.audio.volume + delta)
     }
 
     function toggleMute() {
@@ -44,7 +43,9 @@ RowLayout {
     }
 
     PwObjectTracker {
-        objects: root.outputs.concat(root.applications)
+        // Track discovery independently of audio readiness. Filtering by audio
+        // before tracking can prevent newly discovered nodes from becoming ready.
+        objects: Pipewire.nodes.values
     }
 
     Text {
@@ -73,7 +74,7 @@ RowLayout {
 
         // onMoved is emitted only for user interaction, leaving the binding
         // above intact for volume changes from media keys or other tools.
-        onMoved: root.sink.audio.volume = value
+        onMoved: root.setVolume(root.sink, value)
 
         background: Rectangle {
             x: slider.leftPadding
@@ -157,11 +158,15 @@ RowLayout {
                 }
 
                 Repeater {
-                    model: root.outputs
+                    // Keep the native object model: insert/remove individual
+                    // delegates instead of rebuilding a filtered JS array.
+                    model: Pipewire.nodes
 
                     delegate: Column {
                         required property var modelData
                         required property int index
+                        visible: !!modelData && modelData.ready && modelData.isSink
+                                 && !modelData.isStream && !!modelData.audio
                         width: deviceList.width
                         spacing: 5
 
@@ -171,19 +176,22 @@ RowLayout {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: modelData.description || modelData.nickname || modelData.name
+                                text: modelData ? (modelData.description || modelData.nickname || modelData.name) : ""
                                 color: modelData === root.sink ? Theme.yellow : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
 
                                 TapHandler {
-                                    onTapped: Pipewire.preferredDefaultAudioSink = modelData
+                                    onTapped: {
+                                        if (modelData && modelData.ready && modelData.audio)
+                                            Pipewire.preferredDefaultAudioSink = modelData
+                                    }
                                 }
                             }
 
                             Text {
-                                text: Math.round(modelData.audio.volume * 100) + "%"
+                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -197,8 +205,9 @@ RowLayout {
                             from: 0
                             to: 1
                             stepSize: 0.01
-                            value: modelData.audio.volume
-                            onMoved: modelData.audio.volume = value
+                            enabled: !!modelData && modelData.ready && !!modelData.audio
+                            value: enabled ? modelData.audio.volume : 0
+                            onMoved: root.setVolume(modelData, value)
 
                             background: Rectangle {
                                 x: deviceSlider.leftPadding
@@ -230,7 +239,6 @@ RowLayout {
                         Rectangle {
                             width: parent.width
                             height: 1
-                            visible: index < root.outputs.length - 1
                             color: Theme.bg4
                         }
                     }
@@ -245,11 +253,14 @@ RowLayout {
                 }
 
                 Repeater {
-                    model: root.applications
+                    model: Pipewire.nodes
 
                     delegate: Column {
                         required property var modelData
                         required property int index
+                        // Playback streams are sinks; source streams record audio.
+                        visible: !!modelData && modelData.ready && modelData.isSink
+                                 && modelData.isStream && !!modelData.audio
                         width: deviceList.width
                         spacing: 5
 
@@ -259,9 +270,9 @@ RowLayout {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: modelData.properties["application.name"]
+                                text: modelData ? (modelData.properties["application.name"]
                                       || modelData.description
-                                      || modelData.name
+                                      || modelData.name) : ""
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -269,7 +280,7 @@ RowLayout {
                             }
 
                             Text {
-                                text: Math.round(modelData.audio.volume * 100) + "%"
+                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -283,8 +294,9 @@ RowLayout {
                             from: 0
                             to: 1
                             stepSize: 0.01
-                            value: modelData.audio.volume
-                            onMoved: modelData.audio.volume = value
+                            enabled: !!modelData && modelData.ready && !!modelData.audio
+                            value: enabled ? modelData.audio.volume : 0
+                            onMoved: root.setVolume(modelData, value)
 
                             background: Rectangle {
                                 x: appSlider.leftPadding
@@ -316,7 +328,6 @@ RowLayout {
                         Rectangle {
                             width: parent.width
                             height: 1
-                            visible: index < root.applications.length - 1
                             color: Theme.bg4
                         }
                     }

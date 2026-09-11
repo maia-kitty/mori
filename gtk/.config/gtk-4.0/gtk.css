@@ -1,0 +1,2 @@
+/* Keep GTK 4 and libadwaita on the same Mori Everforest palette. */
+@import url("../gtk-3.0/gtk.css");

@@ -8,21 +8,58 @@ Item {
     required property var notificationServer
     required property var popupCoordinator
     required property bool doNotDisturb
-    property var popupNotifications: []
+    property var pendingNotifications: []
+    property int nextToastId: 0
     property bool suppressed: false
 
     function addNotification(notification) {
-        popupCoordinator.showPopup(root)
-        suppressed = false
-        popupNotifications = [notification].concat(popupNotifications).slice(0, 3)
+        // Copy values out of Quickshell's short-lived DBus wrapper before the
+        // signal handler returns. Never expose that QObject directly to a view.
+        pendingNotifications.push({
+            "toastId": nextToastId++,
+            "appName": String(notification.appName || "Notification"),
+            "summary": String(notification.summary || ""),
+            "body": String(notification.body || "")
+        })
+        notificationQueue.restart()
     }
 
-    function removeNotification(notification) {
-        popupNotifications = popupNotifications.filter(item => item !== notification)
+    function flushNotifications() {
+        while (pendingNotifications.length > 0) {
+            const notification = pendingNotifications.shift()
+            popupNotifications.insert(0, notification)
+        }
+        while (popupNotifications.count > 3)
+            popupNotifications.remove(popupNotifications.count - 1)
+
+        popupCoordinator.showPopup(root)
+        suppressed = false
+    }
+
+    function removeNotification(toastId) {
+        for (let i = 0; i < popupNotifications.count; ++i) {
+            if (popupNotifications.get(i).toastId === toastId) {
+                popupNotifications.remove(i)
+                return
+            }
+        }
     }
 
     function close() {
         suppressed = true
+    }
+
+    ListModel {
+        id: popupNotifications
+    }
+
+    // Defer model mutation until after the DBus notification callback. Qt was
+    // crashing while a Repeater regenerated inside that callback.
+    Timer {
+        id: notificationQueue
+        interval: 0
+        repeat: false
+        onTriggered: root.flushNotifications()
     }
 
     Connections {
@@ -38,7 +75,7 @@ Item {
         id: popup
         implicitWidth: 360
         implicitHeight: popupList.implicitHeight + 24
-        visible: root.popupNotifications.length > 0 && !root.suppressed
+        visible: popupNotifications.count > 0 && !root.suppressed
         color: "transparent"
         grabFocus: false
         onVisibleChanged: if (!visible) root.popupCoordinator.hidePopup(root)
@@ -70,11 +107,14 @@ Item {
                 spacing: 8
 
                 Repeater {
-                    model: root.popupNotifications
+                    model: popupNotifications
 
                     delegate: PopupSurface {
                         id: toast
-                        required property var modelData
+                        required property int toastId
+                        required property string appName
+                        required property string summary
+                        required property string body
                         width: popupList.width
                         implicitHeight: notificationText.implicitHeight + 12
                         shown: false
@@ -102,7 +142,7 @@ Item {
                             id: exitTimer
                             interval: 140
                             repeat: false
-                            onTriggered: root.removeNotification(modelData)
+                            onTriggered: root.removeNotification(toast.toastId)
                         }
 
                         Column {
@@ -115,7 +155,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: modelData.appName || "Notification"
+                                text: toast.appName
                                 color: Theme.purple
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -124,7 +164,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: modelData.summary
+                                text: toast.summary
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -133,8 +173,8 @@ Item {
 
                             Text {
                                 width: parent.width
-                                visible: modelData.body.length > 0
-                                text: modelData.body
+                                visible: toast.body.length > 0
+                                text: toast.body
                                 textFormat: Text.PlainText
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily

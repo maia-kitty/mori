@@ -16,7 +16,7 @@ layout {
     }
 
     shadow {
-        color "#1e2326b3"
+        color "#232a2eb3"
     }
 
     tab-indicator {
@@ -32,7 +32,7 @@ layout {
 
 recent-windows {
     highlight {
-        active-color   "#374145"
+        active-color   "#3d484d"
         urgent-color   "#e67e80"
     }
 }

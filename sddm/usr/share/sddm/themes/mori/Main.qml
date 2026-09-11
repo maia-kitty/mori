@@ -5,11 +5,11 @@ Rectangle {
     id: root
     width: 1920
     height: 1080
-    color: "#272e33"
+    color: "#2d353b"
 
-    readonly property color bg: "#272e33"
-    readonly property color panel: "#2e383c"
-    readonly property color panelRaised: "#374145"
+    readonly property color bg: "#2d353b"
+    readonly property color panel: "#343f44"
+    readonly property color panelRaised: "#3d484d"
     readonly property color fg: "#d3c6aa"
     readonly property color muted: "#9da9a0"
     readonly property color accent: "#a7c080"
@@ -41,11 +41,7 @@ Rectangle {
 
     Rectangle {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: "#1f2628" }
-            GradientStop { position: 0.55; color: root.bg }
-            GradientStop { position: 1.0; color: "#20282d" }
-        }
+        color: root.bg
     }
 
     // Quiet geometry to give the otherwise flat screen some depth.
@@ -54,7 +50,7 @@ Rectangle {
         height: 1
         x: parent.width * 0.08
         y: parent.height * 0.22
-        color: "#4f5b58"
+        color: "#56635f"
         opacity: 0.52
     }
 
@@ -63,7 +59,7 @@ Rectangle {
         height: parent.height * 0.56
         x: parent.width * 0.18
         y: parent.height * 0.22
-        color: "#4f5b58"
+        color: "#56635f"
         opacity: 0.30
     }
 
@@ -209,7 +205,7 @@ Rectangle {
                     height: 34
                     color: root.panelRaised
                     border.width: 1
-                    border.color: "#4f5b58"
+                    border.color: "#56635f"
 
                     Text {
                         anchors.centerIn: parent

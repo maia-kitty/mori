@@ -4,8 +4,6 @@ Mori is my personal collection of desktop configuration and dotfiles.
 
 This is a personal project, not a general-purpose configuration framework. It is shaped around my own hardware, applications, workflow, and preferences, so parts of it may need adjustment before they work on another system.
 
-The visual theming is built around the Everforest Medium color scheme.
-
 ## AI assistance
 
 This repository was made with AI assistance. The AI helped write, modify, organize, and troubleshoot parts of the configuration. I review and use the resulting files, but the repository should still be treated as an actively evolving personal setup rather than polished or independently audited software.
@@ -72,12 +70,6 @@ center remains inactive until that notification server stops.
 The wallpaper picker requires `awww`. Mori starts `awww-daemon`, and selections
 are sent to the selected output with `awww img`. The daemon caches each output's
 last image and restores it automatically after Mori starts on the next login.
-
-## Philosophy
-
-Mori is less about reproducing a perfect setup and more about making the desktop
-feel intentional. It can stay opinionated, unfinished, and specific to its
-owner; changing it as my workflow changes is part of the project.
 
 ## CalDAV calendar
 

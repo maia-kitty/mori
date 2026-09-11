@@ -74,12 +74,26 @@ animations {
         spring damping-ratio=0.80 stiffness=523 epsilon=0.0001
     }
     window-open {
-        duration-ms 150
-        curve "ease-out-expo" 
+        duration-ms 160
+        curve "ease-out-cubic"
+        custom-shader r"
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                vec3 coords_tex = niri_geo_to_tex * coords_geo;
+                vec4 color = texture2D(niri_tex, coords_tex.st);
+                return color * niri_clamped_progress;
+            }
+        "
     }
     window-close {
-        duration-ms 150
-        curve "ease-out-quad"
+        duration-ms 160
+        curve "ease-out-cubic"
+        custom-shader r"
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                vec3 coords_tex = niri_geo_to_tex * coords_geo;
+                vec4 color = texture2D(niri_tex, coords_tex.st);
+                return color * (1.0 - niri_clamped_progress);
+            }
+        "
     }
     horizontal-view-movement {
         spring damping-ratio=0.85 stiffness=423 epsilon=0.0001

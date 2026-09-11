@@ -1,0 +1,23 @@
+#![enable(implicit_some)]
+#![enable(unwrap_newtypes)]
+#![enable(unwrap_variant_newtypes)]
+
+(
+    address: "127.0.0.1:6600",
+    theme: Some("mori"),
+    volume_step: 5,
+    max_fps: 30,
+    wrap_navigation: true,
+    enable_mouse: true,
+    enable_config_hot_reload: true,
+    status_update_interval_ms: 1000,
+    keep_state_on_song_change: true,
+    select_current_song_on_change: true,
+    album_art: (
+        method: Auto,
+        max_size_px: (width: 1200, height: 1200),
+        disabled_protocols: ["http://", "https://"],
+        vertical_align: Center,
+        horizontal_align: Center,
+    ),
+)

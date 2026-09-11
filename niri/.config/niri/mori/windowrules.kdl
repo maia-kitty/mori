@@ -23,6 +23,7 @@ window-rule {
     match app-id="^blueman-manager$"
     match app-id="^org\\.gnome\\.Nautilus$"
     match app-id="^xdg-desktop-portal$"
+    match app-id="^zenity$"
     open-floating true
 }
 

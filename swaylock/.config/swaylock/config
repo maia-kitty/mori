@@ -1,0 +1,52 @@
+# Mori Everforest lock screen
+
+daemonize
+ignore-empty-password
+show-failed-attempts
+show-keyboard-layout
+indicator-caps-lock
+indicator-idle-visible
+
+font=FiraCode Nerd Font Propo
+font-size=20
+indicator-radius=105
+indicator-thickness=8
+
+# Everforest dark background and neutral text.
+color=1e2326
+inside-color=272e33e6
+line-color=00000000
+ring-color=d3c6aa
+text-color=d3c6aa
+separator-color=00000000
+
+# Input feedback.
+key-hl-color=a7c080
+bs-hl-color=e67e80
+
+# Cleared, verifying, invalid, and Caps Lock states.
+inside-clear-color=272e33e6
+line-clear-color=00000000
+ring-clear-color=83c092
+text-clear-color=83c092
+
+inside-ver-color=272e33e6
+line-ver-color=00000000
+ring-ver-color=dbbc7f
+text-ver-color=dbbc7f
+
+inside-wrong-color=272e33e6
+line-wrong-color=00000000
+ring-wrong-color=e67e80
+text-wrong-color=e67e80
+
+inside-caps-lock-color=272e33e6
+line-caps-lock-color=00000000
+ring-caps-lock-color=e69875
+text-caps-lock-color=e69875
+caps-lock-key-hl-color=e69875
+caps-lock-bs-hl-color=e67e80
+
+layout-bg-color=2e383ce6
+layout-border-color=7a8478
+layout-text-color=d3c6aa

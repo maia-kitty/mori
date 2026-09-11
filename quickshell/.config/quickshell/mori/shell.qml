@@ -2,15 +2,11 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland._ToplevelManagement
 import Quickshell.Services.Notifications
 
 ShellRoot {
     id: root
     property bool niriOverviewOpen: false
-    readonly property bool activeWindowFullscreen: ToplevelManager.activeToplevel
-        ? ToplevelManager.activeToplevel.fullscreen
-        : false
 
     // awww restores its per-output cache when the daemon starts.
     Process {
@@ -58,7 +54,6 @@ ShellRoot {
         id: bar
         notificationServer: notificationServer
         overviewOpen: root.niriOverviewOpen
-        fullscreen: root.activeWindowFullscreen
     }
 
     // Niri invokes these through: qs -c mori ipc call bar <function>.

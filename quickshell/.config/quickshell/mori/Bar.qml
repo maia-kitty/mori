@@ -1,13 +1,26 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Wayland._ToplevelManagement
 import "./theme"
 
 PanelWindow {
     id: barWindow
     required property var notificationServer
     required property bool overviewOpen
-    required property bool fullscreen
+    readonly property bool fullscreen: {
+        const active = ToplevelManager.activeToplevel
+        if (!active || !active.fullscreen || !barWindow.screen)
+            return false
+
+        for (let i = 0; i < active.screens.length; ++i) {
+            const activeScreen = active.screens[i]
+            if (activeScreen === barWindow.screen
+                    || (activeScreen && activeScreen.name === barWindow.screen.name))
+                return true
+        }
+        return false
+    }
     property var activePopup: null
     property real contentOpacity: (overviewOpen || fullscreen) ? 0 : 1
     readonly property int componentSpacing: 20

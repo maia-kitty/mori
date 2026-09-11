@@ -10,10 +10,25 @@ RowLayout {
     id: root
     spacing: 4
 
-    readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
-    readonly property var active: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
     readonly property var wiredDevices: Networking.devices.values.filter(d => d.type === DeviceType.Wired)
     readonly property var activeWired: wiredDevices.find(d => d.connected)
+    readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
+    readonly property var activeWifiDevice: Networking.devices.values.find(d =>
+        d.type === DeviceType.Wifi && d.connected)
+    // Ethernet takes precedence in the indicator; Wi-Fi is only a fallback.
+    readonly property var active: activeWired
+        ? null
+        : (activeWifiDevice ? activeWifiDevice.networks.values.find(n => n.connected) : null)
+    readonly property var wifiNetworks: {
+        const networks = wifiDevice ? wifiDevice.networks.values.slice() : []
+        return networks.sort((left, right) => {
+            const leftActive = !!activeWifiDevice && left.connected
+            const rightActive = !!activeWifiDevice && right.connected
+            if (leftActive !== rightActive)
+                return leftActive ? -1 : 1
+            return right.signalStrength - left.signalStrength
+        })
+    }
     property var vpnConnections: []
     property var passwordNetwork: null
     // Supplied by Bar.qml: PopupWindow requires the real Quickshell window,
@@ -291,25 +306,53 @@ RowLayout {
                     }
 
                     Repeater {
-                        model: root.wifiDevice ? root.wifiDevice.networks.values : []
+                        model: root.wifiNetworks
                         delegate: Column {
                             required property int index
                             required property var modelData
                             width: parent.width
 
-                            Text {
-                                text: modelData.name + "   " + Math.round(modelData.signalStrength * 100) + "%"
-                                color: modelData.connected ? Theme.blue : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
+                            RowLayout {
+                                width: parent.width
+                                spacing: 6
 
-                                TapHandler {
-                                    onTapped: {
-                                        if (modelData.connected) return
-                                        if (modelData.known || modelData.security === 0)
-                                            modelData.connect()
-                                        else
-                                            root.requestPassword(modelData)
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.name + "   " + Math.round(modelData.signalStrength * 100) + "%"
+                                    color: (root.activeWifiDevice && modelData.connected) ? Theme.blue : Theme.fg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+
+                                    TapHandler {
+                                        onTapped: {
+                                            if (modelData.connected) return
+                                            if (modelData.known || modelData.security === 0)
+                                                modelData.connect()
+                                            else
+                                                root.requestPassword(modelData)
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    visible: !!root.activeWifiDevice && modelData.connected
+                                    implicitWidth: disconnectLabel.implicitWidth + 10
+                                    implicitHeight: disconnectLabel.implicitHeight + 4
+                                    color: Theme.bgred
+                                    border.width: 1
+                                    border.color: Theme.red
+
+                                    Text {
+                                        id: disconnectLabel
+                                        anchors.centerIn: parent
+                                        text: "Disconnect"
+                                        color: Theme.red
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize - 2
+                                    }
+
+                                    TapHandler {
+                                        onTapped: modelData.disconnect()
                                     }
                                 }
                             }
@@ -317,7 +360,7 @@ RowLayout {
                             Rectangle {
                                 width: parent.width
                                 height: 1
-                                visible: index < (root.wifiDevice ? root.wifiDevice.networks.values.length - 1 : 0)
+                                visible: index < root.wifiNetworks.length - 1
                                 color: Theme.bg4
                             }
                         }

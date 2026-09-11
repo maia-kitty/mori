@@ -7,8 +7,9 @@ PanelWindow {
     id: barWindow
     required property var notificationServer
     required property bool overviewOpen
+    required property bool fullscreen
     property var activePopup: null
-    property real contentOpacity: overviewOpen ? 0 : 1
+    property real contentOpacity: (overviewOpen || fullscreen) ? 0 : 1
     readonly property int componentSpacing: 20
     readonly property int bracketSpacing: 6
 
@@ -23,8 +24,20 @@ PanelWindow {
             activePopup = null
     }
 
+    function togglePowerMenu() { powerMenu.toggle() }
+    function toggleWallpaperPicker() { wallpaperPicker.toggle() }
+    function toggleNotifications() { notificationCenter.toggle() }
+    function volumeUp() { volume.adjustVolume(0.03) }
+    function volumeDown() { volume.adjustVolume(-0.03) }
+    function toggleMute() { volume.toggleMute() }
+
     onOverviewOpenChanged: {
         if (overviewOpen && activePopup)
+            activePopup.close()
+    }
+
+    onFullscreenChanged: {
+        if (fullscreen && activePopup)
             activePopup.close()
     }
 
@@ -34,9 +47,9 @@ PanelWindow {
         right: true
     }
     implicitHeight: 34
-    // Keep the layer mapped while overview is open so niri retains the bar's
-    // exclusive zone and tiled windows do not resize or shift.
-    visible: true
+    // Keep the layer mapped during overview, but remove it completely during
+    // fullscreen so its input region cannot intercept clicks.
+    visible: !fullscreen
     Behavior on contentOpacity {
         NumberAnimation {
             duration: 160
@@ -55,6 +68,7 @@ PanelWindow {
         id: barContent
         anchors.fill: parent
         opacity: barWindow.contentOpacity
+        enabled: !barWindow.overviewOpen && !barWindow.fullscreen
         visible: !barWindow.overviewOpen || opacity > 0
 
         Rectangle {
@@ -108,12 +122,6 @@ PanelWindow {
         panelWindow: barWindow
         popupCoordinator: barWindow
         anchors.left: clockText.right
-        anchors.leftMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    ActiveApp {
-        anchors.left: kdeConnect.right
         anchors.leftMargin: barWindow.componentSpacing
         anchors.verticalCenter: parent.verticalCenter
     }

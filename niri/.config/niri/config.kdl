@@ -1,0 +1,118 @@
+// === Notifications ===
+config-notification {
+    disable-failed
+}
+
+// === Gestures & Input ===
+gestures {
+    hot-corners {
+        off
+   }
+}
+
+input {
+    keyboard {
+        xkb {
+        }
+        numlock
+    }
+    mouse {
+    }
+}
+
+// === Layout ===
+layout {
+    background-color "transparent"
+    center-focused-column "never"
+    preset-column-widths {
+        proportion 0.25
+        proportion 0.5
+        proportion 0.75
+    }
+    preset-window-heights {
+        proportion 0.25
+        proportion 0.5
+        proportion 0.75
+    }
+}
+
+// === Layer Rules & Overview ===
+layer-rule {
+    match namespace="^awww-daemon$"
+    place-within-backdrop true
+}
+
+overview {
+    workspace-shadow {
+        off
+    }
+}
+
+// === Startup spawns ===
+spawn-at-startup "qs" "-c" "mori"
+spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
+
+// === Environment ===
+environment {
+  XDG_CURRENT_DESKTOP "niri"
+  QT_QPA_PLATFORMTHEME "qt6ct"
+  QT_QPA_PLATFORMTHEME_QT6 "qt6ct"
+}
+
+// === Misc Settings ===
+hotkey-overlay {
+    skip-at-startup
+}
+
+prefer-no-csd
+
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+// === Animations ===
+animations {
+    workspace-switch {
+        spring damping-ratio=0.80 stiffness=523 epsilon=0.0001
+    }
+    window-open {
+        duration-ms 150
+        curve "ease-out-expo" 
+    }
+    window-close {
+        duration-ms 150
+        curve "ease-out-quad"
+    }
+    horizontal-view-movement {
+        spring damping-ratio=0.85 stiffness=423 epsilon=0.0001
+    }
+    window-movement {
+        spring damping-ratio=0.75 stiffness=323 epsilon=0.0001
+    }
+    window-resize {
+        spring damping-ratio=0.85 stiffness=423 epsilon=0.0001
+    }
+    config-notification-open-close {
+        spring damping-ratio=0.65 stiffness=923 epsilon=0.001
+    }
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+    overview-open-close {
+        spring damping-ratio=0.85 stiffness=800 epsilon=0.0001
+    }
+}
+
+// === Debug ===
+debug {
+   disable-direct-scanout
+   honor-xdg-activation-with-invalid-serial
+}
+
+// === Includes ===
+include optional=true "mori/colors.kdl"
+include optional=true "mori/layout.kdl"
+include optional=true "mori/alttab.kdl"
+include optional=true "mori/binds.kdl"
+include optional=true "mori/outputs.kdl"
+include optional=true "mori/cursor.kdl"
+include optional=true "mori/windowrules.kdl"

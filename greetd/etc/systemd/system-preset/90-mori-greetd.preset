@@ -1,0 +1,2 @@
+# Apply with: systemctl preset greetd.service
+enable greetd.service

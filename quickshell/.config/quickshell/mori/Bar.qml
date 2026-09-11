@@ -1,13 +1,16 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import "./theme"
 
 PanelWindow {
     id: barWindow
     required property var notificationServer
+    required property bool overviewOpen
     property var activePopup: null
-    property int componentSpacing: 20
-    property int bracketSpacing: 6
+    property real contentOpacity: overviewOpen ? 0 : 1
+    readonly property int componentSpacing: 20
+    readonly property int bracketSpacing: 6
 
     function showPopup(owner) {
         if (activePopup && activePopup !== owner)
@@ -20,21 +23,46 @@ PanelWindow {
             activePopup = null
     }
 
+    onOverviewOpenChanged: {
+        if (overviewOpen && activePopup)
+            activePopup.close()
+    }
+
     anchors {
         top: true
         left: true
         right: true
     }
     implicitHeight: 34
-    color: Theme.bg
-    margins { top: 2; left: 2; right: 2 }
-
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.bg
-        border.width: 2
-        border.color: Theme.fg
+    // Keep the layer mapped while overview is open so niri retains the bar's
+    // exclusive zone and tiled windows do not resize or shift.
+    visible: true
+    Behavior on contentOpacity {
+        NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+        }
     }
+    // The panel stays mapped only to reserve its exclusive zone; the faded
+    // content item below is responsible for all visible bar pixels.
+    color: "transparent"
+    margins { top: 2; left: 2; right: 2 }
+    // Popup dismiss layers cover the desktop while a popup is open. Keep the
+    // bar above them so a click can switch directly to another widget.
+    WlrLayershell.layer: WlrLayer.Overlay
+
+    Item {
+        id: barContent
+        anchors.fill: parent
+        opacity: barWindow.contentOpacity
+        visible: !barWindow.overviewOpen || opacity > 0
+
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.bg
+            border.width: 2
+            border.color: Theme.fg
+        }
 
     PowerMenu {
         id: powerMenu
@@ -65,15 +93,27 @@ PanelWindow {
         action: () => powerMenu.toggle()
     }
 
-    ClockText {
+    // The clock owns the CalDAV-backed calendar and agenda popup.
+    Calendar {
         id: clockText
+        panelWindow: barWindow
+        popupCoordinator: barWindow
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.verticalCenter: parent.verticalCenter
     }
 
-    ActiveApp {
+    KdeConnect {
+        id: kdeConnect
+        panelWindow: barWindow
+        popupCoordinator: barWindow
         anchors.left: clockText.right
+        anchors.leftMargin: barWindow.componentSpacing
+        anchors.verticalCenter: parent.verticalCenter
+    }
+
+    ActiveApp {
+        anchors.left: kdeConnect.right
         anchors.leftMargin: barWindow.componentSpacing
         anchors.verticalCenter: parent.verticalCenter
     }
@@ -228,5 +268,6 @@ PanelWindow {
         notificationServer: barWindow.notificationServer
         popupCoordinator: barWindow
         doNotDisturb: notificationCenter.doNotDisturb
+    }
     }
 }

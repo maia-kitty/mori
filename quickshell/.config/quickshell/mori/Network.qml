@@ -10,8 +10,8 @@ RowLayout {
     id: root
     spacing: 4
 
-    property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
-    property var active: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
+    readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi)
+    readonly property var active: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) : null
     readonly property var wiredDevices: Networking.devices.values.filter(d => d.type === DeviceType.Wired)
     readonly property var activeWired: wiredDevices.find(d => d.connected)
     property var vpnConnections: []
@@ -128,7 +128,7 @@ RowLayout {
         id: popup
 
         implicitWidth: 320
-        implicitHeight: Math.min(listCol.height + 24, 400)
+        implicitHeight: Math.min(listCol.implicitHeight + 24, 400)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -165,11 +165,12 @@ RowLayout {
             radius: 0
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.fg
+            border.color: Theme.blue
 
-            Column {
+            ScrollableColumn {
                 id: listCol
                 anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 12

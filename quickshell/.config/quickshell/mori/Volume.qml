@@ -10,7 +10,7 @@ RowLayout {
     id: root
     spacing: 6
 
-    property var sink: Pipewire.defaultAudioSink
+    readonly property var sink: Pipewire.defaultAudioSink
     readonly property var outputs: Pipewire.nodes.values.filter(node =>
         node.isSink && !node.isStream && node.audio)
     readonly property var applications: Pipewire.nodes.values.filter(node =>
@@ -104,7 +104,7 @@ RowLayout {
     PopupWindow {
         id: devicePopup
         implicitWidth: 320
-        implicitHeight: deviceList.implicitHeight + 24
+        implicitHeight: Math.min(deviceList.implicitHeight + 24, 440)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -126,11 +126,12 @@ RowLayout {
             radius: 0
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.fg
+            border.color: Theme.yellow
 
-            Column {
+            ScrollableColumn {
                 id: deviceList
                 anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 12

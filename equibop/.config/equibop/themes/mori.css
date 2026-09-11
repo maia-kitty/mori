@@ -920,25 +920,25 @@
   --blue-500: #7fbbb3 !important;
 
   /* interactive surfaces */
-  --background-mod-muted: #2e383c !important;
-  --background-mod-normal: #374145 !important;
-  --background-mod-strong: #414b50 !important;
-  --background-mod-subtle: #2e383c !important;
-  --interactive-background-hover: #2e383c !important;
-  --interactive-background-active: #374145 !important;
-  --interactive-background-selected: #3c4841 !important;
+  --background-mod-muted: #343f44 !important;
+  --background-mod-normal: #3d484d !important;
+  --background-mod-strong: #475258 !important;
+  --background-mod-subtle: #343f44 !important;
+  --interactive-background-hover: #343f44 !important;
+  --interactive-background-active: #3d484d !important;
+  --interactive-background-selected: #425047 !important;
 
   /* borders */
-  --border-subtle: #495156 !important;
-  --border-muted: #4f5b58 !important;
+  --border-subtle: #4f585e !important;
+  --border-muted: #56635f !important;
 
   /* elevation scale */
-  --background-base-lowest: #1e2326 !important;
-  --background-base-lower: #272e33 !important;
-  --background-base-low: #2e383c !important;
-  --background-surface-high: #374145 !important;
-  --background-surface-higher: #414b50 !important;
-  --background-surface-highest: #495156 !important;
+  --background-base-lowest: #232a2e !important;
+  --background-base-lower: #2d353b !important;
+  --background-base-low: #343f44 !important;
+  --background-surface-high: #3d484d !important;
+  --background-surface-higher: #475258 !important;
+  --background-surface-highest: #4f585e !important;
 
   /* status */
   --status-online: #a7c080 !important;

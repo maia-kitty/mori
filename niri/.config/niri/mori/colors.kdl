@@ -1,39 +1,38 @@
-// ! Auto-generated file. Do not edit directly.
-// Remove `include "dms/colors.kdl"` from your config to override.
+// Mori Everforest palette, shared with the Quickshell theme.
 
 layout {
     background-color "transparent"
 
     focus-ring {
-        active-color   "#f7bb70"
-        inactive-color "#9c8e80"
-        urgent-color   "#ffb4ab"
+        active-color   "#d3c6aa"
+        inactive-color "#859289"
+        urgent-color   "#e67e80"
     }
 
     border {
-        active-color   "#f7bb70"
-        inactive-color "#9c8e80"
-        urgent-color   "#ffb4ab"
+        active-color   "#d3c6aa"
+        inactive-color "#859289"
+        urgent-color   "#e67e80"
     }
 
     shadow {
-        color "#00000070"
+        color "#1e2326b3"
     }
 
     tab-indicator {
-        active-color   "#f7bb70"
-        inactive-color "#9c8e80"
-        urgent-color   "#ffb4ab"
+        active-color   "#d3c6aa"
+        inactive-color "#859289"
+        urgent-color   "#e67e80"
     }
 
     insert-hint {
-        color "#f7bb7080"
+        color "#a7c08080"
     }
 }
 
 recent-windows {
     highlight {
-        active-color   "#653e00"
-        urgent-color   "#ffb4ab"
+        active-color   "#374145"
+        urgent-color   "#e67e80"
     }
 }

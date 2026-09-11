@@ -31,6 +31,18 @@ RowLayout {
 
     function close() { devicePopup.visible = false }
 
+    function adjustVolume(delta) {
+        if (!root.sink || !root.sink.audio)
+            return
+
+        root.sink.audio.volume = Math.max(0, Math.min(1, root.sink.audio.volume + delta))
+    }
+
+    function toggleMute() {
+        if (root.sink && root.sink.audio)
+            root.sink.audio.muted = !root.sink.audio.muted
+    }
+
     PwObjectTracker {
         objects: root.outputs.concat(root.applications)
     }

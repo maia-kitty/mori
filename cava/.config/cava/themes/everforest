@@ -1,0 +1,18 @@
+[color]
+background = '#2d353b'
+foreground = '#d3c6aa'
+
+gradient = 1
+gradient_color_1 = '#a7c080'
+gradient_color_2 = '#83c092'
+gradient_color_3 = '#7fbbb3'
+gradient_color_4 = '#dbbc7f'
+
+horizontal_gradient = 1
+horizontal_gradient_color_1 = '#7fbbb3'
+horizontal_gradient_color_2 = '#83c092'
+horizontal_gradient_color_3 = '#a7c080'
+horizontal_gradient_color_4 = '#dbbc7f'
+horizontal_gradient_color_5 = '#e69875'
+
+blend_direction = 'up'

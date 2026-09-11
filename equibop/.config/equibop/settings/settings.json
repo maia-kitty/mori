@@ -511,7 +511,7 @@
             "displayNames": false,
             "mode": "user-nick",
             "inReplies": false,
-            "triggerNameRerender": true,
+            "triggerNameRerender": false,
             "messages": true,
             "replies": true,
             "mentions": true,
@@ -540,7 +540,8 @@
             "styleDirectMessagesMessages": true,
             "styleDirectMessagesList": true,
             "gradientGlow": true,
-            "styleFriendsList": true
+            "styleFriendsList": true,
+            "styleActiveNow": true
         },
         "ShowTimeoutDuration": {
             "enabled": false
@@ -1624,7 +1625,7 @@
         "authenticated": false,
         "url": "https://api.vencord.dev/",
         "settingsSync": false,
-        "settingsSyncVersion": 1789134040131
+        "settingsSyncVersion": 1789160719793
     },
     "ignoreResetWarning": false,
     "userCssVars": {},

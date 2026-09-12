@@ -14,6 +14,7 @@ Rectangle {
     readonly property color muted: "#9da9a0"
     readonly property color accent: "#a7c080"
     readonly property color red: "#e67e80"
+    readonly property string uiFont: "Geist"
     property int sessionIndex: session.index
 
     TextConstants { id: textConstants }
@@ -70,7 +71,7 @@ Rectangle {
         anchors.topMargin: Math.max(28, parent.height * 0.11)
         text: "MORI"
         color: root.accent
-        font.family: "JetBrains Mono"
+        font.family: root.uiFont
         font.bold: true
         font.letterSpacing: 7
         font.pixelSize: 18
@@ -83,7 +84,7 @@ Rectangle {
         anchors.topMargin: Math.max(58, parent.height * 0.18)
         text: Qt.formatDateTime(new Date(), "dddd, d MMMM")
         color: root.muted
-        font.family: "JetBrains Mono"
+        font.family: root.uiFont
         font.pixelSize: 14
     }
 
@@ -94,7 +95,7 @@ Rectangle {
         anchors.topMargin: Math.max(80, parent.height * 0.21)
         text: Qt.formatTime(new Date(), "HH:mm")
         color: root.fg
-        font.family: "JetBrains Mono"
+        font.family: root.uiFont
         font.pixelSize: Math.max(42, Math.min(78, parent.height * 0.09))
         font.weight: Font.Light
     }
@@ -118,7 +119,7 @@ Rectangle {
             Text {
                 text: "welcome back"
                 color: root.fg
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 21
                 font.bold: true
             }
@@ -126,7 +127,7 @@ Rectangle {
             Text {
                 text: "sign in to start niri"
                 color: root.muted
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 12
             }
 
@@ -135,7 +136,7 @@ Rectangle {
             Text {
                 text: textConstants.userName
                 color: root.muted
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 11
             }
 
@@ -144,7 +145,7 @@ Rectangle {
                 width: parent.width
                 height: 38
                 text: userModel.lastUser
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 14
                 KeyNavigation.tab: password
                 KeyNavigation.backtab: loginButton
@@ -159,7 +160,7 @@ Rectangle {
             Text {
                 text: textConstants.password
                 color: root.muted
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 11
             }
 
@@ -167,7 +168,7 @@ Rectangle {
                 id: password
                 width: parent.width
                 height: 38
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 14
                 KeyNavigation.tab: session
                 KeyNavigation.backtab: name
@@ -192,7 +193,7 @@ Rectangle {
                     height: 34
                     model: sessionModel
                     index: sessionModel.lastIndex
-                    font.family: "JetBrains Mono"
+                    font.family: root.uiFont
                     font.pixelSize: 12
                     z: 101
                     KeyNavigation.tab: loginButton
@@ -211,7 +212,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "SK · QWERTZ"
                         color: root.accent
-                        font.family: "JetBrains Mono"
+                        font.family: root.uiFont
                         font.pixelSize: 10
                         font.bold: true
                     }
@@ -224,7 +225,7 @@ Rectangle {
                 height: 16
                 text: textConstants.prompt
                 color: root.muted
-                font.family: "JetBrains Mono"
+                font.family: root.uiFont
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
@@ -250,7 +251,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "LOG IN  →"
                     color: loginMouse.containsMouse ? root.bg : root.fg
-                    font.family: "JetBrains Mono"
+                    font.family: root.uiFont
                     font.pixelSize: 13
                     font.bold: true
                     font.letterSpacing: 1
@@ -272,7 +273,7 @@ Rectangle {
                 Text {
                     text: "POWER OFF"
                     color: powerMouse.containsMouse ? root.fg : root.muted
-                    font.family: "JetBrains Mono"
+                    font.family: root.uiFont
                     font.pixelSize: 11
 
                     MouseArea {
@@ -286,7 +287,7 @@ Rectangle {
                 Text {
                     text: "REBOOT"
                     color: rebootMouse.containsMouse ? root.fg : root.muted
-                    font.family: "JetBrains Mono"
+                    font.family: root.uiFont
                     font.pixelSize: 11
 
                     MouseArea {
@@ -307,7 +308,7 @@ Rectangle {
         anchors.bottomMargin: Math.max(24, parent.height * 0.06)
         text: "ENTER  log in     •     SK / QWERTZ"
         color: root.muted
-        font.family: "JetBrains Mono"
+        font.family: root.uiFont
         font.pixelSize: 11
     }
 

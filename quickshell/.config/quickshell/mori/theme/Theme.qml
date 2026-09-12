@@ -32,8 +32,8 @@ Singleton {
     readonly property color bgorange: "#4a4037"
     readonly property color bgvisual: "#543a48"
 
-    // Check the exact family name with: fc-list | grep -i nerd
-    readonly property string fontFamily: "sans-serif"
-    readonly property string nerdFontFamily: "FiraCode Nerd Font Propo"
+    // Text uses Geist; icon-only labels use Symbols Nerd Font.
+    readonly property string fontFamily: "Geist"
+    readonly property string nerdFontFamily: "Symbols Nerd Font"
     readonly property int fontSize: 13
 }

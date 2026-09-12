@@ -1,0 +1,6 @@
+/* Mori typography: retain Discord's icon faces while standardizing UI text. */
+:root {
+  --font-primary: "Geist", sans-serif;
+  --font-display: "Geist", sans-serif;
+  --font-code: "Geist Mono", monospace;
+}

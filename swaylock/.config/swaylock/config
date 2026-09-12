@@ -7,7 +7,7 @@ show-keyboard-layout
 indicator-caps-lock
 indicator-idle-visible
 
-font=FiraCode Nerd Font Propo
+font=Geist
 font-size=20
 indicator-radius=105
 indicator-thickness=8

@@ -4,6 +4,18 @@
 *.log
 *.lock
 
+# Kew generates its state, library cache, layouts, and bundled theme copies.
+/kew/.config/kew/kewstaterc
+/kew/.config/kew/library.dat
+/kew/.config/kew/layouts/
+/kew/.config/kew/themes/*.theme
+!/kew/.config/kew/themes/mori.theme
+/kew/.config/kew/themes/*.theme.bak
+/kew/.config/kew/themes/*.txt
+/kew/.config/kew/themes/*.txt.bak
+/kew/.config/kew/themes/*.md
+/kew/.config/kew/themes/*.md.bak
+
 # Secrets and credentials
 *.secret
 *.secrets

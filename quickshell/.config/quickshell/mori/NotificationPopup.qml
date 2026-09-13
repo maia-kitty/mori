@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "./theme"
 
 Item {
@@ -18,6 +19,7 @@ Item {
         pendingNotifications.push({
             "toastId": nextToastId++,
             "appName": String(notification.appName || "Notification"),
+            "desktopEntry": String(notification.desktopEntry || ""),
             "summary": String(notification.summary || ""),
             "body": String(notification.body || "")
         })
@@ -47,6 +49,73 @@ Item {
 
     function close() {
         suppressed = true
+    }
+
+    function desktopId(value) {
+        return String(value || "").toLowerCase().replace(/\.desktop$/, "")
+    }
+
+    function launchApplication(entry) {
+        const desktopEntry = desktopId(entry)
+        if (desktopEntry.length)
+            applicationLaunch.exec(["gtk-launch", desktopEntry])
+    }
+
+    function focusApplication(entry) {
+        const desktopEntry = desktopId(entry)
+        if (!desktopEntry.length)
+            return
+        if (windowQuery.running) {
+            launchApplication(desktopEntry)
+            return
+        }
+
+        windowQuery.desktopEntry = desktopEntry
+        windowQuery.exec(["niri", "msg", "--json", "windows"])
+    }
+
+    Process {
+        id: applicationLaunch
+    }
+
+    Process {
+        id: windowFocus
+    }
+
+    Process {
+        id: windowQuery
+        property string desktopEntry: ""
+        stdout: StdioCollector { id: windowList }
+
+        onExited: exitCode => {
+            const entry = desktopEntry
+            if (exitCode !== 0) {
+                root.launchApplication(entry)
+                return
+            }
+
+            let windows = []
+            try {
+                windows = JSON.parse(windowList.text)
+            } catch (error) {
+                console.warn("Could not parse Niri window list:", error)
+            }
+
+            let match = null
+            for (let i = 0; i < windows.length; ++i) {
+                const appId = root.desktopId(windows[i].app_id)
+                if (appId === entry || appId.endsWith("." + entry)
+                        || entry.endsWith("." + appId)) {
+                    match = windows[i]
+                    break
+                }
+            }
+
+            if (match)
+                windowFocus.exec(["niri", "msg", "action", "focus-window", "--id", String(match.id)])
+            else
+                root.launchApplication(entry)
+        }
     }
 
     ListModel {
@@ -82,7 +151,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: parentWindow.width - 2
+            x: parentWindow.width
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -93,7 +162,6 @@ Item {
         PopupSurface {
             anchors.fill: parent
             shown: popup.visible
-            radius: 0
             color: Theme.bg1
             border.width: 2
             border.color: Theme.purple
@@ -113,12 +181,12 @@ Item {
                         id: toast
                         required property int toastId
                         required property string appName
+                        required property string desktopEntry
                         required property string summary
                         required property string body
                         width: popupList.width
                         implicitHeight: notificationText.implicitHeight + 12
                         shown: false
-                        radius: 0
                         color: Theme.bg2
 
                         function dismiss() {
@@ -126,6 +194,11 @@ Item {
                             shown = false
                             removeTimer.stop()
                             exitTimer.restart()
+                        }
+
+                        function activate() {
+                            root.focusApplication(desktopEntry)
+                            dismiss()
                         }
 
                         Component.onCompleted: shown = true
@@ -191,13 +264,24 @@ Item {
                             anchors.right: parent.right
                             anchors.margins: 6
                             text: "×"
-                            color: Theme.grey
+                            color: Theme.purple
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                            font.pixelSize: Theme.fontSize + 5
 
                             TapHandler {
+                                margin: 6
                                 onTapped: toast.dismiss()
                             }
+                        }
+
+                        MouseArea {
+                            anchors.left: parent.left
+                            anchors.right: closeButton.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: toast.activate()
                         }
                     }
                 }

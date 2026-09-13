@@ -36,4 +36,5 @@ Singleton {
     readonly property string fontFamily: "Geist"
     readonly property string nerdFontFamily: "Symbols Nerd Font"
     readonly property int fontSize: 13
+    readonly property int headingFontSize: fontSize + 2
 }

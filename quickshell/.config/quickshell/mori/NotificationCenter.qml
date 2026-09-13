@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "./theme"
 
@@ -12,7 +13,9 @@ Item {
     required property var popupCoordinator
     property bool doNotDisturb: false
 
-    readonly property var notifications: notificationServer.trackedNotifications.values
+    property var pendingNotifications: []
+    property int nextNotificationId: 0
+    readonly property int notificationCount: notificationHistory.count
     readonly property bool popupVisible: popup.visible
 
     function close() {
@@ -25,6 +28,124 @@ Item {
         else {
             popupCoordinator.showPopup(root)
             popup.visible = true
+        }
+    }
+
+    function desktopId(value) {
+        return String(value || "").toLowerCase().replace(/\.desktop$/, "")
+    }
+
+    function launchApplication(entry) {
+        const desktopEntry = desktopId(entry)
+        if (desktopEntry.length)
+            applicationLaunch.exec(["gtk-launch", desktopEntry])
+    }
+
+    function focusApplication(entry) {
+        const desktopEntry = desktopId(entry)
+        if (!desktopEntry.length)
+            return
+
+        // A second click while the window list is in flight still gets a
+        // useful result, without racing a shared Process instance.
+        if (windowQuery.running) {
+            launchApplication(desktopEntry)
+            return
+        }
+
+        windowQuery.desktopEntry = desktopEntry
+        windowQuery.exec(["niri", "msg", "--json", "windows"])
+    }
+
+    function addNotification(notification) {
+        // Apps may replace an existing DBus notification. Keep a value copy so
+        // the vault preserves every arrival rather than only its replacement.
+        pendingNotifications.push({
+            "notificationId": nextNotificationId++,
+            "appName": String(notification.appName || "Notification"),
+            "desktopEntry": String(notification.desktopEntry || ""),
+            "summary": String(notification.summary || ""),
+            "body": String(notification.body || "")
+        })
+        notificationQueue.restart()
+    }
+
+    function flushNotifications() {
+        while (pendingNotifications.length > 0)
+            notificationHistory.insert(0, pendingNotifications.shift())
+    }
+
+    function removeNotification(notificationId) {
+        for (let i = 0; i < notificationHistory.count; ++i) {
+            if (notificationHistory.get(i).notificationId === notificationId) {
+                notificationHistory.remove(i)
+                return
+            }
+        }
+    }
+
+    Process {
+        id: applicationLaunch
+    }
+
+    Process {
+        id: windowFocus
+    }
+
+    Process {
+        id: windowQuery
+        property string desktopEntry: ""
+        stdout: StdioCollector { id: windowList }
+
+        onExited: exitCode => {
+            const entry = desktopEntry
+            if (exitCode !== 0) {
+                root.launchApplication(entry)
+                return
+            }
+
+            let windows = []
+            try {
+                windows = JSON.parse(windowList.text)
+            } catch (error) {
+                console.warn("Could not parse Niri window list:", error)
+            }
+
+            let match = null
+            for (let i = 0; i < windows.length; ++i) {
+                const appId = root.desktopId(windows[i].app_id)
+                if (appId === entry || appId.endsWith("." + entry)
+                        || entry.endsWith("." + appId)) {
+                    match = windows[i]
+                    break
+                }
+            }
+
+            if (match)
+                windowFocus.exec(["niri", "msg", "action", "focus-window", "--id", String(match.id)])
+            else
+                root.launchApplication(entry)
+        }
+    }
+
+    ListModel {
+        id: notificationHistory
+    }
+
+    // Mutate the model after the DBus callback returns; doing it directly can
+    // race a Repeater regeneration in Qt.
+    Timer {
+        id: notificationQueue
+        interval: 0
+        repeat: false
+        onTriggered: root.flushNotifications()
+    }
+
+    Connections {
+        target: root.notificationServer
+
+        function onNotification(notification) {
+            root.addNotification(notification)
         }
     }
 
@@ -52,7 +173,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + popup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -63,7 +184,6 @@ Item {
         PopupSurface {
             anchors.fill: parent
             shown: popup.visible
-            radius: 0
             color: Theme.bg1
             border.width: 2
             border.color: Theme.purple
@@ -87,7 +207,7 @@ Item {
                         text: "Notifications"
                         color: Theme.purple
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        font.pixelSize: Theme.headingFontSize
                     }
 
                     Row {
@@ -109,13 +229,13 @@ Item {
                         Text {
                             id: clearAll
                             text: "Clear all"
-                            visible: root.notifications.length > 0
+                            visible: root.notificationCount > 0
                             color: Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
 
                             TapHandler {
-                                onTapped: root.notifications.slice().forEach(notification => notification.dismiss())
+                            onTapped: notificationHistory.clear()
                             }
                         }
                     }
@@ -123,7 +243,7 @@ Item {
 
                 Text {
                     width: parent.width
-                    visible: root.notifications.length === 0
+                    visible: root.notificationCount === 0
                     text: "No notifications"
                     color: Theme.grey
                     font.family: Theme.fontFamily
@@ -131,14 +251,23 @@ Item {
                 }
 
                 Repeater {
-                    model: root.notifications
+                    model: notificationHistory
 
                     delegate: Rectangle {
-                        required property var modelData
+                        required property int notificationId
+                        required property string appName
+                        required property string desktopEntry
+                        required property string summary
+                        required property string body
                         width: notificationList.width
                         implicitHeight: notificationText.implicitHeight + 12
                         radius: 0
                         color: Theme.bg2
+
+                        function activate() {
+                            root.focusApplication(desktopEntry)
+                            root.removeNotification(notificationId)
+                        }
 
                         Column {
                             id: notificationText
@@ -150,7 +279,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: modelData.appName || "Notification"
+                                text: appName
                                 color: Theme.purple
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -159,7 +288,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: modelData.summary
+                                text: summary
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -168,8 +297,8 @@ Item {
 
                             Text {
                                 width: parent.width
-                                visible: modelData.body.length > 0
-                                text: modelData.body
+                                visible: body.length > 0
+                                text: body
                                 textFormat: Text.PlainText
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
@@ -186,13 +315,28 @@ Item {
                             anchors.right: parent.right
                             anchors.margins: 6
                             text: "×"
-                            color: Theme.grey
+                            color: Theme.purple
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                            font.pixelSize: Theme.fontSize + 5
 
                             TapHandler {
-                                onTapped: modelData.dismiss()
+                                margin: 6
+                                onTapped: root.removeNotification(notificationId)
                             }
+                        }
+
+                        // Applications commonly expose a "default" action to
+                        // open their window or jump to the relevant item. When
+                        // they do not, focus the Niri window matching the
+                        // notification's desktop entry instead.
+                        MouseArea {
+                            anchors.left: parent.left
+                            anchors.right: closeButton.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: parent.activate()
                         }
                     }
                 }

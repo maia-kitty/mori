@@ -104,7 +104,7 @@ RowLayout {
 
     Text {
         id: deviceArrow
-        text: "v"
+        text: devicePopup.visible ? "▴" : "▾"
         color: Theme.yellow
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
@@ -125,7 +125,7 @@ RowLayout {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + devicePopup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, devicePopup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -136,7 +136,6 @@ RowLayout {
         PopupSurface {
             anchors.fill: parent
             shown: devicePopup.visible
-            radius: 0
             color: Theme.bg1
             border.width: 2
             border.color: Theme.yellow
@@ -154,7 +153,7 @@ RowLayout {
                     text: "Output Devices"
                     color: Theme.yellow
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
+                    font.pixelSize: Theme.headingFontSize
                 }
 
                 Repeater {

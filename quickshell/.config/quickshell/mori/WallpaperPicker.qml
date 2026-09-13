@@ -147,7 +147,7 @@ Item {
         grabFocus: false
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + popup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -159,7 +159,7 @@ Item {
         PopupSurface {
             anchors.fill: parent
             shown: popup.visible
-            color: Theme.bg
+            color: Theme.bg1
             border.width: 2
             border.color: Theme.green
 
@@ -168,43 +168,52 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                Row {
-                    width: parent.width
-                    spacing: 12
-                    Text {
-                        text: "Wallpapers"
-                        color: Theme.green
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    Text {
-                        text: "↑ Up"
-                        color: up.enabled ? Theme.green : Theme.grey
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                        TapHandler {
-                            id: up
-                            enabled: files.folder.toString() !== root.wallpaperFolder.toString()
-                            onTapped: files.folder = files.parentFolder
-                        }
-                    }
-                    Text {
-                        text: "Choose folder"
-                        color: Theme.green
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-
-                        TapHandler { onTapped: root.openFolderPicker() }
-                    }
+                Text {
+                    text: "Wallpapers"
+                    color: Theme.green
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.headingFontSize
                 }
 
-                Text {
+                Row {
                     width: parent.width
-                    text: decodeURIComponent(files.folder.toString()).replace("file://", "")
-                    elide: Text.ElideLeft
-                    color: Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
+                    height: folderActions.implicitHeight
+                    spacing: 12
+
+                    Text {
+                        width: parent.width - folderActions.implicitWidth - parent.spacing
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: decodeURIComponent(files.folder.toString()).replace("file://", "")
+                        elide: Text.ElideLeft
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+
+                    Row {
+                        id: folderActions
+                        spacing: 12
+
+                        Text {
+                            text: "↑ Up"
+                            color: up.enabled ? Theme.green : Theme.grey
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            TapHandler {
+                                id: up
+                                enabled: files.folder.toString() !== root.wallpaperFolder.toString()
+                                onTapped: files.folder = files.parentFolder
+                            }
+                        }
+                        Text {
+                            text: "Choose folder"
+                            color: Theme.green
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+
+                            TapHandler { onTapped: root.openFolderPicker() }
+                        }
+                    }
                 }
 
                 Row {

@@ -23,6 +23,8 @@ Item {
 
     implicitWidth: clockLabel.implicitWidth
     implicitHeight: clockLabel.implicitHeight
+    width: implicitWidth
+    height: implicitHeight
 
     function dateKey(value) {
         const year = value.getFullYear()
@@ -168,7 +170,7 @@ Item {
         text: Qt.formatDateTime(clock.date, "[ yyyy/MM/dd   hh:mm ]")
         color: Theme.fg
         font.family: Theme.fontFamily
-        font.pixelSize: 14
+        font.pixelSize: Theme.fontSize
 
         TapHandler { onTapped: root.toggle() }
     }
@@ -246,7 +248,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + popup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -287,7 +289,7 @@ Item {
                         text: Qt.formatDate(root.shownMonth, "MMMM yyyy")
                         color: Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize + 1
+                        font.pixelSize: Theme.headingFontSize
                         TapHandler { onTapped: root.goToToday() }
                     }
 

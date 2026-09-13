@@ -25,6 +25,14 @@ PanelWindow {
     property real contentOpacity: (overviewOpen || fullscreen) ? 0 : 1
     readonly property int componentSpacing: 20
     readonly property int bracketSpacing: 6
+    readonly property int edgeMargin: 2
+
+    // The panel window already starts 2px in from each screen edge. Clamp a
+    // popup inside that window so it shares, rather than doubles, that gutter.
+    function popupAnchorX(item, popupWidth) {
+        const centered = item.x + item.width / 2 + popupWidth / 2
+        return Math.max(popupWidth, Math.min(width, centered))
+    }
 
     function showPopup(owner) {
         if (activePopup && activePopup !== owner)
@@ -72,7 +80,7 @@ PanelWindow {
     // The panel stays mapped only to reserve its exclusive zone; the faded
     // content item below is responsible for all visible bar pixels.
     color: "transparent"
-    margins { top: 2; left: 2; right: 2 }
+    margins { top: barWindow.edgeMargin; left: barWindow.edgeMargin; right: barWindow.edgeMargin }
     // Popup dismiss layers cover the desktop while a popup is open. Keep the
     // bar above them so a click can switch directly to another widget.
     WlrLayershell.layer: WlrLayer.Overlay
@@ -130,11 +138,20 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
     }
 
+    Media {
+        id: media
+        panelWindow: barWindow
+        popupCoordinator: barWindow
+        anchors.left: clockText.right
+        anchors.leftMargin: barWindow.componentSpacing
+        anchors.verticalCenter: parent.verticalCenter
+    }
+
     KdeConnect {
         id: kdeConnect
         panelWindow: barWindow
         popupCoordinator: barWindow
-        anchors.left: clockText.right
+        anchors.left: media.right
         anchors.leftMargin: barWindow.componentSpacing
         anchors.verticalCenter: parent.verticalCenter
     }

@@ -7,7 +7,7 @@ Text {
     property real hitMargin: 6
 
     font.family: Theme.fontFamily
-    font.pixelSize: 14
+    font.pixelSize: Theme.fontSize
 
     TapHandler {
         enabled: root.action !== null

@@ -28,6 +28,8 @@ Item {
 
     implicitWidth: summary.implicitWidth
     implicitHeight: summary.implicitHeight
+    width: implicitWidth
+    height: implicitHeight
 
     function selectDevice() {
         let fallback = null
@@ -159,7 +161,7 @@ Item {
         grabFocus: false
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + popup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -189,7 +191,7 @@ Item {
                     elide: Text.ElideRight
                     color: root.accent
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize + 2
+                    font.pixelSize: Theme.headingFontSize
                 }
                 Text {
                     width: parent.width

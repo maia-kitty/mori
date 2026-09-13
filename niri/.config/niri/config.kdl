@@ -49,6 +49,7 @@ overview {
 }
 
 // === Startup spawns ===
+spawn-at-startup "awww-daemon" "--quiet"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 
 // === Environment ===

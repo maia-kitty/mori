@@ -83,7 +83,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + menu.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, menu.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -95,7 +95,6 @@ Item {
             id: menuSurface
             anchors.fill: parent
             shown: menu.visible
-            radius: 0
             color: Theme.bg1
             border.width: 2
             border.color: Theme.red
@@ -109,6 +108,7 @@ Item {
                 spacing: 8
 
                 Repeater {
+                    id: powerActions
                     model: [
                         { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["loginctl", "lock-session"] },
                         { label: "Log out", shortcut: "X", key: Qt.Key_X, command: ["sh", "-c", "loginctl terminate-session \"$XDG_SESSION_ID\""] },
@@ -119,6 +119,7 @@ Item {
 
                     delegate: Item {
                         required property var modelData
+                        required property int index
                         property real holdProgress: 0
                         width: menuItems.width
                         implicitHeight: 20
@@ -147,6 +148,15 @@ Item {
                             color: modelData.label === "Power off" ? Theme.red : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
+                        }
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: 1
+                            visible: index < powerActions.count - 1
+                            color: Theme.bg4
                         }
 
                         Timer {

@@ -8,12 +8,6 @@ ShellRoot {
     id: root
     property bool niriOverviewOpen: false
 
-    // awww restores its per-output cache when the daemon starts.
-    Process {
-        command: ["awww-daemon", "--quiet"]
-        running: true
-    }
-
     // Super+Tab invokes niri's toggle-overview action. Its event stream emits
     // the overview state immediately on connection and whenever it changes.
     Process {
@@ -45,9 +39,8 @@ ShellRoot {
     NotificationServer {
         id: notificationServer
         keepOnReload: false
-        actionsSupported: false
+        actionsSupported: true
         persistenceSupported: true
-        onNotification: notification => notification.tracked = true
     }
 
     Bar {

@@ -312,7 +312,7 @@ RowLayout {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.x + root.width / 2 + popup.implicitWidth / 2
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -341,7 +341,6 @@ RowLayout {
         PopupSurface {
             anchors.fill: parent
             shown: popup.visible
-            radius: 0
             color: Theme.bg1
             border.width: 2
             border.color: Theme.blue
@@ -364,7 +363,7 @@ RowLayout {
                         text: "Ethernet"
                         color: Theme.blue
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        font.pixelSize: Theme.headingFontSize
                     }
 
                     Repeater {
@@ -416,7 +415,7 @@ RowLayout {
                         text: "VPN"
                         color: Theme.blue
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        font.pixelSize: Theme.headingFontSize
                     }
 
                     Text {
@@ -447,7 +446,7 @@ RowLayout {
                         text: "Wi-Fi"
                         color: Theme.blue
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        font.pixelSize: Theme.headingFontSize
                     }
 
                     Text {

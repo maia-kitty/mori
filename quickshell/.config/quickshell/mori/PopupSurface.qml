@@ -3,6 +3,10 @@ import QtQuick
 Rectangle {
     id: root
 
+    // Mori popups use square corners. Keep the default here so individual
+    // popup modules only specify it when intentionally deviating.
+    radius: 0
+
     // PopupWindow itself becomes visible immediately, so animate its content
     // to give every popup a small, consistent entrance.
     property bool shown: false

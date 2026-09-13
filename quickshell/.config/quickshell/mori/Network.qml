@@ -15,6 +15,13 @@ RowLayout {
     property bool wifiConnected: false
     property string wifiName: ""
     property real signal: 0
+    // Quickshell.Networking currently gets its Wi-Fi state from
+    // NetworkManager. This setup uses wpa_supplicant, so keep a small
+    // read-only fallback for the bar when that model has no active network.
+    property string fallbackWifiInterface: ""
+    property bool fallbackWifiConnected: false
+    property string fallbackWifiName: ""
+    property real fallbackWifiSignal: 0
     property var vpnConnections: []
     property string passwordNetworkName: ""
     property var pendingNetwork: null
@@ -23,14 +30,18 @@ RowLayout {
     required property var panelWindow
     required property var popupCoordinator
     readonly property bool popupVisible: popup.visible
+    readonly property bool hasWifiConnection: wifiConnected || fallbackWifiConnected
+    readonly property bool wifiRadioEnabled: Networking.wifiEnabled || fallbackWifiInterface.length > 0
+    readonly property string currentWifiName: wifiConnected ? wifiName : fallbackWifiName
+    readonly property real currentWifiSignal: wifiConnected ? signal : fallbackWifiSignal
 
     readonly property string icon: {
         if (wiredConnected) return String.fromCodePoint(0xf0200)
-        if (!Networking.wifiEnabled || !wifiConnected) return String.fromCodePoint(0xf092d)
+        if (!wifiRadioEnabled || !hasWifiConnection) return String.fromCodePoint(0xf092d)
 
-        let tier = signal >= 0.75 ? 4
-                 : signal >= 0.50 ? 3
-                 : signal >= 0.25 ? 2
+        let tier = currentWifiSignal >= 0.75 ? 4
+                 : currentWifiSignal >= 0.50 ? 3
+                 : currentWifiSignal >= 0.25 ? 2
                  : 1
         return String.fromCodePoint(0xf091f + (tier + 1) * 3)
     }
@@ -139,6 +150,72 @@ RowLayout {
         onTriggered: root.refreshNetworkModel()
     }
 
+    // `iw dev` identifies the wpa_supplicant interface without assuming a
+    // distro-specific name such as wlan0. Then wpa_cli supplies the active
+    // SSID. These processes only affect the compact bar indicator; the popup
+    // continues to use Quickshell's native model for network actions.
+    function refreshWpaSupplicantState() {
+        if (!wifiProbe.running)
+            wifiProbe.exec(["iw", "dev"])
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.refreshWpaSupplicantState()
+    }
+
+    Process {
+        id: wifiProbe
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const match = /^\s*Interface\s+(.+)\s*$/m.exec(this.text)
+                root.fallbackWifiInterface = match ? match[1] : ""
+                if (!root.fallbackWifiInterface) {
+                    root.fallbackWifiConnected = false
+                    root.fallbackWifiName = ""
+                    root.fallbackWifiSignal = 0
+                    return
+                }
+                if (!wpaStatus.running)
+                    wpaStatus.exec(["wpa_cli", "-i", root.fallbackWifiInterface, "status"])
+            }
+        }
+    }
+
+    Process {
+        id: wpaStatus
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const completed = /^wpa_state=COMPLETED$/m.test(this.text)
+                const ssid = /^ssid=(.*)$/m.exec(this.text)
+                root.fallbackWifiConnected = completed && !!ssid && ssid[1].length > 0
+                root.fallbackWifiName = root.fallbackWifiConnected ? ssid[1] : ""
+                if (root.fallbackWifiConnected && !wifiSignalProbe.running)
+                    wifiSignalProbe.exec(["iw", "dev", root.fallbackWifiInterface, "link"])
+                else if (!root.fallbackWifiConnected)
+                    root.fallbackWifiSignal = 0
+            }
+        }
+    }
+
+    Process {
+        id: wifiSignalProbe
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const match = /^\s*signal:\s*(-?\d+(?:\.\d+)?)\s*dBm$/m.exec(this.text)
+                // -90 dBm is effectively unusable and -40 dBm is excellent.
+                const dbm = match ? Number(match[1]) : -90
+                root.fallbackWifiSignal = Math.max(0, Math.min(1, (dbm + 90) / 50))
+            }
+        }
+    }
+
     function refreshVpn() {
         if (!vpnQuery.running)
             vpnQuery.exec(["nmcli", "-t", "--escape", "no", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"])
@@ -204,15 +281,15 @@ RowLayout {
 
     Text {
         text: root.icon
-        color: root.wiredConnected || Networking.wifiEnabled ? Theme.blue : Theme.grey
+        color: root.wiredConnected || (root.wifiRadioEnabled && root.hasWifiConnection) ? Theme.blue : Theme.grey
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
     }
 
     Text {
         text: root.wiredConnected ? root.wiredName
-              : !Networking.wifiEnabled ? "off"
-              : root.wifiConnected ? root.wifiName : "N/A"
+              : !root.wifiRadioEnabled ? "off"
+              : root.hasWifiConnection ? root.currentWifiName : "N/A"
         color: Theme.blue
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
@@ -374,7 +451,7 @@ RowLayout {
                     }
 
                     Text {
-                        visible: !Networking.wifiEnabled
+                        visible: !root.wifiRadioEnabled
                         text: "Wi-Fi is off"
                         color: Theme.grey
                         font.family: Theme.fontFamily

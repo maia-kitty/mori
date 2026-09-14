@@ -31,6 +31,19 @@ Item {
         }
     }
 
+    function handleKeyPressed(event) {
+        if (event.modifiers !== Qt.NoModifier)
+            return
+
+        if (event.key === Qt.Key_C) {
+            notificationHistory.clear()
+            event.accepted = true
+        } else if (event.key === Qt.Key_D) {
+            doNotDisturb = !doNotDisturb
+            event.accepted = true
+        }
+    }
+
     function desktopId(value) {
         return String(value || "").toLowerCase().replace(/\.desktop$/, "")
     }
@@ -345,16 +358,31 @@ Item {
     }
 
     PanelWindow {
+        id: dismissLayer
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea {
+        onVisibleChanged: {
+            if (visible)
+                Qt.callLater(() => keyCapture.forceActiveFocus())
+        }
+
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+
+            Keys.onPressed: event => root.handleKeyPressed(event)
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.close()
+            }
         }
     }
 }

@@ -1,93 +1,85 @@
-# Mori
+# Mori 森
 
-Mori is my personal collection of desktop configuration and dotfiles.
+## AI usage disclaimer
 
-This is a personal project, not a general-purpose configuration framework. It is shaped around my own hardware, applications, workflow, and preferences, so parts of it may need adjustment before they work on another system.
+This rice was made with AI assistance. AI helped write, modify, organize, and troubleshoot parts of the configuration, including the custom shell. I review and use the resulting files, but this is an evolving personal setup, and mistakes may still be present. Read through the configuration before using it on your own machine.
 
-## AI assistance
+## About the rice
 
-This repository was made with AI assistance. The AI helped write, modify, organize, and troubleshoot parts of the configuration. I review and use the resulting files, but the repository should still be treated as an actively evolving personal setup rather than polished or independently audited software.
+**Mori** comes from the Japanese word for **forest**, 森. The name was chosen because of the usage of the Everforest palette.
 
-## Layout
+This is my personal Linux desktop rice and dotfiles collection, built around **Niri** and a custom **Quickshell** bar. The goal is a consistent look across the whole system.
 
-The repository is organized for GNU Stow. Each top-level directory is a package whose contents mirror paths relative to `$HOME`.
+I personally use CachyOs so it was made with it in mind.
 
-For example, the Quickshell package is located at:
+## Dependencies
 
-```text
-quickshell/.config/quickshell/mori/
-```
+| Component | What it is (for) |
+| --- | --- |
+| Niri | Wayland compositor |
+| Quickshell | Bar, popups, notifications, and desktop controls |
+| PipeWire and WirePlumber | Audio and the bar's volume controls |
+| Kitty | Terminal and terminal-based launch shortcuts |
+| Fuzzel | Application launcher and clipboard picker |
+| wl-clipboard and cliphist | Clipboard history and copying selections |
+| awww | Wallpaper daemon and per-output wallpaper selection |
+| Swaylock | Lock screen and the power menu's lock action |
+| Bash and jq | Helper scripts |
+| Zenity | Wallpaper folder picker and Wi-Fi password dialog |
 
-To install that package:
+The shell imports `org.kde.kdeconnect`, so **KDE Connect and its QML module are required by the current shell**, even if you do not pair a phone.
 
-```bash
-cd ~/mori
-stow -t ~ quickshell
-```
+### Fonts and appearance
 
-Review the files and existing symlinks before stowing on a new machine. Stow will report conflicts when another package already owns the same destination.
+| Asset | What it is (for) |
+| --- | --- |
+| Geist | Main font |
+| Geist Mono | Main font but mono |
+| Maple Mono | Terminal font |
+| Symbols Nerd Font | Shell icons |
+| adw-gtk3 | Base GTK 3 theme, styled with color overrides |
+| Adwaita icons | GTK application icons |
+| Bibata Modern Classic | Cursor |
 
-### Login greeter
+Mori’s custom GTK styling is included in `gtk/`: GTK 3 defines the Everforest color overrides in `gtk.css`, and GTK 4 imports the same palette. The GTK settings select `adw-gtk3-dark` as the base theme.
 
-The `greetd` package configures the system login manager with `tuigreet` and
-starts the `niri-session` Wayland session. It is intentionally a system-level
-Stow package because greetd owns TTY1 and reads `/etc/greetd/config.toml`.
+The Everforest terminal theme and Mori application palettes are included in the repository. Fonts, the base GTK theme, icon packs, and cursor themes are not bundled.
 
-Install the required package, deploy the package to `/`, then apply its systemd
-preset:
+## Optional software I use
 
-```bash
-sudo pacman -S greetd greetd-tuigreet
-cd ~/mori
-sudo mv /etc/greetd/config.toml /etc/greetd/config.toml.dms-greeter.bak
-sudo stow -t / greetd
-sudo systemctl preset greetd.service
-```
+These applications have configurations, themes, or shortcuts here. They are optional for the desktop itself; individual shortcuts and integrations need their corresponding program installed.
 
-`greetd.service` is the service that autostarts the greeter; no separate
-tuigreet service should be created. The preset enables greetd for future boots.
-The existing config is backed up first because Stow will not replace a regular
-file with its managed symlink. Reboot to test the new greeter rather than
-restarting greetd from within the current graphical session.
+| Software | What it is (for) |
+| --- | --- |
+| Fish | Shell of choice |
+| Neovim / LazyVim | CLI Editor |
+| Zed | GUI Editor |
+| Yazi | CLI file manager |
+| Nemo | GUI file manager |
+| btop | System monitor |
+| Fastfetch | Quick system info (larping) |
+| Cava | Audio visualizer |
+| Kew | Terminal music player |
+| Equibop | Discord client |
+| Zen Browser | Browser |
+| Obsidian | Notes app |
+| SDDM | Login manager |
+| khal and vdirsyncer | Quickshell calendar integration |
+| lavat and tty-clock | Terminal visuals with Fish helpers |
 
-## Notes
+## Installer
 
-- Configuration is experimental and may change without preserving backwards compatibility.
-- The Mori Quickshell bar currently includes the clock, KDE Connect, active application, network, volume, wallpaper, notifications, system tray, and power widgets.
-
-The KDE Connect widget sits immediately to the right of the clock and requires
-`kdeconnect` (including its `org.kde.kdeconnect` QML module). It selects a paired
-phone, preferring a connected one, and shows battery/charging status, the count
-of mirrored phone notifications, and cellular signal bars. Click it for details
-and a **Send clipboard** button to send the desktop clipboard to the phone.
-Enable Battery, Connectivity Report, Notifications, and Clipboard in KDE Connect;
-unavailable reports show a dash. Signal strength is cellular (0–4), not Wi-Fi.
-
-Only one process can provide `org.freedesktop.Notifications` in a desktop
-session. If another shell such as DMS already owns it, Mori's notification
-center remains inactive until that notification server stops.
-
-The wallpaper picker requires `awww`. Mori starts `awww-daemon`, and selections
-are sent to the selected output with `awww img`. The daemon caches each output's
-last image and restores it automatically after Mori starts on the next login.
-
-## CalDAV calendar
-
-Click the date and time in the Quickshell bar to open the calendar and daily
-agenda. The widget uses `vdirsyncer` for CalDAV synchronization and `khal` to
-read the local calendars; account credentials are therefore never stored in
-the Quickshell configuration.
-
-Install both programs, then configure the account once:
+Requires Python 3 and GNU Stow. Install the dependencies for the components you want first; the installer deploys configuration and does not install software.
 
 ```bash
-khal configure
-vdirsyncer discover
-vdirsyncer sync
+git clone https://github.com/maia-kitty/mori.git
+cd mori
+./install.py --dry-run
+./install.py
 ```
 
-`khal configure` can create the vdirsyncer and khal configuration for a CalDAV
-server. Prefer its password-command/keyring option over putting a password
-directly in a configuration file. Reopen the popup after setup; it syncs when
-opened, can be refreshed with the `↻` action, and refreshes every 15 minutes
-while it remains open.
+Run as your normal user. Choose the dotfile packages you want; the installer offers backups for conflicts, a Zen profile picker, optional SDDM deployment using sudo, and shell service enablement. The preview leaves files and services unchanged.
+
+Regular dotfiles stay managed by Stow. Qt settings with personal paths become local copies; their palettes remain linked. Zen CSS can be linked or copied. Backups are saved under `~/.local/state/mori/backups/`. Keep the checkout in place for symlinked files.
+
+Before using Niri, adjust `niri/.config/niri/mori/outputs.kdl` for your monitors. Ensure `~/.local/bin` is on your PATH for the desktop helpers. For Zen, launch it once to create a profile, close it during installation, then enable `toolkit.legacyUserProfileCustomizations.stylesheets` in `about:config` and restart it.

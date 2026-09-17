@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive Mori deployment. No package downloads or repository rewrites."""
+"""Interactive Mori deployment with optional CachyOS/Arch dependency installation."""
 import argparse
 import configparser
 import datetime
@@ -19,6 +19,80 @@ PACKAGES = {
     'yazi': 'File manager', 'btop': 'System monitor', 'fastfetch': 'System information',
     'cava': 'Audio visualizer', 'kew': 'Music player', 'equibop': 'Discord client',
 }
+
+
+# Names are resolved against the target machine's enabled repositories first.
+DEPENDENCIES = {
+    'bin': ['bash', 'jq', 'kitty', 'btop', 'fuzzel', 'wl-clipboard', 'cliphist'],
+    'niri': ['niri', 'awww', 'wl-clipboard', 'cliphist'],
+    'quickshell': ['quickshell', 'kdeconnect', 'pipewire', 'wireplumber', 'awww',
+                  'zenity', 'gtk3', 'swaylock', 'iw', 'wpa_supplicant'],
+    'systemd': ['quickshell'], 'kitty': ['kitty'], 'fuzzel': ['fuzzel'],
+    'swaylock': ['swaylock'], 'gtk': ['adw-gtk-theme', 'adwaita-icon-theme'],
+    'qt': ['qt5ct', 'qt6ct-kde'], 'fish': ['fish'],
+    'nvim': ['neovim', 'git', 'ripgrep', 'fd', 'unzip'], 'yazi': ['yazi'],
+    'btop': ['btop'], 'fastfetch': ['fastfetch'], 'cava': ['cava'],
+    'kew': ['kew'], 'equibop': ['equibop'],
+}
+FONTS = ['ttf-geist', 'ttf-geist-mono', 'maplemono-otf',
+         'ttf-nerd-fonts-symbols', 'bibata-cursor-theme-bin']
+
+
+def dependency_names(selected, zen=False, sddm=False, fonts=False, calendar=False):
+    wanted = ['stow'] if selected or sddm else []
+    for package in selected:
+        wanted.extend(DEPENDENCIES[package])
+    if zen:
+        wanted.append('zen-browser-bin')
+    if sddm:
+        wanted.append('sddm')
+    if fonts:
+        wanted.extend(FONTS)
+    if calendar:
+        wanted.extend(['khal', 'vdirsyncer'])
+    return list(dict.fromkeys(wanted))
+
+
+def offer_dependencies(wanted, dry_run):
+    if not wanted:
+        return
+    if not shutil.which('pacman'):
+        print('Automatic dependency installation is available on CachyOS/Arch only.')
+        print('Install the equivalent packages yourself: ' + ', '.join(wanted))
+        return
+    if not ask('Review and optionally install software dependencies?'):
+        return
+    available = set(subprocess.run(['pacman', '-Slq'], check=True,
+                                  capture_output=True, text=True).stdout.splitlines())
+    # -T honors installed versions and providers, rather than just package names.
+    result = subprocess.run(['pacman', '-T', *wanted], capture_output=True, text=True)
+    if result.returncode not in (0, 127):
+        raise RuntimeError('Could not check installed packages: ' + result.stderr.strip())
+    missing = result.stdout.splitlines()
+    repo = [name for name in missing if name in available]
+    aur = [name for name in missing if name not in available]
+    if not missing:
+        print('All requested dependencies are already installed.')
+        return
+    print('Enabled repositories: ' + (', '.join(repo) or 'none'))
+    print('AUR candidates (not in enabled repositories): ' + (', '.join(aur) or 'none'))
+    helper = next((name for name in ('paru', 'yay') if shutil.which(name)), None)
+    if aur and not helper:
+        print('No paru/yay found. These packages will need manual installation: ' + ', '.join(aur))
+    commands = []
+    if repo:
+        commands.append(['sudo', 'pacman', '-S', '--needed', *repo])
+    if aur and helper:
+        commands.append([helper, '-S', '--needed', *aur])
+    for command in commands:
+        print('Command: ' + ' '.join(command))
+    print('Package managers keep their own confirmation prompts. No services or network managers are enabled here.')
+    if dry_run:
+        print('Preview only; package installation will not run.')
+        return
+    if commands and ask('Run these package installation commands?'):
+        for command in commands:
+            subprocess.run(command, check=True)
 
 
 def ask(prompt, default=False):
@@ -162,8 +236,8 @@ class Installer:
         command = ['stow', '--no-folding', '--dir', str(REPO), '--target', str(self.home), package]
         print(f'Stow: {package} -> {self.home}')
         # With simulated backups, real Stow would still see the conflicts.
-        if self.dry_run and conflicts:
-            print('Preview only; Stow will run after the approved backups.')
+        if self.dry_run and (conflicts or not shutil.which('stow')):
+            print('Preview only; deployment requires Stow and resolution of the listed conflicts.')
             return
         if self.dry_run:
             command.insert(1, '--simulate')
@@ -220,17 +294,15 @@ def main():
     parser.add_argument('--target', type=Path, default=Path.home(), help='Home directory to deploy into')
     args = parser.parse_args()
     if os.geteuid() == 0:
-        parser.error('Run as your normal user; only SDDM uses sudo.')
+        parser.error('Run as your normal user; system packages and SDDM use sudo.')
     home = args.target.expanduser().resolve()
     if not home.is_dir():
         parser.error('Target home directory must exist.')
-    if not shutil.which('stow'):
-        parser.error('Install GNU Stow first.')
     installer = Installer(home, args.dry_run)
     print('Mori installer' + (' — preview only' if args.dry_run else ''))
     print(f'Repository: {REPO}\nTarget: {home}')
     print('Review Niri monitor settings and Fish machine-specific paths before using them.')
-    print('Desktop dependencies are listed in README.md; this installer does not download software.')
+    print('Choose configurations first; optional software installation follows.')
     for index, (package, description) in enumerate(PACKAGES.items(), 1):
         print(f'{index:2}. {package:10} {description}')
     selection = input('Choose package numbers separated by spaces, "all", or Enter for none: ').strip()
@@ -246,6 +318,24 @@ def main():
         except ValueError:
             parser.error('Choose valid package numbers or "all".')
     print('Selected: ' + (', '.join(selected) or 'none'))
+    zen = ask('Install the Zen Browser theme?')
+    sddm = home == Path.home().resolve() and ask('Preview/install the SDDM login theme?')
+    fonts = bool(selected or zen or sddm) and ask('Include Mori fonts and cursor theme in the dependency list?', True)
+    calendar = 'quickshell' in selected and ask('Include khal/vdirsyncer for the calendar agenda?')
+    wanted = dependency_names(selected, zen=zen, sddm=sddm, fonts=fonts, calendar=calendar)
+    if 'quickshell' in selected and ask('Include NetworkManager for Wi-Fi connection controls (installation only)?'):
+        wanted.append('networkmanager')
+    if 'fish' in selected:
+        release = Path('/etc/os-release').read_text() if Path('/etc/os-release').exists() else ''
+        if 'ID=cachyos' in release or 'ID="cachyos"' in release:
+            wanted.append('cachyos-fish-config')
+        else:
+            print('Fish sources cachyos-fish-config; adapt that line on other distributions.')
+    offer_dependencies(wanted, args.dry_run)
+    if (selected or sddm) and not shutil.which('stow'):
+        if not args.dry_run:
+            parser.error('GNU Stow is still missing. Install it before deploying configurations.')
+        print('Stow is not installed; preview will show planned deployments only.')
     if selected and ask('Deploy these packages?', True):
         for package in selected:
             try:
@@ -253,11 +343,14 @@ def main():
             except (OSError, subprocess.CalledProcessError) as error:
                 print(f'Failed {package}: {error}')
                 installer.failed = True
-    if ask('Install the Zen Browser theme?'):
+    if zen:
         installer.zen()
     if home == Path.home().resolve():
-        if ask('Preview/install the SDDM login theme?'):
-            installer.sddm()
+        if sddm:
+            if args.dry_run and not shutil.which('stow'):
+                print('Preview: sudo stow --target / sddm (requires Stow).')
+            else:
+                installer.sddm()
         service = home / '.config/systemd/user/mori-quickshell.service'
         if service.is_file() and ask('Enable Mori to start with the graphical session?'):
             print('Enable mori-quickshell.service (takes effect with the graphical session).')
@@ -275,6 +368,6 @@ if __name__ == '__main__':
     except (EOFError, KeyboardInterrupt):
         print('\nCancelled.')
         sys.exit(130)
-    except (OSError, subprocess.CalledProcessError) as error:
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f'Installation failed: {error}', file=sys.stderr)
         sys.exit(1)

@@ -69,7 +69,7 @@ These applications have configurations, themes, or shortcuts here. They are opti
 
 ## Installer
 
-Requires Python 3 and GNU Stow. Install the dependencies for the components you want first; the installer deploys configuration and does not install software.
+Requires Python 3 to start. On CachyOS/Arch, the installer offers to install missing dependencies, including GNU Stow, for the components you select. It previews repository packages for pacman and AUR candidates for an existing paru or yay, then asks before installing. On other distributions, install the equivalent dependencies and GNU Stow yourself.
 
 ```bash
 git clone https://github.com/maia-kitty/mori.git
@@ -78,7 +78,7 @@ cd mori
 ./install.py
 ```
 
-Run as your normal user. Choose the dotfile packages you want; the installer offers backups for conflicts, a Zen profile picker, optional SDDM deployment using sudo, and shell service enablement. The preview leaves files and services unchanged.
+Run as your normal user. Choose the dotfile packages you want; the installer offers backups for conflicts, a Zen profile picker, optional SDDM deployment using sudo, and shell service enablement. The preview leaves packages, files, and services unchanged. Fonts/cursors and calendar dependencies are optional. Software installation does not enable network managers or other system services.
 
 Regular dotfiles stay managed by Stow. Qt settings with personal paths become local copies; their palettes remain linked. Zen CSS can be linked or copied. Backups are saved under `~/.local/state/mori/backups/`. Keep the checkout in place for symlinked files.
 

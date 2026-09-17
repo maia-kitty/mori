@@ -67,19 +67,48 @@ These applications have configurations, themes, or shortcuts here. They are opti
 | khal and vdirsyncer | Quickshell calendar integration |
 | lavat and tty-clock | Terminal visuals with Fish helpers |
 
-## Installer
+## Manual installation
 
-Requires Python 3 to start. On CachyOS/Arch, the installer offers to install missing dependencies, including GNU Stow, for the components you select. It previews repository packages for pacman and AUR candidates for an existing paru or yay, then asks before installing. On other distributions, install the equivalent dependencies and GNU Stow yourself.
+Install GNU Stow and the dependencies for the components you want using your package manager. Fonts, cursor themes, and the base GTK theme need to be installed separately.
 
 ```bash
 git clone https://github.com/maia-kitty/mori.git
 cd mori
-./install.py --dry-run
-./install.py
+stow --simulate -v -t ~ bin niri quickshell systemd kitty fuzzel swaylock
+stow -t ~ bin niri quickshell systemd kitty fuzzel swaylock
 ```
 
-Run as your normal user. Choose the dotfile packages you want; the installer offers backups for conflicts, a Zen profile picker, optional SDDM deployment using sudo, and shell service enablement. The preview leaves packages, files, and services unchanged. Fonts/cursors and calendar dependencies are optional. Software installation does not enable network managers or other system services.
+Choose only the packages you want. Other home-directory packages, such as `gtk`, `qt`, `fish`, or `nvim`, can be stowed individually. Back up conflicting files before replacing them. Keep the checkout in place: the installed symlinks point into it.
 
-Regular dotfiles stay managed by Stow. Qt settings with personal paths become local copies; their palettes remain linked. Zen CSS can be linked or copied. Backups are saved under `~/.local/state/mori/backups/`. Keep the checkout in place for symlinked files.
+Before using Niri, adjust `niri/.config/niri/mori/outputs.kdl` for your monitors. Ensure `~/.local/bin` is on your PATH for the desktop helpers. Before stowing `qt`, update the `/home/martin/` palette paths in its settings. Review the CachyOS-specific source and personal paths in the Fish configuration.
 
-Before using Niri, adjust `niri/.config/niri/mori/outputs.kdl` for your monitors. Ensure `~/.local/bin` is on your PATH for the desktop helpers. For Zen, launch it once to create a profile, close it during installation, then enable `toolkit.legacyUserProfileCustomizations.stylesheets` in `about:config` and restart it.
+To start Mori with your graphical session:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable mori-quickshell.service
+```
+
+In an active Niri session, run `systemctl --user start mori-quickshell.service`. Alternatively, launch the shell directly with `qs --no-duplicate -c mori`.
+
+### Zen Browser
+
+Launch Zen once to create a profile. Find its root directory in `about:profiles`, close Zen, and link the theme into that profile:
+
+```bash
+mkdir -p /path/to/zen/profile/chrome
+ln -s "$PWD/zen/userChrome.css" /path/to/zen/profile/chrome/userChrome.css
+```
+
+Replace the example profile path with yours and back up any existing `userChrome.css` first. Copying the CSS instead is also an option. Enable `toolkit.legacyUserProfileCustomizations.stylesheets` in `about:config` and restart Zen.
+
+### SDDM
+
+With SDDM installed, deploy its theme to the system root rather than your home directory:
+
+```bash
+sudo stow --simulate -v -t / sddm
+sudo stow -t / sddm
+```
+
+Resolve existing conflicts and check other SDDM theme overrides before deploying. This selects the Mori theme; enabling SDDM as your login manager is a separate step.

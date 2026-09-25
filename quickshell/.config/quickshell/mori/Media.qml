@@ -18,16 +18,12 @@ Item {
 
     implicitWidth: summary.implicitWidth
     implicitHeight: summary.implicitHeight
-    // Anchors position using width/height, not the implicit dimensions.
-    // Giving this item a real size keeps KDE Connect after it instead of
-    // painting over the media summary.
+    // Anchors use actual dimensions, so this bar item needs an explicit size.
     width: implicitWidth
     height: implicitHeight
 
     function selectPlayer() {
-        // Quickshell exposes ObjectModel entries through its `values` list.
-        // Unlike a Qt ListModel, ObjectModel does not provide indexed player
-        // access via get(), so using it left every candidate undefined.
+        // Mpris.players is an ObjectModel; use `values`, not ListModel#get().
         const players = Mpris.players.values
         if (playerManuallySelected && players.indexOf(player) >= 0)
             return
@@ -137,7 +133,7 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: root.accent
+            border.color: root.hasPlayer && root.player.isPlaying ? root.accent : Theme.grey
 
             Column {
                 id: details

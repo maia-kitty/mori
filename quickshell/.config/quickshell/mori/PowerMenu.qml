@@ -110,8 +110,8 @@ Item {
                 Repeater {
                     id: powerActions
                     model: [
-                        { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["loginctl", "lock-session"] },
-                        { label: "Log out", shortcut: "X", key: Qt.Key_X, command: ["sh", "-c", "loginctl terminate-session \"$XDG_SESSION_ID\""] },
+                        { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["swaylock"] },
+                        { label: "Log out", shortcut: "X", key: Qt.Key_X, command: ["niri", "msg", "action", "quit", "--skip-confirmation"] },
                         { label: "Suspend", shortcut: "S", key: Qt.Key_S, command: ["systemctl", "suspend"] },
                         { label: "Restart", shortcut: "R", key: Qt.Key_R, command: ["systemctl", "reboot"] },
                         { label: "Power off", shortcut: "P", key: Qt.Key_P, command: ["systemctl", "poweroff"] }

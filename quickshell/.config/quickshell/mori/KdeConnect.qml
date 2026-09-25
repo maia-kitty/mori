@@ -175,7 +175,7 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: root.accent
+            border.color: root.connected ? root.accent : Theme.grey
             Column {
                 id: details
                 anchors.margins: 12

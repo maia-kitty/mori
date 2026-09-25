@@ -338,10 +338,6 @@ Item {
                             }
                         }
 
-                        // Applications commonly expose a "default" action to
-                        // open their window or jump to the relevant item. When
-                        // they do not, focus the Niri window matching the
-                        // notification's desktop entry instead.
                         MouseArea {
                             anchors.left: parent.left
                             anchors.right: closeButton.left

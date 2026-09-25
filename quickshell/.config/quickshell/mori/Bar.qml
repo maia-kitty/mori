@@ -128,7 +128,6 @@ PanelWindow {
         action: () => powerMenu.toggle()
     }
 
-    // The clock owns the CalDAV-backed calendar and agenda popup.
     Calendar {
         id: clockText
         panelWindow: barWindow

@@ -335,8 +335,8 @@ RowLayout {
         }
     }
 
-    // The shield starts beneath the bar: it dismisses the panel on an outside
-    // click while keeping the volume controls (including the `v`) clickable.
+    // The shield starts below the bar so outside clicks dismiss the panel
+    // without blocking the volume controls.
     PanelWindow {
         visible: devicePopup.visible
         anchors { top: true; bottom: true; left: true; right: true }

@@ -4,7 +4,8 @@
     "type": "file",
     "source": "~/.config/fastfetch/mori-cachyos.txt",
     "color": {
-      "1": "green"
+      "1": "green",
+      "2": "bright_green"
     }
   },
   "display": {

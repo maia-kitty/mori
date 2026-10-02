@@ -12,6 +12,7 @@ Item {
     property var player: null
     property bool playerManuallySelected: false
     property color accent: Theme.aqua
+    property bool compactMode: false
     readonly property bool hasPlayer: player !== null
     readonly property string trackTitle: hasPlayer ? (player.trackTitle || "Unknown title") : "No media"
     readonly property string trackArtist: hasPlayer ? (player.trackArtist || player.identity || "Unknown artist") : "Start a player to begin"
@@ -92,7 +93,8 @@ Item {
             font.pixelSize: Theme.fontSize
         }
         Text {
-            width: Math.min(220, implicitWidth)
+            visible: !root.compactMode
+            width: root.compactMode ? 0 : Math.min(220, implicitWidth)
             text: root.trackTitle
             color: root.hasPlayer ? root.accent : Theme.grey
             font.family: Theme.fontFamily

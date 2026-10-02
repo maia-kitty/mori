@@ -11,7 +11,7 @@ Item {
     required property var popupCoordinator
     property var player: null
     property bool playerManuallySelected: false
-    readonly property color accent: Theme.aqua
+    property color accent: Theme.aqua
     readonly property bool hasPlayer: player !== null
     readonly property string trackTitle: hasPlayer ? (player.trackTitle || "Unknown title") : "No media"
     readonly property string trackArtist: hasPlayer ? (player.trackArtist || player.identity || "Unknown artist") : "Start a player to begin"
@@ -120,7 +120,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1

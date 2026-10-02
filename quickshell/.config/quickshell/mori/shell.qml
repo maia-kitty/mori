@@ -8,6 +8,10 @@ ShellRoot {
     id: root
     property bool niriOverviewOpen: false
 
+    SettingsStore {
+        id: settings
+    }
+
     // Super+Tab invokes niri's toggle-overview action. Its event stream emits
     // the overview state immediately on connection and whenever it changes.
     Process {
@@ -47,6 +51,7 @@ ShellRoot {
         id: bar
         notificationServer: notificationServer
         overviewOpen: root.niriOverviewOpen
+        settings: settings
         // Keep the bar on the primary output. Without an explicit screen,
         // Quickshell may remap the panel to the currently active monitor.
         screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
@@ -59,6 +64,7 @@ ShellRoot {
         function togglePowerMenu(): void { bar.togglePowerMenu() }
         function toggleWallpaperPicker(): void { bar.toggleWallpaperPicker() }
         function toggleNotifications(): void { bar.toggleNotifications() }
+        function toggleSettings(): void { bar.toggleSettings() }
         function volumeUp(): void { bar.volumeUp() }
         function volumeDown(): void { bar.volumeDown() }
         function toggleMute(): void { bar.toggleMute() }

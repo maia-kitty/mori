@@ -11,6 +11,7 @@ Item {
     required property var panelWindow
     required property var notificationServer
     required property var popupCoordinator
+    property color accent: Theme.purple
     property bool doNotDisturb: false
 
     property var pendingNotifications: []
@@ -166,7 +167,7 @@ Item {
         id: bell
         anchors.centerIn: parent
         text: String.fromCodePoint(root.doNotDisturb ? 0xf009b : 0xf009a)
-        color: Theme.purple
+        color: root.accent
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
 
@@ -186,7 +187,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -199,7 +200,7 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.purple
+            border.color: root.accent
 
             ScrollableColumn {
                 id: notificationList
@@ -218,7 +219,7 @@ Item {
                     Text {
                         id: headerTitle
                         text: "Notifications"
-                        color: Theme.purple
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize
                     }
@@ -230,7 +231,7 @@ Item {
 
                         Text {
                             text: root.doNotDisturb ? "DND on" : "DND off"
-                            color: root.doNotDisturb ? Theme.purple : Theme.grey1
+                            color: root.doNotDisturb ? root.accent : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
 
@@ -293,7 +294,7 @@ Item {
                             Text {
                                 width: parent.width
                                 text: appName
-                                color: Theme.purple
+                                color: root.accent
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
@@ -328,7 +329,7 @@ Item {
                             anchors.right: parent.right
                             anchors.margins: 6
                             text: "×"
-                            color: Theme.purple
+                            color: root.accent
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize + 5
 

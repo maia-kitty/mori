@@ -9,6 +9,8 @@ import "./theme"
 RowLayout {
     id: root
     spacing: 4
+    property color accent: Theme.blue
+    property bool compactMode: false
     property var wifiDevice: null
     property bool wiredConnected: false
     property string wiredName: ""
@@ -281,7 +283,7 @@ RowLayout {
 
     Text {
         text: root.icon
-        color: root.wiredConnected || (root.wifiRadioEnabled && root.hasWifiConnection) ? Theme.blue : Theme.grey
+        color: root.wiredConnected || (root.wifiRadioEnabled && root.hasWifiConnection) ? root.accent : Theme.grey
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
     }
@@ -290,11 +292,12 @@ RowLayout {
         text: root.wiredConnected ? root.wiredName
               : !root.wifiRadioEnabled ? "off"
               : root.hasWifiConnection ? root.currentWifiName : "N/A"
-        color: Theme.blue
+        color: root.accent
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
         elide: Text.ElideRight
         Layout.maximumWidth: 90
+        visible: !root.compactMode
     }
 
     TapHandler { onTapped: root.toggle() }
@@ -312,7 +315,7 @@ RowLayout {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -343,7 +346,7 @@ RowLayout {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.blue
+            border.color: root.accent
 
             ScrollableColumn {
                 id: listCol
@@ -361,7 +364,7 @@ RowLayout {
 
                     Text {
                         text: "Ethernet"
-                        color: Theme.blue
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize
                     }
@@ -378,7 +381,7 @@ RowLayout {
 
                             Text {
                                 text: displayName
-                                color: isConnected ? Theme.blue : Theme.fg
+                                color: isConnected ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
@@ -413,7 +416,7 @@ RowLayout {
 
                     Text {
                         text: "VPN"
-                        color: Theme.blue
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize
                     }
@@ -431,7 +434,7 @@ RowLayout {
                         delegate: Text {
                             required property string modelData
                             text: modelData
-                            color: Theme.blue
+                            color: root.accent
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
@@ -444,7 +447,7 @@ RowLayout {
 
                     Text {
                         text: "Wi-Fi"
-                        color: Theme.blue
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize
                     }
@@ -475,7 +478,7 @@ RowLayout {
                                 Text {
                                     Layout.fillWidth: true
                                     text: networkName + "   " + Math.round(strength * 100) + "%"
-                                    color: isConnected ? Theme.blue : Theme.fg
+                                    color: isConnected ? root.accent : Theme.fg
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
 

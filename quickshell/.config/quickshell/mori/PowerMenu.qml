@@ -10,6 +10,7 @@ Item {
     implicitHeight: powerIcon.implicitHeight
     required property var panelWindow
     required property var popupCoordinator
+    property color accent: Theme.red
     property int heldActionKey: 0
 
     function toggle() {
@@ -58,7 +59,7 @@ Item {
         id: powerIcon
         anchors.centerIn: parent
         text: String.fromCodePoint(0xf0425)
-        color: Theme.red
+        color: root.accent
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
 
@@ -83,7 +84,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, menu.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, menu.implicitWidth, menu.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -97,7 +98,7 @@ Item {
             shown: menu.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.red
+            border.color: root.accent
 
             Column {
                 id: menuItems
@@ -136,7 +137,7 @@ Item {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.label
-                            color: modelData.label === "Power off" ? Theme.red : Theme.fg
+                            color: modelData.label === "Power off" ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
@@ -145,7 +146,7 @@ Item {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.shortcut
-                            color: modelData.label === "Power off" ? Theme.red : Theme.grey1
+                            color: modelData.label === "Power off" ? root.accent : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }

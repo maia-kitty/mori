@@ -8,6 +8,8 @@ import "./theme"
 
 RowLayout {
     id: root
+    property color accent: Theme.yellow
+    property bool compactMode: false
     spacing: 6
 
     readonly property var sink: Pipewire.defaultAudioSink
@@ -52,13 +54,18 @@ RowLayout {
         text: root.sink && root.sink.audio && root.sink.audio.muted
               ? String.fromCodePoint(0xf0583)
               : String.fromCodePoint(0xf057e)
-        color: root.sink ? Theme.yellow : Theme.grey
+        color: root.sink ? root.accent : Theme.grey
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
 
         TapHandler {
-            enabled: root.sink && root.sink.audio
-            onTapped: root.sink.audio.muted = !root.sink.audio.muted
+            enabled: root.compactMode || (root.sink && root.sink.audio)
+            onTapped: {
+                if (root.compactMode)
+                    root.togglePopup()
+                else
+                    root.sink.audio.muted = !root.sink.audio.muted
+            }
         }
     }
 
@@ -69,6 +76,7 @@ RowLayout {
         stepSize: 0.01
         implicitWidth: 110
         implicitHeight: 20
+        visible: !root.compactMode
         enabled: root.sink && root.sink.audio
         value: enabled ? root.sink.audio.volume : 0
 
@@ -88,7 +96,7 @@ RowLayout {
                 width: slider.visualPosition * parent.width
                 height: parent.height
                 radius: 0
-                color: Theme.yellow
+                color: root.accent
             }
         }
 
@@ -98,14 +106,15 @@ RowLayout {
             width: 10
             height: 10
             radius: 0
-            color: Theme.yellow
+            color: root.accent
         }
     }
 
     Text {
         id: deviceArrow
+        visible: !root.compactMode
         text: devicePopup.visible ? "▴" : "▾"
-        color: Theme.yellow
+        color: root.accent
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
 
@@ -125,7 +134,8 @@ RowLayout {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, devicePopup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(
+                root, devicePopup.implicitWidth, devicePopup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -138,7 +148,7 @@ RowLayout {
             shown: devicePopup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.yellow
+            border.color: root.accent
 
             ScrollableColumn {
                 id: deviceList
@@ -151,7 +161,7 @@ RowLayout {
 
                 Text {
                     text: "Output Devices"
-                    color: Theme.yellow
+                    color: root.accent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize
                 }
@@ -176,7 +186,7 @@ RowLayout {
                             Text {
                                 Layout.fillWidth: true
                                 text: modelData ? (modelData.description || modelData.nickname || modelData.name) : ""
-                                color: modelData === root.sink ? Theme.yellow : Theme.fg
+                                color: modelData === root.sink ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
@@ -220,7 +230,7 @@ RowLayout {
                                     width: deviceSlider.visualPosition * parent.width
                                     height: parent.height
                                     radius: 0
-                                    color: Theme.yellow
+                                    color: root.accent
                                 }
                             }
 
@@ -231,7 +241,7 @@ RowLayout {
                                 width: 10
                                 height: 10
                                 radius: 0
-                                color: Theme.yellow
+                                color: root.accent
                             }
                         }
 
@@ -245,7 +255,7 @@ RowLayout {
 
                 Text {
                     text: "Applications"
-                    color: Theme.yellow
+                    color: root.accent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     topPadding: 4
@@ -309,7 +319,7 @@ RowLayout {
                                     width: appSlider.visualPosition * parent.width
                                     height: parent.height
                                     radius: 0
-                                    color: Theme.yellow
+                                    color: root.accent
                                 }
                             }
 
@@ -320,7 +330,7 @@ RowLayout {
                                 width: 10
                                 height: 10
                                 radius: 0
-                                color: Theme.yellow
+                                color: root.accent
                             }
                         }
 

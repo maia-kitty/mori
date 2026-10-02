@@ -9,6 +9,7 @@ Item {
     id: root
     required property var panelWindow
     required property var popupCoordinator
+    property color accent: Theme.green
     property var wallpapers: ({})
     property var selectedScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
     property url wallpaperFolder: "file://" + Quickshell.env("HOME") + "/Pictures/Wallpapers"
@@ -95,7 +96,7 @@ Item {
         id: icon
         anchors.centerIn: parent
         text: String.fromCodePoint(0xf03e)
-        color: Theme.green
+        color: root.accent
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
         TapHandler { onTapped: root.toggle() }
@@ -147,7 +148,7 @@ Item {
         grabFocus: false
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -161,7 +162,7 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.green
+            border.color: root.accent
 
             Column {
                 anchors.fill: parent
@@ -170,7 +171,7 @@ Item {
 
                 Text {
                     text: "Wallpapers"
-                    color: Theme.green
+                    color: root.accent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize
                 }
@@ -196,7 +197,7 @@ Item {
 
                         Text {
                             text: "↑ Up"
-                            color: up.enabled ? Theme.green : Theme.grey
+                            color: up.enabled ? root.accent : Theme.grey
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                             TapHandler {
@@ -207,7 +208,7 @@ Item {
                         }
                         Text {
                             text: "Choose folder"
-                            color: Theme.green
+                            color: root.accent
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
 
@@ -230,13 +231,13 @@ Item {
                             width: screenName.implicitWidth + 16
                             color: root.selectedScreen === modelData ? Theme.bggreen : Theme.bg2
                             border.width: 2
-                            border.color: root.selectedScreen === modelData ? Theme.green : Theme.bg4
+                            border.color: root.selectedScreen === modelData ? root.accent : Theme.bg4
 
                             Text {
                                 id: screenName
                                 anchors.centerIn: parent
                                 text: modelData.name
-                                color: root.selectedScreen === modelData ? Theme.green : Theme.fg
+                                color: root.selectedScreen === modelData ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
@@ -264,7 +265,7 @@ Item {
                         height: grid.cellHeight - 6
                         color: hover.hovered ? Theme.bggreen : Theme.bg2
                         border.width: 2
-                        border.color: root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl) || hover.hovered ? Theme.green : Theme.bg4
+                        border.color: root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl) || hover.hovered ? root.accent : Theme.bg4
 
                         Image {
                             id: preview
@@ -282,14 +283,14 @@ Item {
                             y: 20
                             visible: tile.fileIsDir || preview.status === Image.Error
                             text: tile.fileIsDir ? "▸" : "?"
-                            color: Theme.green
+                            color: root.accent
                             font.pixelSize: 28
                         }
                         Text {
                             anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 5 }
                             text: tile.fileName
                             elide: Text.ElideRight
-                            color: tile.fileIsDir ? Theme.green : Theme.fg
+                            color: tile.fileIsDir ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }

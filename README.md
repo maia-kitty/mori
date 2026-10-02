@@ -19,6 +19,7 @@ I personally use CachyOs so it was made with it in mind.
 | Niri | Wayland compositor |
 | Quickshell | Bar, popups, notifications, and desktop controls |
 | PipeWire and WirePlumber | Audio and the bar's volume controls |
+| brightnessctl | Laptop backlight control |
 | Kitty | Terminal and terminal-based launch shortcuts |
 | Fuzzel | Application launcher and clipboard picker |
 | wl-clipboard and cliphist | Clipboard history and copying selections |

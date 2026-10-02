@@ -764,7 +764,7 @@ Item {
                 const currentRevision = root.settings.revision
                 return root.settings.moduleEnabled(moduleKey)
             }
-            readonly property bool supportsCompact: ["network", "volume", "brightness"]
+            readonly property bool supportsCompact: ["media", "network", "volume", "brightness"]
                 .indexOf(moduleKey) >= 0
             readonly property bool moduleCompact: {
                 const currentRevision = root.settings.revision
@@ -855,8 +855,10 @@ Item {
                         }
                     }
 
-                    TapHandler {
-                        onTapped: root.settings.setCompactMode(
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.settings.setCompactMode(
                             moduleRow.moduleKey, !moduleRow.moduleCompact)
                     }
                 }

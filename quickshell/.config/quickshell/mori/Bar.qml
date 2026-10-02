@@ -160,6 +160,7 @@ PanelWindow {
                 panelWindow: barWindow
                 popupCoordinator: barWindow
                 accent: barWindow.settings.moduleColor("media")
+                compactMode: barWindow.settings.mediaCompact
             }
         }
     }

@@ -14,6 +14,7 @@ Item {
     property bool networkEnabled: true
     property bool volumeEnabled: true
     property bool brightnessEnabled: true
+    property bool mediaCompact: false
     property bool networkCompact: false
     property bool volumeCompact: false
     property bool brightnessCompact: false
@@ -94,6 +95,7 @@ Item {
 
     function compactMode(name) {
         switch (name) {
+        case "media": return mediaCompact
         case "network": return networkCompact
         case "volume": return volumeCompact
         case "brightness": return brightnessCompact
@@ -103,6 +105,7 @@ Item {
 
     function setCompactMode(name, compact) {
         switch (name) {
+        case "media": mediaCompact = compact; break
         case "network": networkCompact = compact; break
         case "volume": volumeCompact = compact; break
         case "brightness": brightnessCompact = compact; break
@@ -256,7 +259,7 @@ Item {
                 moduleColors = updatedColors
 
                 const compact = parsed.compact || {}
-                for (const name of ["network", "volume", "brightness"]) {
+                for (const name of ["media", "network", "volume", "brightness"]) {
                     if (typeof compact[name] === "boolean")
                         setCompactMode(name, compact[name])
                 }
@@ -292,6 +295,7 @@ Item {
             },
             "colors": moduleColors,
             "compact": {
+                "media": mediaCompact,
                 "network": networkCompact,
                 "volume": volumeCompact,
                 "brightness": brightnessCompact

@@ -9,6 +9,7 @@ Item {
 
     required property var panelWindow
     required property var popupCoordinator
+    property color accent: Theme.fg
     property date shownMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12)
     property date selectedDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 12)
     property var events: []
@@ -168,7 +169,7 @@ Item {
         id: clockLabel
         anchors.centerIn: parent
         text: Qt.formatDateTime(clock.date, "[ yyyy/MM/dd   hh:mm ]")
-        color: Theme.fg
+        color: root.accent
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
 
@@ -248,7 +249,7 @@ Item {
 
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1
@@ -263,7 +264,7 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.fg
+            border.color: root.accent
 
             Column {
                 anchors.fill: parent
@@ -278,7 +279,7 @@ Item {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: "‹"
-                        color: Theme.fg
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: 20
                         TapHandler { onTapped: root.changeMonth(-1) }
@@ -287,7 +288,7 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: Qt.formatDate(root.shownMonth, "MMMM yyyy")
-                        color: Theme.fg
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize
                         TapHandler { onTapped: root.goToToday() }
@@ -297,7 +298,7 @@ Item {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         text: "›"
-                        color: Theme.fg
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: 20
                         TapHandler { onTapped: root.changeMonth(1) }
@@ -341,13 +342,13 @@ Item {
                             height: 28
                             color: selected ? Theme.bg3 : "transparent"
                             border.width: current ? 1 : 0
-                            border.color: Theme.fg
+                            border.color: root.accent
 
                             Text {
                                 anchors.centerIn: parent
                                 text: dayCell.value.getDate()
-                                color: dayCell.selected ? Theme.fg
-                                     : dayCell.inMonth ? Theme.fg : Theme.grey
+                                color: dayCell.selected ? root.accent
+                                     : dayCell.inMonth ? root.accent : Theme.grey
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
@@ -360,7 +361,7 @@ Item {
                                 height: 4
                                 radius: 2
                                 visible: dayCell.inMonth && root.hasEvent(dayCell.value)
-                                color: Theme.fg
+                                color: root.accent
                             }
 
                             TapHandler { onTapped: root.selectDate(dayCell.value) }
@@ -382,7 +383,7 @@ Item {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: Qt.formatDate(root.selectedDate, "dddd, MMMM d")
-                        color: Theme.fg
+                        color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
@@ -443,7 +444,7 @@ Item {
                                     width: 3
                                     height: parent.height
                                     color: /^#[0-9a-fA-F]{6}$/.test(modelData["calendar-color"] || "")
-                                           ? modelData["calendar-color"] : Theme.fg
+                                           ? modelData["calendar-color"] : root.accent
                                 }
 
                                 Column {
@@ -458,7 +459,7 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: modelData.title || "Untitled event"
-                                        color: Theme.fg
+                                        color: root.accent
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                         elide: Text.ElideRight

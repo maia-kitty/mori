@@ -10,7 +10,7 @@ Item {
     required property var panelWindow
     required property var popupCoordinator
     property var device: null
-    readonly property color accent: Theme.orange
+    property color accent: Theme.orange
     readonly property string deviceId: device ? device.id() : ""
     readonly property bool connected: device !== null && device.isReachable && device.isPaired
     readonly property var battery: connected && batteryPlugin.available
@@ -61,10 +61,11 @@ Item {
         notificationsPlugin.available = false
         clipboardPlugin.available = false
         Qt.callLater(() => {
-            batteryPlugin.pluginsChanged()
-            networkPlugin.pluginsChanged()
-            notificationsPlugin.pluginsChanged()
-            clipboardPlugin.pluginsChanged()
+            // The module may be unloaded or moved before this deferred refresh.
+            if (batteryPlugin) batteryPlugin.pluginsChanged()
+            if (networkPlugin) networkPlugin.pluginsChanged()
+            if (notificationsPlugin) notificationsPlugin.pluginsChanged()
+            if (clipboardPlugin) clipboardPlugin.pluginsChanged()
         })
     }
 
@@ -161,7 +162,7 @@ Item {
         grabFocus: false
         anchor.window: root.panelWindow
         anchor.rect {
-            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth)
+            x: root.panelWindow.popupAnchorX(root, popup.implicitWidth, popup.visible)
             y: parentWindow.height + 6
             width: 1
             height: 1

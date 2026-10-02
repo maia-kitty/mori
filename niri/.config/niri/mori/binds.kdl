@@ -4,7 +4,10 @@ binds {
 
     // === Application Launchers ===
     Mod+T hotkey-overlay-title="Open Terminal" { spawn "kitty"; }
-    Mod+Space hotkey-overlay-title="Application Launcher" { spawn "fuzzel"; }
+    Mod+Space hotkey-overlay-title="Application Launcher: Toggle" {
+        spawn "sh" "-c" "pkill -x fuzzel || exec fuzzel";
+    }
+    Mod+Period hotkey-overlay-title="Mori Settings" { spawn "qs" "-c" "mori" "ipc" "call" "bar" "toggleSettings"; }
     Mod+Z hotkey-overlay-title="Open Zen Browser" { spawn "zen-browser"; }
 
     Mod+V hotkey-overlay-title="Clipboard Manager" {

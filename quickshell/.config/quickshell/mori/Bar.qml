@@ -8,6 +8,7 @@ PanelWindow {
     id: barWindow
     required property var notificationServer
     required property bool overviewOpen
+    required property var settings
     readonly property bool fullscreen: {
         const active = ToplevelManager.activeToplevel
         if (!active || !active.fullscreen || !barWindow.screen)
@@ -29,8 +30,11 @@ PanelWindow {
 
     // The panel window already starts 2px in from each screen edge. Clamp a
     // popup inside that window so it shares, rather than doubles, that gutter.
-    function popupAnchorX(item, popupWidth) {
-        const centered = item.x + item.width / 2 + popupWidth / 2
+    function popupAnchorX(item, popupWidth, popupVisible) {
+        const currentLayoutRevision = settings.revision
+        const visibilityRevision = popupVisible
+        const position = item.mapToItem(barContent, 0, 0)
+        const centered = position.x + item.width / 2 + popupWidth / 2
         return Math.max(popupWidth, Math.min(width, centered))
     }
 
@@ -45,12 +49,61 @@ PanelWindow {
             activePopup = null
     }
 
-    function togglePowerMenu() { powerMenu.toggle() }
-    function toggleWallpaperPicker() { wallpaperPicker.toggle() }
-    function toggleNotifications() { notificationCenter.toggle() }
-    function volumeUp() { volume.adjustVolume(0.03) }
-    function volumeDown() { volume.adjustVolume(-0.03) }
-    function toggleMute() { volume.toggleMute() }
+    function componentForModule(name) {
+        switch (name) {
+        case "calendar": return calendarComponent
+        case "media": return mediaComponent
+        case "kdeConnect": return kdeConnectComponent
+        case "systemTray": return systemTrayComponent
+        case "network": return networkComponent
+        case "volume": return volumeComponent
+        case "brightness": return brightnessComponent
+        case "wallpaper": return wallpaperComponent
+        case "notifications": return notificationComponent
+        case "battery": return batteryComponent
+        case "workspaces": return workspacesComponent
+        case "powerMenu": return powerMenuComponent
+        default: return null
+        }
+    }
+
+    function loadedModule(name) {
+        const repeaters = [leftModuleRepeater, centerModuleRepeater, rightModuleRepeater]
+        for (const repeater of repeaters) {
+            for (let index = 0; index < repeater.count; ++index) {
+                const loader = repeater.itemAt(index)
+                if (loader && loader.moduleKey === name && loader.item)
+                    return loader.item.module
+            }
+        }
+        return null
+    }
+
+    function togglePowerMenu() {
+        const module = loadedModule("powerMenu")
+        if (module) module.toggle()
+    }
+    function toggleWallpaperPicker() {
+        const module = loadedModule("wallpaper")
+        if (module) module.toggle()
+    }
+    function toggleNotifications() {
+        const module = loadedModule("notifications")
+        if (module) module.toggle()
+    }
+    function toggleSettings() { settingsPanel.toggle() }
+    function volumeUp() {
+        const module = loadedModule("volume")
+        if (module) module.adjustVolume(0.03)
+    }
+    function volumeDown() {
+        const module = loadedModule("volume")
+        if (module) module.adjustVolume(-0.03)
+    }
+    function toggleMute() {
+        const module = loadedModule("volume")
+        if (module) module.toggleMute()
+    }
 
     onOverviewOpenChanged: {
         if (overviewOpen && activePopup)
@@ -85,6 +138,183 @@ PanelWindow {
     // bar above them so a click can switch directly to another widget.
     WlrLayershell.layer: WlrLayer.Overlay
 
+    Component {
+        id: calendarComponent
+        Row {
+            readonly property alias module: calendar
+            Calendar {
+                id: calendar
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("calendar")
+            }
+        }
+    }
+
+    Component {
+        id: mediaComponent
+        Row {
+            readonly property alias module: media
+            Media {
+                id: media
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("media")
+            }
+        }
+    }
+
+    Component {
+        id: kdeConnectComponent
+        Row {
+            readonly property alias module: kdeConnect
+            KdeConnect {
+                id: kdeConnect
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("kdeConnect")
+            }
+        }
+    }
+
+    Component {
+        id: systemTrayComponent
+        Row {
+            readonly property alias module: systemTray
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: barWindow.settings.moduleColor("systemTray") }
+            SystemTray { id: systemTray; panelWindow: barWindow }
+            BarBracket { text: "]"; color: barWindow.settings.moduleColor("systemTray") }
+        }
+    }
+
+    Component {
+        id: networkComponent
+        Row {
+            readonly property alias module: network
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: network.accent; action: () => network.toggle() }
+            Network {
+                id: network
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("network")
+                compactMode: barWindow.settings.networkCompact
+            }
+            BarBracket { text: "]"; color: network.accent; action: () => network.toggle() }
+        }
+    }
+
+    Component {
+        id: volumeComponent
+        Row {
+            readonly property alias module: volume
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: volume.accent; action: () => volume.togglePopup() }
+            Volume {
+                id: volume
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("volume")
+                compactMode: barWindow.settings.volumeCompact
+            }
+            BarBracket { text: "]"; color: volume.accent; action: () => volume.togglePopup() }
+        }
+    }
+
+    Component {
+        id: brightnessComponent
+        Row {
+            readonly property alias module: brightness
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
+            Brightness {
+                id: brightness
+                accent: barWindow.settings.moduleColor("brightness")
+                compactMode: barWindow.settings.brightnessCompact
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+            }
+            BarBracket { text: "]"; color: brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
+        }
+    }
+
+    Component {
+        id: wallpaperComponent
+        Row {
+            readonly property alias module: wallpaperPicker
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: wallpaperPicker.accent; action: () => wallpaperPicker.toggle() }
+            WallpaperPicker {
+                id: wallpaperPicker
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("wallpaper")
+            }
+            BarBracket { text: "]"; color: wallpaperPicker.accent; action: () => wallpaperPicker.toggle() }
+        }
+    }
+
+    Component {
+        id: notificationComponent
+        Row {
+            readonly property alias module: notificationCenter
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: notificationCenter.accent; action: () => notificationCenter.toggle() }
+            NotificationCenter {
+                id: notificationCenter
+                panelWindow: barWindow
+                notificationServer: barWindow.notificationServer
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("notifications")
+            }
+            BarBracket { text: "]"; color: notificationCenter.accent; action: () => notificationCenter.toggle() }
+        }
+    }
+
+    Component {
+        id: batteryComponent
+        // Battery is an indicator only; its visibility is controlled in Modules.
+        Row {
+            readonly property alias module: battery
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: battery.accent }
+            Battery {
+                id: battery
+                accent: barWindow.settings.moduleColor("battery")
+            }
+            BarBracket { text: "]"; color: battery.accent }
+        }
+    }
+
+    Component {
+        id: workspacesComponent
+        Row {
+            readonly property alias module: workspaces
+            Workspaces {
+                id: workspaces
+                panelWindow: barWindow
+                accent: barWindow.settings.moduleColor("workspaces")
+            }
+        }
+    }
+
+    Component {
+        id: powerMenuComponent
+        Row {
+            readonly property alias module: powerMenu
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: powerMenu.accent; action: () => powerMenu.toggle() }
+            PowerMenu {
+                id: powerMenu
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                accent: barWindow.settings.moduleColor("powerMenu")
+            }
+            BarBracket { text: "]"; color: powerMenu.accent; action: () => powerMenu.toggle() }
+        }
+    }
+
     Item {
         id: barContent
         anchors.fill: parent
@@ -99,212 +329,88 @@ PanelWindow {
             border.color: Theme.fg
         }
 
-    PowerMenu {
-        id: powerMenu
-        anchors.right: powerClose.left
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.rightMargin: barWindow.bracketSpacing
+        Row {
+            id: leftModules
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: barWindow.componentSpacing
+
+            Repeater {
+                id: leftModuleRepeater
+                model: barWindow.settings.leftModuleOrder
+
+                delegate: Loader {
+                    required property string modelData
+                    readonly property string moduleKey: modelData
+                    active: barWindow.settings.moduleEnabled(moduleKey)
+                    visible: active
+                    sourceComponent: barWindow.componentForModule(moduleKey)
+                }
+            }
+        }
+
+        Row {
+            id: centerModules
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: barWindow.componentSpacing
+
+            Repeater {
+                id: centerModuleRepeater
+                model: barWindow.settings.centerModuleOrder
+
+                delegate: Loader {
+                    required property string modelData
+                    readonly property string moduleKey: modelData
+                    active: barWindow.settings.moduleEnabled(moduleKey)
+                    visible: active
+                    sourceComponent: barWindow.componentForModule(moduleKey)
+                }
+            }
+        }
+
+        Row {
+            id: rightModules
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: barWindow.componentSpacing
+
+            Repeater {
+                id: rightModuleRepeater
+                model: barWindow.settings.rightModuleOrder
+
+                delegate: Loader {
+                    required property string modelData
+                    readonly property string moduleKey: modelData
+                    active: barWindow.settings.moduleEnabled(moduleKey)
+                    visible: active
+                    sourceComponent: barWindow.componentForModule(moduleKey)
+                }
+            }
+
+        }
+
+        Loader {
+            active: barWindow.settings.notificationsEnabled
+            sourceComponent: NotificationPopup {
+                panelWindow: barWindow
+                notificationServer: barWindow.notificationServer
+                popupCoordinator: barWindow
+                doNotDisturb: {
+                    const currentRevision = barWindow.settings.revision
+                    const center = barWindow.loadedModule("notifications")
+                    return center ? center.doNotDisturb : false
+                }
+            }
+        }
+    }
+
+    MoriSettings {
+        id: settingsPanel
         panelWindow: barWindow
         popupCoordinator: barWindow
-    }
-
-    BarBracket {
-        id: powerOpen
-        anchors.right: powerMenu.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.red
-        action: () => powerMenu.toggle()
-    }
-
-    BarBracket {
-        id: powerClose
-        anchors.right: parent.right
-        anchors.rightMargin: 12
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.red
-        action: () => powerMenu.toggle()
-    }
-
-    Calendar {
-        id: clockText
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    Media {
-        id: media
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.left: clockText.right
-        anchors.leftMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    KdeConnect {
-        id: kdeConnect
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.left: media.right
-        anchors.leftMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    WallpaperPicker {
-        id: wallpaperPicker
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.right: wallpaperClose.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    Network {
-        id: network
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.right: networkClose.left
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.rightMargin: barWindow.bracketSpacing
-    }
-
-    Volume {
-        id: volume
-        panelWindow: barWindow
-        popupCoordinator: barWindow
-        anchors.right: volumeClose.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    SystemTray {
-        id: systemTray
-        panelWindow: barWindow
-        anchors.right: trayClose.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    NotificationCenter {
-        id: notificationCenter
-        panelWindow: barWindow
-        notificationServer: barWindow.notificationServer
-        popupCoordinator: barWindow
-        anchors.right: notificationClose.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-
-    }
-
-    BarBracket {
-        id: notificationOpen
-        anchors.right: notificationCenter.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.purple
-        action: () => notificationCenter.toggle()
-    }
-
-    BarBracket {
-        id: notificationClose
-        anchors.right: powerOpen.left
-        anchors.rightMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.purple
-        action: () => notificationCenter.toggle()
-    }
-
-    BarBracket {
-        id: wallpaperOpen
-        anchors.right: wallpaperPicker.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.green
-        action: () => wallpaperPicker.toggle()
-    }
-
-    BarBracket {
-        id: wallpaperClose
-        anchors.right: notificationOpen.left
-        anchors.rightMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.green
-        action: () => wallpaperPicker.toggle()
-    }
-
-    BarBracket {
-        id: volumeOpen
-        anchors.right: volume.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.yellow
-        action: () => volume.togglePopup()
-    }
-
-    BarBracket {
-        id: volumeClose
-        anchors.right: wallpaperOpen.left
-        anchors.rightMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.yellow
-        action: () => volume.togglePopup()
-    }
-
-    BarBracket {
-        id: networkOpen
-        anchors.right: network.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.blue
-        action: () => network.toggle()
-    }
-
-    BarBracket {
-        id: networkClose
-        anchors.right: volumeOpen.left
-        anchors.rightMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.blue
-        action: () => network.toggle()
-    }
-
-    BarBracket {
-        id: trayOpen
-        anchors.right: systemTray.left
-        anchors.rightMargin: barWindow.bracketSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "["
-        color: Theme.fg
-    }
-
-    BarBracket {
-        id: trayClose
-        anchors.right: networkOpen.left
-        anchors.rightMargin: barWindow.componentSpacing
-        anchors.verticalCenter: parent.verticalCenter
-        text: "]"
-        color: Theme.fg
-    }
-
-    NotificationPopup {
-        id: notificationPopup
-        panelWindow: barWindow
-        notificationServer: barWindow.notificationServer
-        popupCoordinator: barWindow
-        doNotDisturb: notificationCenter.doNotDisturb
-    }
+        settings: barWindow.settings
     }
 }

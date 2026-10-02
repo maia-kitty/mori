@@ -1,11 +1,12 @@
 output "DP-1" {
     mode "1920x1080@143.855"
     scale 1
-    position x=0 y=447
+    position x=0 y=352
     focus-at-startup
     layout {
         always-center-single-column
     }
+    transform "normal"
 }
 
 output "HDMI-A-1" {
@@ -14,11 +15,3 @@ output "HDMI-A-1" {
     transform "270"
     position x=1920 y=0
 }
-
-output "eDP-1" {
-    mode "1920x1080@120.030"
-    scale 2
-    transform "normal"
-    position x=6200 y=437
-}
-

@@ -98,6 +98,12 @@ Item {
         id: summary
         spacing: 6
 
+        TextMetrics {
+            id: titleMetrics
+            font: titleText.font
+            text: root.trackTitle
+        }
+
         Text {
             text: "["
             color: root.hasPlayer ? root.accent : Theme.grey
@@ -113,8 +119,9 @@ Item {
             font.pixelSize: Theme.fontSize
         }
         Text {
+            id: titleText
             visible: !root.compactMode
-            width: root.compactMode ? 0 : Math.min(220, implicitWidth)
+            width: root.compactMode ? 0 : Math.min(220, titleMetrics.width)
             text: root.trackTitle
             color: root.hasPlayer ? root.accent : Theme.grey
             font.family: Theme.fontFamily

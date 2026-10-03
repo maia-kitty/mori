@@ -261,10 +261,17 @@ RowLayout {
         // The backend fills its constant object model asynchronously, which
         // does not invalidate JavaScript expressions based on `.values`.
         const devices = Networking.devices.values.slice()
-        wiredDevices.clear()
         wiredConnected = false
         wiredName = ""
-        wifiDevice = devices.find(device => device.type === DeviceType.Wifi) || null
+        const nextWifiDevice = devices.find(device => device.type === DeviceType.Wifi) || null
+        if (wifiDevice !== nextWifiDevice) {
+            if (wifiDevice)
+                wifiDevice.scannerEnabled = false
+            wifiDevice = nextWifiDevice
+            if (wifiDevice)
+                wifiDevice.scannerEnabled = popup.visible
+        }
+        const wiredEntries = []
 
         for (const device of devices) {
             if (device.type !== DeviceType.Wired)
@@ -272,7 +279,7 @@ RowLayout {
 
             const connectedNetwork = device.networks.values.find(network => network.connected)
             const name = connectedNetwork ? connectedNetwork.name : device.name
-            wiredDevices.append({
+            wiredEntries.push({
                 "deviceName": String(device.name || "Ethernet"),
                 "displayName": String(name || "Ethernet"),
                 "isConnected": !!device.connected
@@ -282,6 +289,7 @@ RowLayout {
                 wiredName = String(name || device.name || "Ethernet")
             }
         }
+        syncNetworkList(wiredDevices, wiredEntries)
 
         const networks = wifiDevice ? wifiDevice.networks.values.slice() : []
         nativeWifiNetworkCount = networks.length
@@ -291,12 +299,12 @@ RowLayout {
             return right.signalStrength - left.signalStrength
         })
 
-        wifiNetworks.clear()
         wifiConnected = false
         wifiName = ""
         signal = 0
+        const wifiEntries = []
         for (const network of networks) {
-            wifiNetworks.append({
+            wifiEntries.push({
                 "networkName": String(network.name || "Unknown"),
                 "strength": Number(network.signalStrength || 0),
                 "securityType": Number(network.security),
@@ -310,6 +318,26 @@ RowLayout {
                 signal = Number(network.signalStrength || 0)
             }
         }
+        syncNetworkList(wifiNetworks, wifiEntries)
+    }
+
+    function syncNetworkList(model, entries) {
+        // Preserve delegates (and the keyboard selection) when a poll finds
+        // the same networks, instead of clearing and recreating every row.
+        while (model.count > entries.length)
+            model.remove(model.count - 1)
+        for (let i = 0; i < entries.length; ++i) {
+            const entry = entries[i]
+            if (i >= model.count) {
+                model.append(entry)
+                continue
+            }
+            const current = model.get(i)
+            for (const key of Object.keys(entry)) {
+                if (current[key] !== entry[key])
+                    model.setProperty(i, key, entry[key])
+            }
+        }
     }
 
     Component.onCompleted: refreshNetworkModel()
@@ -319,7 +347,7 @@ RowLayout {
     ListModel { id: wpaNetworks }
 
     Timer {
-        interval: 2000
+        interval: popup.visible ? 2000 : 10000
         repeat: true
         running: true
         onTriggered: root.refreshNetworkModel()
@@ -330,16 +358,27 @@ RowLayout {
     // SSID. These processes only affect the compact bar indicator; the popup
     // continues to use Quickshell's native model for network actions.
     function refreshWpaSupplicantState() {
-        if (!wifiProbe.running)
+        if (fallbackWifiInterface) {
+            if (!wpaStatus.running)
+                wpaStatus.exec(["wpa_cli", "-i", fallbackWifiInterface, "status"])
+        } else if (!wifiProbe.running) {
             wifiProbe.exec(["iw", "dev"])
+        }
     }
 
     Timer {
-        interval: 5000
+        interval: root.fallbackWifiInterface ? 5000 : 10000
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: root.refreshWpaSupplicantState()
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: root.fallbackWifiInterface.length > 0
+        onTriggered: if (!wifiProbe.running) wifiProbe.exec(["iw", "dev"])
     }
 
     Process {

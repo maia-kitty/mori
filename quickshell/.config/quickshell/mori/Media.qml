@@ -63,6 +63,26 @@ Item {
     }
 
     function close() { popup.visible = false }
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Escape) {
+            close()
+            event.accepted = true
+            return
+        }
+        if (event.isAutoRepeat || !hasPlayer || !player.canControl)
+            return
+        if ((event.key === Qt.Key_Space || event.key === Qt.Key_P)
+                && player.canTogglePlaying) {
+            player.togglePlaying()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Left && player.canGoPrevious) {
+            player.previous()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right && player.canGoNext) {
+            player.next()
+            event.accepted = true
+        }
+    }
 
     // ObjectModel does not expose a convenient preferred-player property.
     // Refreshing lightly also makes a newly-playing player take precedence.
@@ -287,16 +307,29 @@ Item {
     }
 
     PanelWindow {
+        id: dismissLayer
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea {
+        onVisibleChanged: {
+            if (visible)
+                Qt.callLater(() => keyCapture.forceActiveFocus())
+        }
+
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+            Keys.onPressed: event => root.handleKeyPressed(event)
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.close()
+            }
         }
     }
 }

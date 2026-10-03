@@ -13,6 +13,7 @@ RowLayout {
     spacing: 6
 
     readonly property var sink: Pipewire.defaultAudioSink
+    property var keyboardNode: null
     required property var panelWindow
     required property var popupCoordinator
 
@@ -22,10 +23,49 @@ RowLayout {
         else {
             popupCoordinator.showPopup(root)
             devicePopup.visible = true
+            keyboardNode = sink || selectableNodes()[0] || null
         }
     }
 
     function close() { devicePopup.visible = false }
+
+    function selectableNodes() {
+        const nodes = Pipewire.nodes.values.filter(node => node && node.ready
+            && node.isSink && node.audio)
+        return nodes.filter(node => !node.isStream)
+            .concat(nodes.filter(node => node.isStream))
+    }
+    function moveKeyboardSelection(offset) {
+        const nodes = selectableNodes()
+        if (nodes.length === 0) return
+        const current = nodes.indexOf(keyboardNode)
+        keyboardNode = nodes[Math.max(0, Math.min(nodes.length - 1,
+            (current < 0 ? 0 : current) + offset))]
+        Qt.callLater(() => {
+            for (const repeater of [outputRepeater, appRepeater]) {
+                for (let i = 0; i < repeater.count; i++) {
+                    const item = repeater.itemAt(i)
+                    if (!item || item.modelData !== keyboardNode) continue
+                    const y = item.mapToItem(deviceList.contentItem, 0, 0).y
+                    if (y < deviceList.contentY) deviceList.contentY = y
+                    else if (y + item.height > deviceList.contentY + deviceList.height)
+                        deviceList.contentY = y + item.height - deviceList.height
+                    return
+                }
+            }
+        })
+    }
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Escape) close()
+        else if (event.key === Qt.Key_Up) moveKeyboardSelection(-1)
+        else if (event.key === Qt.Key_Down) moveKeyboardSelection(1)
+        else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+            if (keyboardNode && keyboardNode.audio)
+                setVolume(keyboardNode, keyboardNode.audio.volume
+                    + (event.key === Qt.Key_Left ? -0.05 : 0.05))
+        } else return
+        event.accepted = true
+    }
 
     function setVolume(node, value) {
         if (node && node.ready && node.audio)
@@ -167,6 +207,7 @@ RowLayout {
                 }
 
                 Repeater {
+                    id: outputRepeater
                     // Keep the native object model: insert/remove individual
                     // delegates instead of rebuilding a filtered JS array.
                     model: Pipewire.nodes
@@ -185,14 +226,17 @@ RowLayout {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: modelData ? (modelData.description || modelData.nickname || modelData.name) : ""
-                                color: modelData === root.sink ? root.accent : Theme.fg
+                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
+                                    + (modelData.description || modelData.nickname || modelData.name) : ""
+                                color: modelData === root.sink || modelData === root.keyboardNode
+                                    ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
 
                                 TapHandler {
                                     onTapped: {
+                                        root.keyboardNode = modelData
                                         if (modelData && modelData.ready && modelData.audio)
                                             Pipewire.preferredDefaultAudioSink = modelData
                                     }
@@ -216,7 +260,7 @@ RowLayout {
                             stepSize: 0.01
                             enabled: !!modelData && modelData.ready && !!modelData.audio
                             value: enabled ? modelData.audio.volume : 0
-                            onMoved: root.setVolume(modelData, value)
+                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
 
                             background: Rectangle {
                                 x: deviceSlider.leftPadding
@@ -262,6 +306,7 @@ RowLayout {
                 }
 
                 Repeater {
+                    id: appRepeater
                     model: Pipewire.nodes
 
                     delegate: Column {
@@ -279,10 +324,11 @@ RowLayout {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: modelData ? (modelData.properties["application.name"]
+                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
+                                    + (modelData.properties["application.name"]
                                       || modelData.description
                                       || modelData.name) : ""
-                                color: Theme.fg
+                                color: modelData === root.keyboardNode ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
@@ -305,7 +351,7 @@ RowLayout {
                             stepSize: 0.01
                             enabled: !!modelData && modelData.ready && !!modelData.audio
                             value: enabled ? modelData.audio.volume : 0
-                            onMoved: root.setVolume(modelData, value)
+                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
 
                             background: Rectangle {
                                 x: appSlider.leftPadding
@@ -348,16 +394,22 @@ RowLayout {
     // The shield starts below the bar so outside clicks dismiss the panel
     // without blocking the volume controls.
     PanelWindow {
+        id: dismissLayer
         visible: devicePopup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
 
-        MouseArea {
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+            Keys.onPressed: event => root.handleKeyPressed(event)
+            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 }

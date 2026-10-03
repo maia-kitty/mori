@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -15,6 +16,24 @@ Item {
     height: 0
 
     property string page: "home"
+    property int keyboardCategoryIndex: 0
+    property string keyboardModule: ""
+    property int keyboardColorRow: 0
+    property int keyboardColorIndex: 0
+    property string keyboardDisplaySection: "outputs"
+    property int keyboardDisplayField: 0
+    property int keyboardConfirmationIndex: 0
+    property int keyboardInputIndex: 0
+    property real mouseSpeed: 0
+    property real touchpadSpeed: 0
+    property bool touchpadTap: false
+    property bool touchpadNaturalScroll: false
+    property bool touchpadDwt: false
+    property string inputContents: ""
+    property string inputError: ""
+    property string inputStatus: ""
+    property int inputRevision: 0
+    property bool inputWritePending: false
     property string draggingModule: ""
     property string dragSourceSide: ""
     property int dragSourceIndex: -1
@@ -25,6 +44,7 @@ Item {
     property var displays: []
     property string displayError: ""
     property string displayStatus: ""
+    property bool displayDirty: false
     property string selectedDisplay: ""
     property var targetScreen: null
     property bool focusQueryResolved: false
@@ -43,6 +63,19 @@ Item {
         "calendar", "media", "kdeConnect", "systemTray", "network",
         "volume", "brightness", "wallpaper", "notifications", "battery", "workspaces",
         "powerMenu"
+    ]
+    readonly property var categoryPages: ["modules", "appearance", "displays", "input", "about"]
+    readonly property var inputOptions: [
+        { "key": "mouseSpeed", "label": "Mouse sensitivity", "device": "mouse",
+            "setting": "accel-speed", "kind": "speed" },
+        { "key": "touchpadSpeed", "label": "Touchpad sensitivity", "device": "touchpad",
+            "setting": "accel-speed", "kind": "speed" },
+        { "key": "touchpadTap", "label": "Tap to click", "device": "touchpad",
+            "setting": "tap", "kind": "flag" },
+        { "key": "touchpadNaturalScroll", "label": "Natural scrolling",
+            "device": "touchpad", "setting": "natural-scroll", "kind": "flag" },
+        { "key": "touchpadDwt", "label": "Disable while typing",
+            "device": "touchpad", "setting": "dwt", "kind": "flag" }
     ]
     readonly property var colorChoices: [
         { "name": "White", "token": "fg", "color": Theme.fg },
@@ -78,6 +111,7 @@ Item {
         case "modules": return "Modules"
         case "appearance": return "Appearance"
         case "displays": return "Displays"
+        case "input": return "Input"
         case "about": return "About"
         default: return "Mori settings"
         }
@@ -88,6 +122,7 @@ Item {
             close()
         } else {
             page = "home"
+            keyboardCategoryIndex = 0
             focusQueryResolved = false
             if (!focusedOutputQuery.running)
                 focusedOutputQuery.exec(["niri", "msg", "--json", "focused-output"])
@@ -128,8 +163,297 @@ Item {
 
     function openPage(name) {
         page = name
-        if (name === "displays")
+        if (name === "modules") {
+            keyboardModule = orderedModules()[0] || ""
+            Qt.callLater(scrollToKeyboardModule)
+        } else if (name === "appearance") {
+            keyboardColorRow = 0
+            syncKeyboardColor()
+        } else if (name === "displays") {
+            keyboardDisplaySection = "outputs"
+            keyboardDisplayField = 0
             refreshDisplays()
+        } else if (name === "input") {
+            keyboardInputIndex = 0
+            loadInputSettings()
+        }
+    }
+
+    function inputBlock(lines, device) {
+        let start = -1
+        for (let i = 0; i < lines.length; ++i) {
+            if (new RegExp("^\\s*" + device + "\\s*\\{\\s*$").test(lines[i])) {
+                start = i
+                break
+            }
+        }
+        if (start < 0) return null
+        let depth = 0
+        for (let i = start; i < lines.length; ++i) {
+            const code = lines[i].replace(/\/\/.*$/, "")
+            depth += (code.match(/\{/g) || []).length
+            depth -= (code.match(/\}/g) || []).length
+            if (depth === 0) return { "start": start, "end": i }
+        }
+        return null
+    }
+
+    function readInputValue(lines, device, setting, kind) {
+        const block = inputBlock(lines, device)
+        if (!block) return kind === "speed" ? 0 : false
+        const pattern = new RegExp("^\\s*" + setting + "(?:\\s+([^\\s/]+))?(?:\\s*//.*)?$")
+        for (let i = block.start + 1; i < block.end; ++i) {
+            const match = lines[i].match(pattern)
+            if (match) return kind === "speed" ? Number(match[1]) : true
+        }
+        return kind === "speed" ? 0 : false
+    }
+
+    function loadInputSettings() {
+        if (!inputWritePending)
+            inputContents = inputFile.text()
+        const lines = inputContents.split(/\r?\n/)
+        if (!inputBlock(lines, "mouse") || !inputBlock(lines, "touchpad")) {
+            inputError = "Could not read mouse and touchpad sections in input.kdl"
+            return
+        }
+        mouseSpeed = readInputValue(lines, "mouse", "accel-speed", "speed")
+        touchpadSpeed = readInputValue(lines, "touchpad", "accel-speed", "speed")
+        touchpadTap = readInputValue(lines, "touchpad", "tap", "flag")
+        touchpadNaturalScroll = readInputValue(lines, "touchpad", "natural-scroll", "flag")
+        touchpadDwt = readInputValue(lines, "touchpad", "dwt", "flag")
+        inputError = ""
+        inputStatus = ""
+        inputRevision++
+    }
+
+    function inputValue(key) { return root[key] }
+
+    function setInputValue(option, value) {
+        const lines = inputContents.split(/\r?\n/)
+        const block = inputBlock(lines, option.device)
+        if (!block) {
+            inputError = "Could not update " + option.device + " in input.kdl"
+            return
+        }
+        const pattern = new RegExp("^\\s*" + option.setting + "(?:\\s+.*)?$")
+        const normalized = option.kind === "speed"
+            ? Math.max(-1, Math.min(1, Math.round(value * 20) / 20)) : !!value
+        let lineIndex = -1
+        for (let i = block.start + 1; i < block.end; ++i) {
+            if (pattern.test(lines[i])) {
+                lineIndex = i
+                break
+            }
+        }
+        const indentation = (lines[block.start].match(/^\s*/) || [""])[0] + "    "
+        const replacement = indentation + option.setting
+            + (option.kind === "speed" ? " " + normalized.toFixed(2) : "")
+        if (option.kind === "flag" && !normalized) {
+            if (lineIndex >= 0) lines.splice(lineIndex, 1)
+        } else if (lineIndex >= 0)
+            lines[lineIndex] = replacement
+        else
+            lines.splice(block.end, 0, replacement)
+        inputContents = lines.join("\n")
+        root[option.key] = normalized
+        inputRevision++
+        inputError = ""
+        inputStatus = "Applying input settings…"
+        inputWritePending = true
+        inputSaveTimer.restart()
+    }
+
+    function orderedModules() {
+        return settings.leftModuleOrder.concat(settings.centerModuleOrder,
+            settings.rightModuleOrder)
+    }
+
+    function scrollIntoView(flick, item) {
+        if (!item) return
+        const y = item.mapToItem(flick.contentItem, 0, 0).y
+        if (y < flick.contentY)
+            flick.contentY = y
+        else if (y + item.height > flick.contentY + flick.height)
+            flick.contentY = y + item.height - flick.height
+    }
+
+    function scrollToKeyboardModule() {
+        for (let i = 0; i < anchorRepeater.count; ++i) {
+            const anchor = anchorRepeater.itemAt(i)
+            if (!anchor) continue
+            const index = anchor.anchorOrder.indexOf(keyboardModule)
+            if (index >= 0) {
+                scrollIntoView(modulesFlick, anchor.rowRepeater.itemAt(index))
+                return
+            }
+        }
+    }
+
+    function moveKeyboardModule(offset) {
+        const modules = orderedModules()
+        if (modules.length === 0) return
+        const index = Math.max(0, modules.indexOf(keyboardModule))
+        keyboardModule = modules[Math.max(0, Math.min(modules.length - 1, index + offset))]
+        Qt.callLater(scrollToKeyboardModule)
+    }
+
+    function moveKeyboardModuleInAnchor(offset) {
+        if (!keyboardModule) return
+        const side = settings.moduleSide(keyboardModule)
+        const order = side === "left" ? settings.leftModuleOrder
+            : side === "center" ? settings.centerModuleOrder : settings.rightModuleOrder
+        const index = order.indexOf(keyboardModule)
+        if (index < 0 || index + offset < 0 || index + offset >= order.length) return
+        settings.moveModuleTo(keyboardModule, side, index + (offset > 0 ? 2 : -1))
+        Qt.callLater(scrollToKeyboardModule)
+    }
+
+    function moveKeyboardModuleToAnchor(offset) {
+        if (!keyboardModule) return
+        const anchors = ["left", "center", "right"]
+        const index = anchors.indexOf(settings.moduleSide(keyboardModule))
+        const targetIndex = index + offset
+        if (targetIndex < 0 || targetIndex >= anchors.length) return
+        const target = anchors[targetIndex]
+        const order = target === "left" ? settings.leftModuleOrder
+            : target === "center" ? settings.centerModuleOrder : settings.rightModuleOrder
+        settings.moveModuleTo(keyboardModule, target, order.length)
+        Qt.callLater(scrollToKeyboardModule)
+    }
+
+    function syncKeyboardColor() {
+        const name = allModules[keyboardColorRow]
+        const token = settings.moduleColors[name]
+        const index = colorChoices.findIndex(choice => choice.token === token)
+        keyboardColorIndex = Math.max(0, index)
+    }
+
+    function moveKeyboardColorRow(offset) {
+        keyboardColorRow = Math.max(0, Math.min(allModules.length - 1,
+            keyboardColorRow + offset))
+        syncKeyboardColor()
+        Qt.callLater(() => scrollIntoView(appearanceFlick,
+            colorRows.itemAt(keyboardColorRow)))
+    }
+
+    function handleSettingsKey(event) {
+        const key = event.key
+        if (event.isAutoRepeat && key !== Qt.Key_Up && key !== Qt.Key_Down
+                && key !== Qt.Key_Left && key !== Qt.Key_Right)
+            return
+        if (awaitingDisplayConfirmation) {
+            if (key === Qt.Key_Left || key === Qt.Key_Right || key === Qt.Key_Tab)
+                keyboardConfirmationIndex = key === Qt.Key_Tab
+                    ? 1 - keyboardConfirmationIndex : key === Qt.Key_Left ? 0 : 1
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+                if (keyboardConfirmationIndex === 0) keepDisplayConfiguration()
+                else revertDisplayConfiguration("Reverting display settings…")
+            } else if (key === Qt.Key_Escape)
+                revertDisplayConfiguration("Reverting display settings…")
+            else return
+            event.accepted = true
+            return
+        }
+        if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
+            if (page !== "home") page = "home"
+            else close()
+            event.accepted = true
+            return
+        }
+        if (page === "home") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardCategoryIndex = Math.max(0, Math.min(categoryPages.length - 1,
+                    keyboardCategoryIndex + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                openPage(categoryPages[keyboardCategoryIndex])
+            else return
+        } else if (page === "modules") {
+            if (event.modifiers & Qt.ShiftModifier
+                    && (key === Qt.Key_Up || key === Qt.Key_Down))
+                moveKeyboardModuleInAnchor(key === Qt.Key_Up ? -1 : 1)
+            else if (event.modifiers & Qt.ShiftModifier
+                    && (key === Qt.Key_Left || key === Qt.Key_Right))
+                moveKeyboardModuleToAnchor(key === Qt.Key_Left ? -1 : 1)
+            else if (key === Qt.Key_Up || key === Qt.Key_Down)
+                moveKeyboardModule(key === Qt.Key_Up ? -1 : 1)
+            else if ((key === Qt.Key_Return || key === Qt.Key_Enter) && keyboardModule)
+                settings.setModuleEnabled(keyboardModule,
+                    !settings.moduleEnabled(keyboardModule))
+            else if (key === Qt.Key_C && keyboardModule
+                    && ["media", "network", "volume", "brightness"].indexOf(keyboardModule) >= 0)
+                settings.setCompactMode(keyboardModule,
+                    !settings.compactMode(keyboardModule))
+            else return
+        } else if (page === "appearance") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                moveKeyboardColorRow(key === Qt.Key_Up ? -1 : 1)
+            else if (key === Qt.Key_Left || key === Qt.Key_Right)
+                keyboardColorIndex = Math.max(0, Math.min(colorChoices.length - 1,
+                    keyboardColorIndex + (key === Qt.Key_Left ? -1 : 1)))
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                settings.setModuleColor(allModules[keyboardColorRow],
+                    colorChoices[keyboardColorIndex].token)
+            else return
+        } else if (page === "input") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardInputIndex = Math.max(0, Math.min(inputOptions.length - 1,
+                    keyboardInputIndex + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Left || key === Qt.Key_Right
+                    || key === Qt.Key_Return || key === Qt.Key_Enter) {
+                const option = inputOptions[keyboardInputIndex]
+                if (option.kind === "speed") {
+                    if (key === Qt.Key_Left || key === Qt.Key_Right)
+                        setInputValue(option, inputValue(option.key)
+                            + (key === Qt.Key_Left ? -0.05 : 0.05))
+                } else {
+                    const next = key === Qt.Key_Left ? false
+                        : key === Qt.Key_Right ? true : !inputValue(option.key)
+                    setInputValue(option, next)
+                }
+            } else if (key === Qt.Key_R)
+                loadInputSettings()
+            else return
+        } else if (page === "displays") {
+            if (key === Qt.Key_R && !displayQuery.running) refreshDisplays()
+            else if (key === Qt.Key_S && displays.length > 0
+                    && displaySavePhase === "idle") {
+                keyboardConfirmationIndex = 0
+                saveDisplayLayout()
+            } else if (key === Qt.Key_Tab)
+                keyboardDisplaySection = keyboardDisplaySection === "outputs"
+                    ? "editor" : "outputs"
+            else if (keyboardDisplaySection === "outputs") {
+                if (key !== Qt.Key_Left && key !== Qt.Key_Right
+                        && key !== Qt.Key_Up && key !== Qt.Key_Down) return
+                if (displays.length > 0) {
+                    const index = Math.max(0,
+                        displays.findIndex(output => output.connector === selectedDisplay))
+                    const offset = key === Qt.Key_Left || key === Qt.Key_Up ? -1 : 1
+                    selectedDisplay = displays[Math.max(0,
+                        Math.min(displays.length - 1, index + offset))].connector
+                }
+            } else if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardDisplayField = Math.max(0, Math.min(4,
+                    keyboardDisplayField + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Left || key === Qt.Key_Right
+                    || key === Qt.Key_Return || key === Qt.Key_Enter) {
+                const offset = key === Qt.Key_Left ? -1 : 1
+                if (keyboardDisplayField === 0) {
+                    const output = selectedDisplayData()
+                    if (output) {
+                        if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                            setSelectedDisplayEnabled(!output.enabled)
+                        else
+                            setSelectedDisplayEnabled(key === Qt.Key_Right)
+                    }
+                } else if (keyboardDisplayField === 1) cycleSelectedResolution(offset)
+                else if (keyboardDisplayField === 2) cycleSelectedRefreshRate(offset)
+                else if (keyboardDisplayField === 3) adjustSelectedScale(offset * 0.25)
+                else cycleSelectedTransform(offset)
+            } else return
+        } else return
+        event.accepted = true
     }
 
     function refreshDisplays() {
@@ -202,6 +526,7 @@ Item {
                 })
             }
             displays = result
+            displayDirty = false
             selectedDisplay = result.length > 0 ? result[0].connector : ""
             displayError = ""
             Qt.callLater(fitDisplayLayout)
@@ -259,6 +584,7 @@ Item {
             return changed
         })
         displays = updated
+        displayDirty = true
         displayStatus = "Unsaved display changes"
         Qt.callLater(fitDisplayLayout)
     }
@@ -441,6 +767,7 @@ Item {
         const updated = displays.map(output => output.connector === connector
             ? Object.assign({}, output, snapped) : output)
         displays = updated
+        displayDirty = true
         selectedDisplay = connector
         displayStatus = "Unsaved layout changes"
         Qt.callLater(fitDisplayLayout)
@@ -544,6 +871,7 @@ Item {
     function saveDisplayLayout() {
         if (displaySavePhase !== "idle" || awaitingDisplayConfirmation)
             return
+        keyboardConfirmationIndex = 0
         let contents = outputsFile.text()
         previousOutputConfiguration = contents
         previousDisplays = JSON.parse(JSON.stringify(displays))
@@ -570,6 +898,7 @@ Item {
         previousOutputConfiguration = ""
         previousDisplays = []
         displaySavePhase = "idle"
+        displayDirty = false
         displayStatus = "Display settings kept"
     }
 
@@ -728,6 +1057,64 @@ Item {
         }
     }
 
+    Connections {
+        target: Quickshell
+        function onScreensChanged() {
+            if (settingsWindow.visible && root.page === "displays")
+                displayHotplugRefresh.restart()
+        }
+    }
+
+    Timer {
+        id: displayHotplugRefresh
+        interval: 350
+        onTriggered: {
+            if (root.displaySavePhase !== "idle" || root.awaitingDisplayConfirmation
+                    || !settingsWindow.visible || root.page !== "displays")
+                return
+            if (root.displayDirty) {
+                root.displayStatus = "Outputs changed. Refresh to discard unsaved edits."
+                return
+            }
+            root.refreshDisplays()
+        }
+    }
+
+    FileView {
+        id: inputFile
+        path: root.settings.configRoot + "/niri/mori/input.kdl"
+        blockLoading: true
+        printErrors: false
+        atomicWrites: true
+        watchChanges: true
+        onSaved: {
+            if (!inputSaveTimer.running)
+                root.inputWritePending = false
+            if (!inputValidation.running)
+                inputValidation.exec(["niri", "validate", "-c",
+                    root.settings.configRoot + "/niri/config.kdl"])
+        }
+        onSaveFailed: error => {
+            root.inputStatus = ""
+            root.inputError = "Could not write input.kdl: "
+                + FileViewError.toString(error)
+        }
+    }
+
+    Timer {
+        id: inputSaveTimer
+        interval: 150
+        onTriggered: inputFile.setText(root.inputContents)
+    }
+
+    Process {
+        id: inputValidation
+        onExited: exitCode => {
+            root.inputStatus = exitCode === 0 ? "Input settings saved" : ""
+            root.inputError = exitCode === 0 ? "" : "Niri config validation failed"
+        }
+    }
+
     FileView {
         id: outputsFile
         path: root.settings.configRoot + "/niri/mori/outputs.kdl"
@@ -803,7 +1190,10 @@ Item {
                         id: dragHandler
                         target: null
                         onActiveChanged: {
-                            if (active) root.beginDrag(moduleRow)
+                            if (active) {
+                                root.keyboardModule = moduleRow.moduleKey
+                                root.beginDrag(moduleRow)
+                            }
                             else root.finishDrag()
                         }
                         onTranslationChanged: if (active) root.updateDrag(translation.y)
@@ -811,13 +1201,18 @@ Item {
                 }
 
                 Text {
-                    text: root.moduleLabel(moduleRow.moduleKey)
-                    color: moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
+                    text: (root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
+                        + root.moduleLabel(moduleRow.moduleKey)
+                    color: root.keyboardModule === moduleRow.moduleKey
+                        || moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     TapHandler {
-                        onTapped: root.settings.setModuleEnabled(
-                            moduleRow.moduleKey, !moduleRow.moduleEnabled)
+                        onTapped: {
+                            root.keyboardModule = moduleRow.moduleKey
+                            root.settings.setModuleEnabled(
+                                moduleRow.moduleKey, !moduleRow.moduleEnabled)
+                        }
                     }
                 }
             }
@@ -858,8 +1253,11 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.settings.setCompactMode(
-                            moduleRow.moduleKey, !moduleRow.moduleCompact)
+                        onClicked: {
+                            root.keyboardModule = moduleRow.moduleKey
+                            root.settings.setCompactMode(
+                                moduleRow.moduleKey, !moduleRow.moduleCompact)
+                        }
                     }
                 }
 
@@ -880,8 +1278,11 @@ Item {
                         }
                     }
                     TapHandler {
-                        onTapped: root.settings.setModuleEnabled(
-                            moduleRow.moduleKey, !moduleRow.moduleEnabled)
+                        onTapped: {
+                            root.keyboardModule = moduleRow.moduleKey
+                            root.settings.setModuleEnabled(
+                                moduleRow.moduleKey, !moduleRow.moduleEnabled)
+                        }
                     }
                 }
             }
@@ -909,7 +1310,10 @@ Item {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-        onVisibleChanged: if (!visible) root.popupCoordinator.hidePopup(root)
+        onVisibleChanged: {
+            if (visible) Qt.callLater(() => keyboardScope.forceActiveFocus())
+            else root.popupCoordinator.hidePopup(root)
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -917,13 +1321,10 @@ Item {
         }
 
         FocusScope {
+            id: keyboardScope
             anchors.fill: parent
             focus: settingsWindow.visible
-            Keys.onEscapePressed: event => {
-                if (root.page !== "home") root.page = "home"
-                else root.close()
-                event.accepted = true
-            }
+            Keys.onPressed: event => root.handleSettingsKey(event)
         }
 
         Rectangle {
@@ -990,9 +1391,52 @@ Item {
                 color: Theme.fg
             }
 
+            Rectangle {
+                id: saveErrorBanner
+                visible: root.settings.saveError.length > 0
+                anchors.top: headerDivider.bottom
+                anchors.topMargin: 10
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 18
+                anchors.rightMargin: 18
+                height: Math.max(34, saveErrorText.implicitHeight + 12)
+                color: Theme.bgred
+                border.width: 1
+                border.color: Theme.red
+
+                Text {
+                    id: saveErrorText
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.right: retrySave.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Settings not saved: " + root.settings.saveError
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    wrapMode: Text.Wrap
+                }
+
+                Text {
+                    id: retrySave
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Retry"
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    font.weight: Font.DemiBold
+                    TapHandler { onTapped: root.settings.save() }
+                }
+            }
+
             Item {
                 id: pageArea
-                anchors.top: headerDivider.bottom
+                anchors.top: saveErrorBanner.visible
+                    ? saveErrorBanner.bottom : headerDivider.bottom
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -1005,21 +1449,24 @@ Item {
                     spacing: 8
 
                     Text {
-                        text: "Choose a category"
+                        text: "Choose a category · ↑↓ / Enter"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
                     Repeater {
+                        id: categoryRepeater
                         model: [
                             { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
                             { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
                             { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
+                            { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
                             { "key": "about", "label": "About", "description": "Mori shell information" }
                         ]
                         delegate: Rectangle {
                             id: categoryRow
                             required property var modelData
+                            required property int index
                             width: parent.width
                             height: 62
                             color: categoryHover.hovered ? Theme.bg2 : Theme.bg1
@@ -1031,8 +1478,10 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 3
                                 Text {
-                                    text: categoryRow.modelData.label
-                                    color: Theme.fg
+                                    text: (categoryRow.index === root.keyboardCategoryIndex
+                                        ? "› " : "  ") + categoryRow.modelData.label
+                                    color: categoryRow.index === root.keyboardCategoryIndex
+                                        || categoryHover.hovered ? Theme.fg : Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.headingFontSize
                                 }
@@ -1053,7 +1502,12 @@ Item {
                                 font.pixelSize: 24
                             }
                             HoverHandler { id: categoryHover }
-                            TapHandler { onTapped: root.openPage(categoryRow.modelData.key) }
+                            TapHandler {
+                                onTapped: {
+                                    root.keyboardCategoryIndex = categoryRow.index
+                                    root.openPage(categoryRow.modelData.key)
+                                }
+                            }
                         }
                     }
                 }
@@ -1072,12 +1526,13 @@ Item {
                         width: modulesFlick.width
                         spacing: 8
                         Text {
-                            text: "Drag ≡ to reorder or move a module between anchors."
+                            text: "↑↓ select · Enter toggle · C compact · Shift+arrows move · drag ≡"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
                         Repeater {
+                            id: anchorRepeater
                             model: ["left", "center", "right"]
                             delegate: Rectangle {
                                 id: anchorBox
@@ -1088,6 +1543,7 @@ Item {
                                     : anchorKey === "center"
                                         ? root.settings.centerModuleOrder
                                         : root.settings.rightModuleOrder
+                                readonly property var rowRepeater: moduleRows
                                 width: parent.width
                                 height: anchorColumn.implicitHeight + 16
                                     + root.anchorHeightAdjustment(anchorKey)
@@ -1127,6 +1583,7 @@ Item {
                                     }
 
                                     Repeater {
+                                        id: moduleRows
                                         model: anchorBox.anchorOrder
                                         delegate: moduleSettingDelegate
                                     }
@@ -1162,16 +1619,18 @@ Item {
                         width: appearanceFlick.width
                         spacing: 6
                         Text {
-                            text: "Module accents"
+                            text: "↑↓ module · ←→ color · Enter apply"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
                         Repeater {
+                            id: colorRows
                             model: root.allModules
                             delegate: Rectangle {
                                 id: colorRow
                                 required property string modelData
+                                required property int index
                                 readonly property string moduleKey: modelData
                                 width: parent.width
                                 height: 48
@@ -1180,8 +1639,10 @@ Item {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: root.moduleLabel(colorRow.moduleKey)
-                                    color: Theme.fg
+                                    text: (colorRow.index === root.keyboardColorRow ? "› " : "  ")
+                                        + root.moduleLabel(colorRow.moduleKey)
+                                    color: colorRow.index === root.keyboardColorRow
+                                        ? Theme.fg : Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
                                 }
@@ -1195,6 +1656,7 @@ Item {
                                         delegate: Rectangle {
                                             id: swatch
                                             required property var modelData
+                                            required property int index
                                             readonly property bool selected: {
                                                 const currentRevision = root.settings.revision
                                                 return root.settings.moduleColors[colorRow.moduleKey]
@@ -1203,11 +1665,18 @@ Item {
                                             width: 24
                                             height: 24
                                             color: modelData.color
-                                            border.width: selected ? 3 : 1
-                                            border.color: selected ? Theme.fg : Theme.bg4
+                                            border.width: root.keyboardColorRow === colorRow.index
+                                                && root.keyboardColorIndex === index ? 3 : 1
+                                            border.color: selected || root.keyboardColorRow === colorRow.index
+                                                && root.keyboardColorIndex === index
+                                                ? Theme.fg : Theme.bg4
                                             TapHandler {
-                                                onTapped: root.settings.setModuleColor(
-                                                    colorRow.moduleKey, swatch.modelData.token)
+                                                onTapped: {
+                                                    root.keyboardColorRow = colorRow.index
+                                                    root.keyboardColorIndex = swatch.index
+                                                    root.settings.setModuleColor(
+                                                        colorRow.moduleKey, swatch.modelData.token)
+                                                }
                                             }
                                         }
                                     }
@@ -1215,6 +1684,141 @@ Item {
                                 HoverHandler { id: colorHover }
                             }
                         }
+                    }
+                }
+
+                Column {
+                    visible: root.page === "input"
+                    width: parent.width
+                    spacing: 10
+
+                    Text {
+                        text: "Niri pointer settings · changes apply automatically"
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+                    Text {
+                        text: "↑↓ select · ←→ adjust · Enter toggle · R reload"
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                    }
+                    Text {
+                        text: "Sensitivity is Niri acceleration speed: −1 slower, +1 faster."
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                    }
+
+                    Repeater {
+                        model: root.inputOptions
+                        delegate: Rectangle {
+                            id: inputRow
+                            required property var modelData
+                            required property int index
+                            readonly property var option: modelData
+                            readonly property var currentValue: {
+                                const revision = root.inputRevision
+                                return root.inputValue(option.key)
+                            }
+                            width: parent.width
+                            height: 54
+                            color: Theme.bg1
+                            border.width: 1
+                            border.color: Theme.bg4
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: (inputRow.index === root.keyboardInputIndex ? "› " : "  ")
+                                    + inputRow.option.label
+                                color: inputRow.index === root.keyboardInputIndex
+                                    ? Theme.fg : Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+
+                            Row {
+                                visible: inputRow.option.kind === "speed"
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 10
+
+                                Slider {
+                                    id: speedSlider
+                                    width: 175
+                                    height: 22
+                                    from: -1
+                                    to: 1
+                                    stepSize: 0.05
+                                    value: Number(inputRow.currentValue)
+                                    onMoved: root.setInputValue(inputRow.option, value)
+
+                                    background: Rectangle {
+                                        x: speedSlider.leftPadding
+                                        y: speedSlider.topPadding
+                                            + speedSlider.availableHeight / 2 - height / 2
+                                        width: speedSlider.availableWidth
+                                        height: 4
+                                        color: Theme.bg4
+                                    }
+                                    handle: Rectangle {
+                                        x: speedSlider.leftPadding + speedSlider.visualPosition
+                                            * (speedSlider.availableWidth - width)
+                                        y: speedSlider.topPadding
+                                            + speedSlider.availableHeight / 2 - height / 2
+                                        width: 10
+                                        height: 10
+                                        color: Theme.fg
+                                    }
+                                }
+                                Text {
+                                    width: 42
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    horizontalAlignment: Text.AlignRight
+                                    text: Number(inputRow.currentValue).toFixed(2)
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                            }
+
+                            Rectangle {
+                                visible: inputRow.option.kind === "flag"
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 36
+                                height: 18
+                                color: inputRow.currentValue ? Theme.fg : Theme.bg4
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: inputRow.currentValue ? parent.width - width - 3 : 3
+                                    width: 12
+                                    height: 12
+                                    color: inputRow.currentValue ? Theme.bg : Theme.grey1
+                                }
+                                TapHandler {
+                                    onTapped: {
+                                        root.keyboardInputIndex = inputRow.index
+                                        root.setInputValue(inputRow.option, !inputRow.currentValue)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        visible: root.inputError.length > 0 || root.inputStatus.length > 0
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: root.inputError.length > 0 ? root.inputError : root.inputStatus
+                        color: root.inputError.length > 0 ? Theme.red : Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
                     }
                 }
 
@@ -1226,6 +1830,15 @@ Item {
                         id: displaysColumn
                         anchors.fill: parent
                         spacing: 10
+
+                        Text {
+                            text: root.keyboardDisplaySection === "outputs"
+                                ? "Arrows: output · Tab: editor · R: refresh · S: save"
+                                : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
+                            color: Theme.grey1
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                        }
 
                         Row {
                             spacing: 10
@@ -1300,17 +1913,19 @@ Item {
                                     required property var modelData
                                     width: selectorLabel.implicitWidth + 18
                                     height: 26
-                                    color: root.selectedDisplay === modelData.connector
-                                        ? Theme.bg3 : Theme.bg1
+                                    color: Theme.bg1
                                     border.width: 1
-                                    border.color: Theme.fg
+                                    border.color: Theme.bg4
                                     opacity: modelData.enabled ? 1 : 0.6
                                     Text {
                                         id: selectorLabel
                                         anchors.centerIn: parent
                                         text: displaySelector.modelData.connector
                                             + (displaySelector.modelData.enabled ? "" : " · off")
-                                        color: Theme.fg
+                                        color: root.selectedDisplay === displaySelector.modelData.connector
+                                            ? Theme.fg : Theme.grey1
+                                        font.underline: root.keyboardDisplaySection === "outputs"
+                                            && root.selectedDisplay === displaySelector.modelData.connector
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -1349,11 +1964,11 @@ Item {
                                     width: Math.max(54, modelData.width * root.displayViewScale)
                                     height: Math.max(42, modelData.height * root.displayViewScale)
                                     z: displayDrag.active ? 10 : 1
-                                    color: root.selectedDisplay === modelData.connector
-                                        ? Theme.bg3 : Theme.bg1
+                                    color: Theme.bg1
                                     opacity: modelData.enabled ? 1 : 0.55
                                     border.width: root.selectedDisplay === modelData.connector ? 2 : 1
-                                    border.color: Theme.fg
+                                    border.color: root.selectedDisplay === modelData.connector
+                                        ? Theme.fg : Theme.bg4
 
                                     Column {
                                         anchors.centerIn: parent
@@ -1364,7 +1979,8 @@ Item {
                                             horizontalAlignment: Text.AlignHCenter
                                             elide: Text.ElideRight
                                             text: displayTile.modelData.connector
-                                            color: Theme.fg
+                                            color: root.selectedDisplay === displayTile.modelData.connector
+                                                ? Theme.fg : Theme.grey1
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
                                             font.weight: Font.DemiBold
@@ -1448,6 +2064,8 @@ Item {
                                     color: Theme.fg
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
+                                    font.underline: root.keyboardDisplaySection === "editor"
+                                        && root.keyboardDisplayField === 0
                                 }
                                 HoverHandler { id: displayEnabledHover }
                                 TapHandler {
@@ -1480,9 +2098,12 @@ Item {
                                 Row {
                                     spacing: 8
                                     Text {
-                                        width: 76
-                                        text: "Resolution"
-                                        color: Theme.grey1
+                                        width: 95
+                                        text: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 1
+                                            ? "› Resolution" : "  Resolution"
+                                        color: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 1 ? Theme.fg : Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -1516,9 +2137,12 @@ Item {
                                 Row {
                                     spacing: 8
                                     Text {
-                                        width: 76
-                                        text: "Refresh"
-                                        color: Theme.grey1
+                                        width: 95
+                                        text: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 2
+                                            ? "› Refresh" : "  Refresh"
+                                        color: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 2 ? Theme.fg : Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -1552,9 +2176,12 @@ Item {
                                 Row {
                                     spacing: 8
                                     Text {
-                                        width: 76
-                                        text: "Scale"
-                                        color: Theme.grey1
+                                        width: 95
+                                        text: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 3
+                                            ? "› Scale" : "  Scale"
+                                        color: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 3 ? Theme.fg : Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -1586,9 +2213,12 @@ Item {
                                 Row {
                                     spacing: 8
                                     Text {
-                                        width: 76
-                                        text: "Transform"
-                                        color: Theme.grey1
+                                        width: 95
+                                        text: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 4
+                                            ? "› Transform" : "  Transform"
+                                        color: root.keyboardDisplaySection === "editor"
+                                            && root.keyboardDisplayField === 4 ? Theme.fg : Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -1678,9 +2308,11 @@ Item {
                                 id: keepLabel
                                 anchors.centerIn: parent
                                 text: "Keep"
-                                color: Theme.fg
+                                color: root.keyboardConfirmationIndex === 0
+                                    ? Theme.fg : Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
+                                font.underline: root.keyboardConfirmationIndex === 0
                             }
                             HoverHandler { id: keepHover }
                             TapHandler { onTapped: root.keepDisplayConfiguration() }
@@ -1696,9 +2328,11 @@ Item {
                                 id: revertLabel
                                 anchors.centerIn: parent
                                 text: "Revert"
-                                color: Theme.fg
+                                color: root.keyboardConfirmationIndex === 1
+                                    ? Theme.fg : Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
+                                font.underline: root.keyboardConfirmationIndex === 1
                             }
                             HoverHandler { id: revertHover }
                             TapHandler {

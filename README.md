@@ -18,8 +18,10 @@ I personally use CachyOs so it was made with it in mind.
 | --- | --- |
 | Niri | Wayland compositor |
 | Quickshell | Bar, popups, notifications, and desktop controls |
+| NetworkManager or `iw` and `wpa_supplicant` (`wpa_cli`) | Wi-Fi controls; standalone wpa_supplicant needs user access to its control socket |
 | PipeWire and WirePlumber | Audio and the bar's volume controls |
 | brightnessctl | Laptop backlight control |
+| power-profiles-daemon | Battery popup power profiles |
 | Kitty | Terminal and terminal-based launch shortcuts |
 | Fuzzel | Application launcher and clipboard picker |
 | wl-clipboard and cliphist | Clipboard history and copying selections |
@@ -29,6 +31,10 @@ I personally use CachyOs so it was made with it in mind.
 | Zenity | Wallpaper folder picker and Wi-Fi password dialog |
 
 The shell imports `org.kde.kdeconnect`, so **KDE Connect and its QML module are required by the current shell**, even if you do not pair a phone.
+
+On a standalone `wpa_supplicant` setup, the network popup can add open and WPA-Personal networks. Saving new connections across restarts also requires `wpa_supplicant` to allow `SAVE_CONFIG` (`update_config=1`).
+
+The shell settings menu also edits Niri input settings. `niri/config.kdl` includes `niri/mori/input.kdl`; the Input page controls mouse and touchpad acceleration speed, tap-to-click, natural scrolling, and disable-while-typing. Changes are saved to that KDL file and Niri reloads them.
 
 ### Fonts and appearance
 

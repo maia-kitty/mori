@@ -1,6 +1,11 @@
 input {
+    keyboard {
+        xkb {
+        }
+        numlock
+    }
     mouse {
-        accel-speed 0.0
+        accel-speed 0.00
     }
     touchpad {
         tap
@@ -9,4 +14,3 @@ input {
         dwt
     }
 }
-

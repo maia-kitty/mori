@@ -10,16 +10,6 @@ gestures {
    }
 }
 
-input {
-    keyboard {
-        xkb {
-        }
-        numlock
-    }
-    mouse {
-    }
-}
-
 // === Layout ===
 layout {
     background-color "transparent"
@@ -125,6 +115,7 @@ debug {
 
 // === Includes ===
 include optional=true "mori/colors.kdl"
+include optional=true "mori/input.kdl"
 include optional=true "mori/layout.kdl"
 include optional=true "mori/alttab.kdl"
 include optional=true "mori/binds.kdl"

@@ -9,6 +9,7 @@ Item {
 
     required property var panelWindow
     required property var popupCoordinator
+    required property var settings
     property color accent: Theme.fg
     property date shownMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12)
     property date selectedDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 12)
@@ -33,6 +34,21 @@ Item {
         const month = String(value.getMonth() + 1).padStart(2, "0")
         const day = String(value.getDate()).padStart(2, "0")
         return year + "-" + month + "-" + day
+    }
+
+    function formatEventTime(value) {
+        const original = String(value || "")
+        const match = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?\s*$/i.exec(original)
+        if (!match) return original
+        let hour = Number(match[1])
+        const minute = match[2]
+        const period = match[3] ? match[3].toUpperCase() : ""
+        if (period)
+            hour = (hour % 12) + (period === "PM" ? 12 : 0)
+        if (hour > 23 || Number(minute) > 59) return original
+        if (settings.clockTimeFormat === "12h")
+            return String(hour % 12 || 12) + ":" + minute + (hour < 12 ? " AM" : " PM")
+        return String(hour).padStart(2, "0") + ":" + minute
     }
 
     function sameDay(left, right) {
@@ -207,13 +223,17 @@ Item {
 
     SystemClock {
         id: clock
-        precision: SystemClock.Minutes
+        precision: root.settings.clockShowSeconds
+            ? SystemClock.Seconds : SystemClock.Minutes
     }
 
     Text {
         id: clockLabel
         anchors.centerIn: parent
-        text: Qt.formatDateTime(clock.date, "[ yyyy/MM/dd   hh:mm ]")
+        text: "[ " + Qt.formatDate(clock.date, root.settings.clockDateFormat)
+            + "   " + Qt.formatTime(clock.date, root.settings.clockTimeFormat === "12h"
+                ? (root.settings.clockShowSeconds ? "h:mm:ss AP" : "h:mm AP")
+                : (root.settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")) + " ]"
         color: root.accent
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
@@ -524,7 +544,8 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: (modelData["start-time"]
-                                               ? modelData["start-time"] + "–" + modelData["end-time"]
+                                               ? root.formatEventTime(modelData["start-time"])
+                                                   + "–" + root.formatEventTime(modelData["end-time"])
                                                : "All day")
                                               + (modelData.calendar ? " · " + modelData.calendar : "")
                                               + (modelData.location ? " · " + modelData.location : "")

@@ -12,6 +12,8 @@ ShellRoot {
         id: settings
     }
 
+    BatteryWarning {}
+
     // Super+Tab invokes niri's toggle-overview action. Its event stream emits
     // the overview state immediately on connection and whenever it changes.
     Process {

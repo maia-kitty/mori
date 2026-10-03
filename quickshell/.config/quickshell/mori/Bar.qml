@@ -275,16 +275,17 @@ PanelWindow {
 
     Component {
         id: batteryComponent
-        // Battery is an indicator only; its visibility is controlled in Modules.
         Row {
             readonly property alias module: battery
             spacing: barWindow.bracketSpacing
-            BarBracket { text: "["; color: battery.accent }
+            BarBracket { text: "["; color: battery.accent; action: () => battery.toggle() }
             Battery {
                 id: battery
+                panelWindow: barWindow
+                popupCoordinator: barWindow
                 accent: barWindow.settings.moduleColor("battery")
             }
-            BarBracket { text: "]"; color: battery.accent }
+            BarBracket { text: "]"; color: battery.accent; action: () => battery.toggle() }
         }
     }
 

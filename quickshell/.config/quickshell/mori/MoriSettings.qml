@@ -16,6 +16,10 @@ Item {
     height: 0
 
     property string page: "home"
+    onPageChanged: {
+        if (page !== "input" && editingKeyboardLayout)
+            keyboardScope.forceActiveFocus()
+    }
     property int keyboardCategoryIndex: 0
     property string keyboardModule: ""
     property int keyboardColorRow: 0
@@ -24,6 +28,9 @@ Item {
     property int keyboardDisplayField: 0
     property int keyboardConfirmationIndex: 0
     property int keyboardInputIndex: 0
+    property string keyboardLayout: ""
+    property string keyboardLayoutDraft: ""
+    property bool editingKeyboardLayout: false
     property real mouseSpeed: 0
     property real touchpadSpeed: 0
     property bool touchpadTap: false
@@ -34,6 +41,19 @@ Item {
     property string inputStatus: ""
     property int inputRevision: 0
     property bool inputWritePending: false
+    property bool inputDirty: false
+    property bool inputApplyPending: false
+    property bool inputRestoring: false
+    property string inputBaselineContents: ""
+    property bool applyAfterDisplayKeep: false
+    property bool applyAfterDrag: false
+    property string applyStatus: ""
+    readonly property bool hasPendingChanges: settings.editDirty || inputDirty
+        || displayDirty || keyboardLayoutDraft !== keyboardLayout
+    onHasPendingChangesChanged: {
+        if (hasPendingChanges && applyStatus === "Settings applied")
+            applyStatus = ""
+    }
     property string draggingModule: ""
     property string dragSourceSide: ""
     property int dragSourceIndex: -1
@@ -66,6 +86,8 @@ Item {
     ]
     readonly property var categoryPages: ["modules", "appearance", "displays", "input", "about"]
     readonly property var inputOptions: [
+        { "key": "keyboardLayout", "label": "Keyboard layout", "device": "xkb",
+            "setting": "layout", "kind": "layout" },
         { "key": "mouseSpeed", "label": "Mouse sensitivity", "device": "mouse",
             "setting": "accel-speed", "kind": "speed" },
         { "key": "touchpadSpeed", "label": "Touchpad sensitivity", "device": "touchpad",
@@ -148,17 +170,91 @@ Item {
         } catch (error) {
             targetScreen = panelWindow.screen
         }
+        settings.beginEditSession()
         popupCoordinator.showPopup(root)
         settingsWindow.visible = true
     }
 
     function close() {
+        if (awaitingDisplayConfirmation || displaySavePhase !== "idle"
+                || settings.editApplyPending || inputApplyPending || inputRestoring)
+            return
+        settings.discardEditSession()
+        inputDirty = false
+        inputWritePending = false
+        keyboardLayoutDraft = keyboardLayout
+        displayDirty = false
+        displayError = ""
+        displayStatus = ""
+        applyAfterDisplayKeep = false
+        applyAfterDrag = false
+        applyStatus = ""
         draggingModule = ""
         dragSourceSide = ""
         dragSourceIndex = -1
         dropSide = ""
         dropIndex = -1
         settingsWindow.visible = false
+    }
+
+    function stageKeyboardLayout() {
+        const option = inputOptions[0]
+        if (!setInputValue(option, keyboardLayoutDraft)) {
+            page = "input"
+            applyStatus = "Check keyboard layout"
+            return false
+        }
+        keyboardLayoutDraft = keyboardLayout
+        const editor = keyboardLayoutEditor()
+        if (editor)
+            editor.text = keyboardLayout
+        keyboardScope.forceActiveFocus()
+        return true
+    }
+
+    function keyboardLayoutEditor() {
+        const row = inputRows.itemAt(0)
+        return row ? row.editor : null
+    }
+
+    function commitSettingsAndInput() {
+        settings.applyEditSession()
+        if (inputDirty && !inputApplyPending) {
+            inputApplyPending = true
+            inputWritePending = true
+            inputFile.setText(inputContents)
+        }
+        applyStatus = "Applying settings…"
+        if (!settings.editDirty && !inputDirty)
+            applyStatus = "Settings applied"
+    }
+
+    function maybeFinishApply() {
+        if (!settings.editDirty && !settings.editApplyPending
+                && !inputDirty && !inputApplyPending && !displayDirty
+                && !awaitingDisplayConfirmation && displaySavePhase === "idle")
+            applyStatus = "Settings applied"
+    }
+
+    function applyAll() {
+        if (settings.editApplyPending || inputApplyPending
+                || displaySavePhase !== "idle" || awaitingDisplayConfirmation)
+            return
+        if (draggingModule.length > 0) {
+            applyAfterDrag = true
+            return
+        }
+        if (keyboardLayoutDraft !== keyboardLayout && !stageKeyboardLayout())
+            return
+        if (!hasPendingChanges) {
+            applyStatus = "No changes to apply"
+            return
+        }
+        if (displayDirty) {
+            applyAfterDisplayKeep = true
+            saveDisplayLayout()
+        } else
+            commitSettingsAndInput()
     }
 
     function openPage(name) {
@@ -172,7 +268,8 @@ Item {
         } else if (name === "displays") {
             keyboardDisplaySection = "outputs"
             keyboardDisplayField = 0
-            refreshDisplays()
+            if (!displayDirty)
+                refreshDisplays()
         } else if (name === "input") {
             keyboardInputIndex = 0
             loadInputSettings()
@@ -200,23 +297,40 @@ Item {
 
     function readInputValue(lines, device, setting, kind) {
         const block = inputBlock(lines, device)
-        if (!block) return kind === "speed" ? 0 : false
+        if (!block) return kind === "speed" ? 0 : kind === "layout" ? "" : false
         const pattern = new RegExp("^\\s*" + setting + "(?:\\s+([^\\s/]+))?(?:\\s*//.*)?$")
         for (let i = block.start + 1; i < block.end; ++i) {
             const match = lines[i].match(pattern)
-            if (match) return kind === "speed" ? Number(match[1]) : true
+            if (match) {
+                if (kind === "speed") return Number(match[1])
+                if (kind === "layout") {
+                    try { return JSON.parse(match[1]) }
+                    catch (error) { return "" }
+                }
+                return true
+            }
         }
-        return kind === "speed" ? 0 : false
+        return kind === "speed" ? 0 : kind === "layout" ? "" : false
     }
 
     function loadInputSettings() {
-        if (!inputWritePending)
+        const preserveDraft = keyboardLayoutDraft !== keyboardLayout && inputContents.length > 0
+        const draft = keyboardLayoutDraft
+        if (!inputWritePending && !inputDirty) {
             inputContents = inputFile.text()
+            inputBaselineContents = inputContents
+        }
         const lines = inputContents.split(/\r?\n/)
-        if (!inputBlock(lines, "mouse") || !inputBlock(lines, "touchpad")) {
-            inputError = "Could not read mouse and touchpad sections in input.kdl"
+        if (!inputBlock(lines, "xkb") || !inputBlock(lines, "mouse")
+                || !inputBlock(lines, "touchpad")) {
+            inputError = "Could not read keyboard, mouse, and touchpad sections in input.kdl"
             return
         }
+        keyboardLayout = readInputValue(lines, "xkb", "layout", "layout")
+        keyboardLayoutDraft = preserveDraft ? draft : keyboardLayout
+        const editor = keyboardLayoutEditor()
+        if (editor)
+            editor.text = keyboardLayoutDraft
         mouseSpeed = readInputValue(lines, "mouse", "accel-speed", "speed")
         touchpadSpeed = readInputValue(lines, "touchpad", "accel-speed", "speed")
         touchpadTap = readInputValue(lines, "touchpad", "tap", "flag")
@@ -230,15 +344,23 @@ Item {
     function inputValue(key) { return root[key] }
 
     function setInputValue(option, value) {
+        if (inputApplyPending)
+            return false
         const lines = inputContents.split(/\r?\n/)
         const block = inputBlock(lines, option.device)
         if (!block) {
             inputError = "Could not update " + option.device + " in input.kdl"
-            return
+            return false
         }
         const pattern = new RegExp("^\\s*" + option.setting + "(?:\\s+.*)?$")
         const normalized = option.kind === "speed"
-            ? Math.max(-1, Math.min(1, Math.round(value * 20) / 20)) : !!value
+            ? Math.max(-1, Math.min(1, Math.round(value * 20) / 20))
+            : option.kind === "layout" ? String(value).trim() : !!value
+        if (option.kind === "layout" && normalized.length > 0
+                && !/^[A-Za-z0-9_-]+(?:,[A-Za-z0-9_-]+)*$/.test(normalized)) {
+            inputError = "Use layout names such as us or us,sk"
+            return false
+        }
         let lineIndex = -1
         for (let i = block.start + 1; i < block.end; ++i) {
             if (pattern.test(lines[i])) {
@@ -248,8 +370,10 @@ Item {
         }
         const indentation = (lines[block.start].match(/^\s*/) || [""])[0] + "    "
         const replacement = indentation + option.setting
-            + (option.kind === "speed" ? " " + normalized.toFixed(2) : "")
-        if (option.kind === "flag" && !normalized) {
+            + (option.kind === "speed" ? " " + normalized.toFixed(2)
+                : option.kind === "layout" ? " " + JSON.stringify(normalized) : "")
+        if ((option.kind === "flag" && !normalized)
+                || (option.kind === "layout" && normalized.length === 0)) {
             if (lineIndex >= 0) lines.splice(lineIndex, 1)
         } else if (lineIndex >= 0)
             lines[lineIndex] = replacement
@@ -259,9 +383,9 @@ Item {
         root[option.key] = normalized
         inputRevision++
         inputError = ""
-        inputStatus = "Applying input settings…"
-        inputWritePending = true
-        inputSaveTimer.restart()
+        inputStatus = "Input changes pending Apply"
+        inputDirty = true
+        return true
     }
 
     function orderedModules() {
@@ -339,6 +463,13 @@ Item {
 
     function handleSettingsKey(event) {
         const key = event.key
+        if (page === "input" && editingKeyboardLayout) {
+            if (key === Qt.Key_Escape) {
+                keyboardScope.forceActiveFocus()
+                event.accepted = true
+            }
+            return
+        }
         if (event.isAutoRepeat && key !== Qt.Key_Up && key !== Qt.Key_Down
                 && key !== Qt.Key_Left && key !== Qt.Key_Right)
             return
@@ -358,6 +489,12 @@ Item {
         if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
             if (page !== "home") page = "home"
             else close()
+            event.accepted = true
+            return
+        }
+        if ((event.modifiers & Qt.ControlModifier)
+                && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
+            applyAll()
             event.accepted = true
             return
         }
@@ -402,7 +539,11 @@ Item {
             else if (key === Qt.Key_Left || key === Qt.Key_Right
                     || key === Qt.Key_Return || key === Qt.Key_Enter) {
                 const option = inputOptions[keyboardInputIndex]
-                if (option.kind === "speed") {
+                if (option.kind === "layout") {
+                    const editor = keyboardLayoutEditor()
+                    if (editor && (key === Qt.Key_Return || key === Qt.Key_Enter))
+                        editor.forceActiveFocus()
+                } else if (option.kind === "speed") {
                     if (key === Qt.Key_Left || key === Qt.Key_Right)
                         setInputValue(option, inputValue(option.key)
                             + (key === Qt.Key_Left ? -0.05 : 0.05))
@@ -411,15 +552,17 @@ Item {
                         : key === Qt.Key_Right ? true : !inputValue(option.key)
                     setInputValue(option, next)
                 }
-            } else if (key === Qt.Key_R)
+            } else if (key === Qt.Key_R && !inputApplyPending && !inputRestoring) {
+                inputDirty = false
+                keyboardLayoutDraft = keyboardLayout
                 loadInputSettings()
-            else return
+            } else return
         } else if (page === "displays") {
             if (key === Qt.Key_R && !displayQuery.running) refreshDisplays()
             else if (key === Qt.Key_S && displays.length > 0
                     && displaySavePhase === "idle") {
                 keyboardConfirmationIndex = 0
-                saveDisplayLayout()
+                applyAll()
             } else if (key === Qt.Key_Tab)
                 keyboardDisplaySection = keyboardDisplaySection === "outputs"
                     ? "editor" : "outputs"
@@ -900,11 +1043,18 @@ Item {
         displaySavePhase = "idle"
         displayDirty = false
         displayStatus = "Display settings kept"
+        if (applyAfterDisplayKeep) {
+            applyAfterDisplayKeep = false
+            commitSettingsAndInput()
+        }
+        maybeFinishApply()
     }
 
     function revertDisplayConfiguration(reason) {
         if (previousOutputConfiguration.length === 0)
             return
+        applyAfterDisplayKeep = false
+        applyStatus = "Display changes reverted"
         displayConfirmationTimer.stop()
         awaitingDisplayConfirmation = false
         displaySavePhase = "reverting"
@@ -980,12 +1130,18 @@ Item {
         const targetSide = dropSide
         const targetIndex = dropIndex
         Qt.callLater(() => {
-            settings.moveModuleTo(moduleKey, targetSide, targetIndex)
+            if (settingsWindow.visible && settings.editSession
+                    && !settings.editApplyPending)
+                settings.moveModuleTo(moduleKey, targetSide, targetIndex)
             draggingModule = ""
             dragSourceSide = ""
             dragSourceIndex = -1
             dropSide = ""
             dropIndex = -1
+            if (applyAfterDrag) {
+                applyAfterDrag = false
+                applyAll()
+            }
         })
     }
 
@@ -1088,30 +1244,56 @@ Item {
         atomicWrites: true
         watchChanges: true
         onSaved: {
-            if (!inputSaveTimer.running)
+            if (root.inputRestoring) {
+                root.inputRestoring = false
                 root.inputWritePending = false
+                root.inputApplyPending = false
+                return
+            }
             if (!inputValidation.running)
                 inputValidation.exec(["niri", "validate", "-c",
                     root.settings.configRoot + "/niri/config.kdl"])
         }
         onSaveFailed: error => {
+            root.inputApplyPending = false
+            root.inputRestoring = false
+            root.inputWritePending = false
             root.inputStatus = ""
             root.inputError = "Could not write input.kdl: "
                 + FileViewError.toString(error)
         }
     }
 
-    Timer {
-        id: inputSaveTimer
-        interval: 150
-        onTriggered: inputFile.setText(root.inputContents)
-    }
-
     Process {
         id: inputValidation
         onExited: exitCode => {
-            root.inputStatus = exitCode === 0 ? "Input settings saved" : ""
-            root.inputError = exitCode === 0 ? "" : "Niri config validation failed"
+            root.inputApplyPending = false
+            if (exitCode === 0) {
+                root.inputWritePending = false
+                root.inputDirty = false
+                root.inputBaselineContents = root.inputContents
+                root.inputStatus = "Input settings saved"
+                root.inputError = ""
+                root.maybeFinishApply()
+            } else {
+                root.inputContents = root.inputBaselineContents
+                root.inputRestoring = true
+                inputFile.setText(root.inputContents)
+                root.loadInputSettings()
+                root.inputDirty = false
+                root.inputStatus = ""
+                root.inputError = "Invalid input settings; restored previous config"
+                root.applyStatus = "Input settings rejected"
+            }
+        }
+    }
+
+    Connections {
+        target: root.settings
+        function onEditDirtyChanged() { root.maybeFinishApply() }
+        function onSaveErrorChanged() {
+            if (root.settings.saveError.length > 0)
+                root.applyStatus = "Could not save shell settings"
         }
     }
 
@@ -1127,6 +1309,8 @@ Item {
             root.settings.configRoot + "/niri/config.kdl"
         ])
         onSaveFailed: error => {
+            root.applyAfterDisplayKeep = false
+            root.applyStatus = "Could not apply displays"
             root.displaySavePhase = "idle"
             root.awaitingDisplayConfirmation = false
             root.previousOutputConfiguration = ""
@@ -1380,6 +1564,46 @@ Item {
             }
 
             Rectangle {
+                id: applyButton
+                anchors.top: parent.top
+                anchors.topMargin: 16
+                anchors.right: parent.right
+                anchors.rightMargin: 54
+                width: 84
+                height: 28
+                color: root.hasPendingChanges ? Theme.bg2 : Theme.bg1
+                border.width: 1
+                border.color: root.hasPendingChanges ? Theme.fg : Theme.bg4
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "Apply"
+                    color: root.hasPendingChanges ? Theme.fg : Theme.grey1
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                }
+                TapHandler {
+                    enabled: root.hasPendingChanges && !root.settings.editApplyPending
+                        && !root.inputApplyPending && root.displaySavePhase === "idle"
+                        && !root.awaitingDisplayConfirmation
+                    onTapped: root.applyAll()
+                }
+            }
+
+            Text {
+                anchors.right: applyButton.left
+                anchors.rightMargin: 10
+                anchors.verticalCenter: applyButton.verticalCenter
+                width: 175
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideRight
+                text: root.applyStatus
+                color: Theme.grey1
+                font.family: Theme.fontFamily
+                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+            }
+
+            Rectangle {
                 id: headerDivider
                 anchors.top: header.bottom
                 anchors.left: parent.left
@@ -1429,7 +1653,7 @@ Item {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     font.weight: Font.DemiBold
-                    TapHandler { onTapped: root.settings.save() }
+                    TapHandler { onTapped: root.applyAll() }
                 }
             }
 
@@ -1453,6 +1677,12 @@ Item {
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
+                    }
+                    Text {
+                        text: "Apply saves changes across categories; close to discard."
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
                     }
                     Repeater {
                         id: categoryRepeater
@@ -1693,13 +1923,13 @@ Item {
                     spacing: 10
 
                     Text {
-                        text: "Niri pointer settings · changes apply automatically"
+                        text: "Niri input · leave keyboard layout empty for the system default"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
                     Text {
-                        text: "↑↓ select · ←→ adjust · Enter toggle · R reload"
+                        text: "↑↓ select · ←→ adjust · Enter edit/toggle · Ctrl+Enter apply"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -1712,9 +1942,11 @@ Item {
                     }
 
                     Repeater {
+                        id: inputRows
                         model: root.inputOptions
                         delegate: Rectangle {
                             id: inputRow
+                            property alias editor: layoutField
                             required property var modelData
                             required property int index
                             readonly property var option: modelData
@@ -1738,6 +1970,62 @@ Item {
                                     ? Theme.fg : Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
+                            }
+
+                            TextField {
+                                id: layoutField
+                                visible: inputRow.option.kind === "layout"
+                                anchors.right: parent.right
+                                anchors.rightMargin: 112
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 150
+                                height: 28
+                                placeholderText: "System default"
+                                color: Theme.fg
+                                placeholderTextColor: Theme.grey1
+                                selectionColor: Theme.bg4
+                                selectedTextColor: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                                background: Rectangle {
+                                    color: Theme.bg2
+                                    border.width: 1
+                                    border.color: layoutField.activeFocus ? Theme.fg : Theme.bg4
+                                }
+                                onTextChanged: if (visible) root.keyboardLayoutDraft = text
+                                onActiveFocusChanged: {
+                                    root.editingKeyboardLayout = activeFocus
+                                    if (activeFocus)
+                                        root.keyboardInputIndex = inputRow.index
+                                }
+                                Keys.onPressed: event => {
+                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                        keyboardScope.forceActiveFocus()
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Escape) {
+                                        layoutField.text = root.keyboardLayout
+                                        keyboardScope.forceActiveFocus()
+                                        event.accepted = true
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: inputRow.option.kind === "layout"
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Use system"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 1)
+                                TapHandler {
+                                    onTapped: {
+                                        root.keyboardInputIndex = inputRow.index
+                                        layoutField.text = ""
+                                        keyboardScope.forceActiveFocus()
+                                    }
+                                }
                             }
 
                             Row {
@@ -1833,7 +2121,7 @@ Item {
 
                         Text {
                             text: root.keyboardDisplaySection === "outputs"
-                                ? "Arrows: output · Tab: editor · R: refresh · S: save"
+                                ? "Arrows: output · Tab: editor · R: refresh · S: Apply all"
                                 : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
@@ -1860,30 +2148,9 @@ Item {
                                 HoverHandler { id: refreshHover }
                                 TapHandler {
                                     enabled: !displayQuery.running
-                                    onTapped: root.refreshDisplays()
-                                }
-                            }
-
-                            Rectangle {
-                                width: saveLabel.implicitWidth + 20
-                                height: 30
-                                color: saveHover.hovered ? Theme.bg2 : Theme.bg1
-                                border.width: 1
-                                border.color: Theme.fg
-                                Text {
-                                    id: saveLabel
-                                    anchors.centerIn: parent
-                                    text: "Save displays"
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                HoverHandler { id: saveHover }
-                                TapHandler {
-                                    enabled: root.displays.length > 0
                                         && root.displaySavePhase === "idle"
                                         && !root.awaitingDisplayConfirmation
-                                    onTapped: root.saveDisplayLayout()
+                                    onTapped: root.refreshDisplays()
                                 }
                             }
 
@@ -2259,7 +2526,7 @@ Item {
                         }
 
                         Text {
-                            text: "Save writes enabled state, position, mode, scale, and transform; other output settings and comments are preserved."
+                            text: "Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
                             width: parent.width
                             wrapMode: Text.WordWrap
                             color: Theme.grey1

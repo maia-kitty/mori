@@ -18,6 +18,9 @@ Item {
     property bool networkCompact: false
     property bool volumeCompact: false
     property bool brightnessCompact: false
+    property string clockTimeFormat: "24h"
+    property string clockDateFormat: "yyyy/MM/dd"
+    property bool clockShowSeconds: false
     property bool wallpaperEnabled: true
     property bool notificationsEnabled: true
     property bool powerMenuEnabled: true
@@ -48,75 +51,15 @@ Item {
     property int revision: 0
     property bool loading: true
     property string saveError: ""
-    property bool editSession: false
-    property bool editDirty: false
-    property bool editApplyPending: false
-    property var editSnapshot: null
 
     readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || ""
     readonly property string configRoot: xdgConfigHome.length > 0
         ? xdgConfigHome
         : Quickshell.env("HOME") + "/.config"
 
-    function snapshotState() {
-        const modules = {}
-        for (const name of ["calendar", "media", "kdeConnect", "systemTray",
-                "network", "volume", "brightness", "wallpaper", "notifications",
-                "battery", "workspaces", "powerMenu"])
-            modules[name] = moduleEnabled(name)
-        return {
-            "modules": modules,
-            "left": leftModuleOrder.slice(),
-            "center": centerModuleOrder.slice(),
-            "right": rightModuleOrder.slice(),
-            "colors": Object.assign({}, moduleColors),
-            "compact": {
-                "media": mediaCompact, "network": networkCompact,
-                "volume": volumeCompact, "brightness": brightnessCompact
-            }
-        }
-    }
-
-    function beginEditSession() {
-        editSnapshot = snapshotState()
-        editSession = true
-        editDirty = false
-        editApplyPending = false
-        saveError = ""
-    }
-
-    function discardEditSession() {
-        if (editSession && editDirty && editSnapshot) {
-            for (const name of Object.keys(editSnapshot.modules))
-                setModuleEnabled(name, editSnapshot.modules[name])
-            leftModuleOrder = editSnapshot.left.slice()
-            centerModuleOrder = editSnapshot.center.slice()
-            rightModuleOrder = editSnapshot.right.slice()
-            moduleColors = Object.assign({}, editSnapshot.colors)
-            mediaCompact = editSnapshot.compact.media
-            networkCompact = editSnapshot.compact.network
-            volumeCompact = editSnapshot.compact.volume
-            brightnessCompact = editSnapshot.compact.brightness
-            revision++
-        }
-        editSession = false
-        editDirty = false
-        editApplyPending = false
-        editSnapshot = null
-    }
-
-    function applyEditSession() {
-        if (!editSession || !editDirty || editApplyPending)
-            return
-        editApplyPending = true
-        save()
-    }
-
     function noteChange() {
         revision++
-        if (editSession)
-            editDirty = true
-        else if (!loading)
+        if (!loading)
             save()
     }
 
@@ -139,7 +82,6 @@ Item {
     }
 
     function setModuleEnabled(name, enabled) {
-        if (editApplyPending) return
         switch (name) {
         case "calendar": calendarEnabled = enabled; break
         case "media": mediaEnabled = enabled; break
@@ -170,7 +112,6 @@ Item {
     }
 
     function setCompactMode(name, compact) {
-        if (editApplyPending) return
         switch (name) {
         case "media": mediaCompact = compact; break
         case "network": networkCompact = compact; break
@@ -178,6 +119,21 @@ Item {
         case "brightness": brightnessCompact = compact; break
         default: return
         }
+        noteChange()
+    }
+
+    function setClockOption(name, value) {
+        if (name === "timeFormat" && ["24h", "12h"].indexOf(value) >= 0) {
+            if (clockTimeFormat === value) return
+            clockTimeFormat = value
+        } else if (name === "dateFormat"
+                && ["yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"].indexOf(value) >= 0) {
+            if (clockDateFormat === value) return
+            clockDateFormat = value
+        } else if (name === "showSeconds" && typeof value === "boolean") {
+            if (clockShowSeconds === value) return
+            clockShowSeconds = value
+        } else return
         noteChange()
     }
 
@@ -195,7 +151,6 @@ Item {
     }
 
     function setModuleColor(name, colorName) {
-        if (editApplyPending) return
         if (!(name in moduleColors) || moduleColors[name] === colorName)
             return
         const updated = Object.assign({}, moduleColors)
@@ -213,7 +168,6 @@ Item {
     }
 
     function moveModuleTo(name, targetSide, targetIndex) {
-        if (editApplyPending) return
         const left = leftModuleOrder.slice()
         const center = centerModuleOrder.slice()
         const right = rightModuleOrder.slice()
@@ -326,6 +280,14 @@ Item {
                     if (typeof compact[name] === "boolean")
                         setCompactMode(name, compact[name])
                 }
+
+                const clock = parsed.clock || {}
+                if (["24h", "12h"].indexOf(clock.timeFormat) >= 0)
+                    clockTimeFormat = clock.timeFormat
+                if (["yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"].indexOf(clock.dateFormat) >= 0)
+                    clockDateFormat = clock.dateFormat
+                if (typeof clock.showSeconds === "boolean")
+                    clockShowSeconds = clock.showSeconds
             } catch (error) {
                 console.warn("Could not parse Mori settings:", error)
             }
@@ -362,6 +324,11 @@ Item {
                 "network": networkCompact,
                 "volume": volumeCompact,
                 "brightness": brightnessCompact
+            },
+            "clock": {
+                "timeFormat": clockTimeFormat,
+                "dateFormat": clockDateFormat,
+                "showSeconds": clockShowSeconds
             }
         }
         settingsFile.setText(JSON.stringify(contents, null, 2) + "\n")
@@ -373,19 +340,13 @@ Item {
         id: settingsFile
         path: root.configRoot + "/quickshell/mori-settings.json"
         blockLoading: true
+        // This file is tiny, and shell settings save as soon as they change.
+        blockWrites: true
         printErrors: false
         atomicWrites: true
-        onSaved: {
-            root.saveError = ""
-            if (root.editApplyPending) {
-                root.editSnapshot = root.snapshotState()
-                root.editDirty = false
-                root.editApplyPending = false
-            }
-        }
+        onSaved: root.saveError = ""
         onSaveFailed: error => {
             root.saveError = FileViewError.toString(error)
-            root.editApplyPending = false
             console.warn("Could not save Mori settings:", root.saveError)
         }
     }

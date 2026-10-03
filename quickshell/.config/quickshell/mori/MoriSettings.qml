@@ -24,6 +24,7 @@ Item {
     property string keyboardModule: ""
     property int keyboardColorRow: 0
     property int keyboardColorIndex: 0
+    property int keyboardClockIndex: 0
     property string keyboardDisplaySection: "outputs"
     property int keyboardDisplayField: 0
     property int keyboardConfirmationIndex: 0
@@ -45,15 +46,9 @@ Item {
     property bool inputApplyPending: false
     property bool inputRestoring: false
     property string inputBaselineContents: ""
-    property bool applyAfterDisplayKeep: false
-    property bool applyAfterDrag: false
-    property string applyStatus: ""
-    readonly property bool hasPendingChanges: settings.editDirty || inputDirty
-        || displayDirty || keyboardLayoutDraft !== keyboardLayout
-    onHasPendingChangesChanged: {
-        if (hasPendingChanges && applyStatus === "Settings applied")
-            applyStatus = ""
-    }
+    property bool closeAfterApply: false
+    readonly property bool inputPendingChanges: inputDirty
+        || keyboardLayoutDraft !== keyboardLayout
     property string draggingModule: ""
     property string dragSourceSide: ""
     property int dragSourceIndex: -1
@@ -84,7 +79,16 @@ Item {
         "volume", "brightness", "wallpaper", "notifications", "battery", "workspaces",
         "powerMenu"
     ]
-    readonly property var categoryPages: ["modules", "appearance", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "appearance", "clock", "displays", "input", "about"]
+    readonly property var clockOptions: [
+        { "key": "timeFormat", "label": "Time", "values": ["24h", "12h"],
+            "labels": ["24-hour", "12-hour AM/PM"] },
+        { "key": "showSeconds", "label": "Seconds", "values": [false, true],
+            "labels": ["Off", "On"] },
+        { "key": "dateFormat", "label": "Date order",
+            "values": ["yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"],
+            "labels": ["YYYY/MM/DD", "DD/MM/YYYY", "MM/DD/YYYY"] }
+    ]
     readonly property var inputOptions: [
         { "key": "keyboardLayout", "label": "Keyboard layout", "device": "xkb",
             "setting": "layout", "kind": "layout" },
@@ -132,6 +136,7 @@ Item {
         switch (page) {
         case "modules": return "Modules"
         case "appearance": return "Appearance"
+        case "clock": return "Time & date"
         case "displays": return "Displays"
         case "input": return "Input"
         case "about": return "About"
@@ -143,6 +148,11 @@ Item {
         if (settingsWindow.visible) {
             close()
         } else {
+            if (closeAfterApply) {
+                closeAfterApply = false
+                settingsWindow.visible = true
+                return
+            }
             page = "home"
             keyboardCategoryIndex = 0
             focusQueryResolved = false
@@ -170,25 +180,31 @@ Item {
         } catch (error) {
             targetScreen = panelWindow.screen
         }
-        settings.beginEditSession()
         popupCoordinator.showPopup(root)
         settingsWindow.visible = true
     }
 
     function close() {
-        if (awaitingDisplayConfirmation || displaySavePhase !== "idle"
-                || settings.editApplyPending || inputApplyPending || inputRestoring)
+        if (awaitingDisplayConfirmation || displaySavePhase !== "idle")
             return
-        settings.discardEditSession()
+        if (inputApplyPending || inputRestoring) {
+            // Let the menu dismiss immediately, but preserve the edit session
+            // until the in-flight save/validation reports its result.
+            closeAfterApply = true
+            settingsWindow.visible = false
+            return
+        }
+        finishClose()
+    }
+
+    function finishClose() {
+        closeAfterApply = false
         inputDirty = false
         inputWritePending = false
         keyboardLayoutDraft = keyboardLayout
         displayDirty = false
         displayError = ""
         displayStatus = ""
-        applyAfterDisplayKeep = false
-        applyAfterDrag = false
-        applyStatus = ""
         draggingModule = ""
         dragSourceSide = ""
         dragSourceIndex = -1
@@ -197,11 +213,17 @@ Item {
         settingsWindow.visible = false
     }
 
+    function finishDeferredClose() {
+        if (closeAfterApply && !inputApplyPending && !inputRestoring
+                && !awaitingDisplayConfirmation && displaySavePhase === "idle")
+            finishClose()
+    }
+
     function stageKeyboardLayout() {
         const option = inputOptions[0]
         if (!setInputValue(option, keyboardLayoutDraft)) {
             page = "input"
-            applyStatus = "Check keyboard layout"
+            inputStatus = "Check keyboard layout"
             return false
         }
         keyboardLayoutDraft = keyboardLayout
@@ -217,44 +239,20 @@ Item {
         return row ? row.editor : null
     }
 
-    function commitSettingsAndInput() {
-        settings.applyEditSession()
-        if (inputDirty && !inputApplyPending) {
-            inputApplyPending = true
-            inputWritePending = true
-            inputFile.setText(inputContents)
-        }
-        applyStatus = "Applying settings…"
-        if (!settings.editDirty && !inputDirty)
-            applyStatus = "Settings applied"
-    }
-
-    function maybeFinishApply() {
-        if (!settings.editDirty && !settings.editApplyPending
-                && !inputDirty && !inputApplyPending && !displayDirty
-                && !awaitingDisplayConfirmation && displaySavePhase === "idle")
-            applyStatus = "Settings applied"
-    }
-
-    function applyAll() {
-        if (settings.editApplyPending || inputApplyPending
-                || displaySavePhase !== "idle" || awaitingDisplayConfirmation)
-            return
-        if (draggingModule.length > 0) {
-            applyAfterDrag = true
-            return
-        }
+    function applyInput() {
+        if (inputApplyPending || inputRestoring) return
         if (keyboardLayoutDraft !== keyboardLayout && !stageKeyboardLayout())
             return
-        if (!hasPendingChanges) {
-            applyStatus = "No changes to apply"
-            return
-        }
-        if (displayDirty) {
-            applyAfterDisplayKeep = true
-            saveDisplayLayout()
-        } else
-            commitSettingsAndInput()
+        if (!inputDirty) return
+        inputApplyPending = true
+        inputWritePending = true
+        inputStatus = "Applying input settings…"
+        inputFile.setText(inputContents)
+    }
+
+    function applyCurrentPage() {
+        if (page === "input") applyInput()
+        else if (page === "displays" && displayDirty) saveDisplayLayout()
     }
 
     function openPage(name) {
@@ -265,6 +263,8 @@ Item {
         } else if (name === "appearance") {
             keyboardColorRow = 0
             syncKeyboardColor()
+        } else if (name === "clock") {
+            keyboardClockIndex = 0
         } else if (name === "displays") {
             keyboardDisplaySection = "outputs"
             keyboardDisplayField = 0
@@ -274,6 +274,28 @@ Item {
             keyboardInputIndex = 0
             loadInputSettings()
         }
+    }
+
+    function clockOptionValue(key) {
+        if (key === "timeFormat") return settings.clockTimeFormat
+        if (key === "showSeconds") return settings.clockShowSeconds
+        return settings.clockDateFormat
+    }
+
+    function cycleClockOption(offset) {
+        const option = clockOptions[keyboardClockIndex]
+        const index = option.values.indexOf(clockOptionValue(option.key))
+        const next = (index + offset + option.values.length) % option.values.length
+        settings.setClockOption(option.key, option.values[next])
+    }
+
+    function clockPreview() {
+        const sample = new Date(2026, 9, 3, 17, 8, 9)
+        const timeFormat = settings.clockTimeFormat === "12h"
+            ? (settings.clockShowSeconds ? "h:mm:ss AP" : "h:mm AP")
+            : (settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")
+        return "[ " + Qt.formatDate(sample, settings.clockDateFormat)
+            + "   " + Qt.formatTime(sample, timeFormat) + " ]"
     }
 
     function inputBlock(lines, device) {
@@ -494,7 +516,8 @@ Item {
         }
         if ((event.modifiers & Qt.ControlModifier)
                 && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
-            applyAll()
+            if (page !== "input" && page !== "displays") return
+            applyCurrentPage()
             event.accepted = true
             return
         }
@@ -532,6 +555,14 @@ Item {
                 settings.setModuleColor(allModules[keyboardColorRow],
                     colorChoices[keyboardColorIndex].token)
             else return
+        } else if (page === "clock") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardClockIndex = Math.max(0, Math.min(clockOptions.length - 1,
+                    keyboardClockIndex + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Left || key === Qt.Key_Right
+                    || key === Qt.Key_Return || key === Qt.Key_Enter)
+                cycleClockOption(key === Qt.Key_Left ? -1 : 1)
+            else return
         } else if (page === "input") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardInputIndex = Math.max(0, Math.min(inputOptions.length - 1,
@@ -562,7 +593,7 @@ Item {
             else if (key === Qt.Key_S && displays.length > 0
                     && displaySavePhase === "idle") {
                 keyboardConfirmationIndex = 0
-                applyAll()
+                applyCurrentPage()
             } else if (key === Qt.Key_Tab)
                 keyboardDisplaySection = keyboardDisplaySection === "outputs"
                     ? "editor" : "outputs"
@@ -1043,18 +1074,11 @@ Item {
         displaySavePhase = "idle"
         displayDirty = false
         displayStatus = "Display settings kept"
-        if (applyAfterDisplayKeep) {
-            applyAfterDisplayKeep = false
-            commitSettingsAndInput()
-        }
-        maybeFinishApply()
     }
 
     function revertDisplayConfiguration(reason) {
         if (previousOutputConfiguration.length === 0)
             return
-        applyAfterDisplayKeep = false
-        applyStatus = "Display changes reverted"
         displayConfirmationTimer.stop()
         awaitingDisplayConfirmation = false
         displaySavePhase = "reverting"
@@ -1130,18 +1154,13 @@ Item {
         const targetSide = dropSide
         const targetIndex = dropIndex
         Qt.callLater(() => {
-            if (settingsWindow.visible && settings.editSession
-                    && !settings.editApplyPending)
+            if (settingsWindow.visible)
                 settings.moveModuleTo(moduleKey, targetSide, targetIndex)
             draggingModule = ""
             dragSourceSide = ""
             dragSourceIndex = -1
             dropSide = ""
             dropIndex = -1
-            if (applyAfterDrag) {
-                applyAfterDrag = false
-                applyAll()
-            }
         })
     }
 
@@ -1274,7 +1293,6 @@ Item {
                 root.inputBaselineContents = root.inputContents
                 root.inputStatus = "Input settings saved"
                 root.inputError = ""
-                root.maybeFinishApply()
             } else {
                 root.inputContents = root.inputBaselineContents
                 root.inputRestoring = true
@@ -1283,19 +1301,12 @@ Item {
                 root.inputDirty = false
                 root.inputStatus = ""
                 root.inputError = "Invalid input settings; restored previous config"
-                root.applyStatus = "Input settings rejected"
             }
         }
     }
 
-    Connections {
-        target: root.settings
-        function onEditDirtyChanged() { root.maybeFinishApply() }
-        function onSaveErrorChanged() {
-            if (root.settings.saveError.length > 0)
-                root.applyStatus = "Could not save shell settings"
-        }
-    }
+    onInputApplyPendingChanged: finishDeferredClose()
+    onInputRestoringChanged: finishDeferredClose()
 
     FileView {
         id: outputsFile
@@ -1309,8 +1320,6 @@ Item {
             root.settings.configRoot + "/niri/config.kdl"
         ])
         onSaveFailed: error => {
-            root.applyAfterDisplayKeep = false
-            root.applyStatus = "Could not apply displays"
             root.displaySavePhase = "idle"
             root.awaitingDisplayConfirmation = false
             root.previousOutputConfiguration = ""
@@ -1525,68 +1534,94 @@ Item {
                 onClicked: mouse => mouse.accepted = true
             }
 
-            Row {
+            Item {
                 id: header
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 18
-                height: 28
-                spacing: 10
+                height: 30
 
-                Text {
+                Rectangle {
+                    id: backButton
                     visible: root.page !== "home"
-                    text: "‹"
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 24
-                    width: visible ? 20 : 0
+                    anchors.right: closeButton.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 28
+                    height: 28
+                    color: Theme.bg1
+                    border.width: 1
+                    border.color: Theme.fg
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "←"
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize + 2
+                    }
                     TapHandler { onTapped: root.page = "home" }
                 }
                 Text {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.pageTitle()
                     color: Theme.fg
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize + 2
                     font.weight: Font.DemiBold
                 }
-            }
 
-            Text {
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.margins: 18
-                text: "×"
-                color: Theme.fg
-                font.family: Theme.fontFamily
-                font.pixelSize: 22
-                TapHandler { onTapped: root.close() }
+                Rectangle {
+                    id: closeButton
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 28
+                    height: 28
+                    color: Theme.bg1
+                    border.width: 1
+                    border.color: Theme.fg
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "×"
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize + 2
+                    }
+                    TapHandler { onTapped: root.close() }
+                }
             }
 
             Rectangle {
                 id: applyButton
+                readonly property bool ready: root.page === "input"
+                    ? root.inputPendingChanges && !root.inputApplyPending && !root.inputRestoring
+                    : root.page === "displays" ? root.displayDirty
+                        && root.displaySavePhase === "idle" && !root.awaitingDisplayConfirmation
+                        : false
+                visible: root.page === "input" || root.page === "displays"
                 anchors.top: parent.top
                 anchors.topMargin: 16
                 anchors.right: parent.right
-                anchors.rightMargin: 54
+                anchors.rightMargin: 90
                 width: 84
                 height: 28
-                color: root.hasPendingChanges ? Theme.bg2 : Theme.bg1
+                color: ready ? Theme.bg2 : Theme.bg1
                 border.width: 1
-                border.color: root.hasPendingChanges ? Theme.fg : Theme.bg4
+                border.color: ready ? Theme.fg : Theme.bg4
 
                 Text {
                     anchors.centerIn: parent
                     text: "Apply"
-                    color: root.hasPendingChanges ? Theme.fg : Theme.grey1
+                    color: applyButton.ready ? Theme.fg : Theme.grey1
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                 }
                 TapHandler {
-                    enabled: root.hasPendingChanges && !root.settings.editApplyPending
-                        && !root.inputApplyPending && root.displaySavePhase === "idle"
-                        && !root.awaitingDisplayConfirmation
-                    onTapped: root.applyAll()
+                    enabled: applyButton.ready
+                    onTapped: root.applyCurrentPage()
                 }
             }
 
@@ -1597,7 +1632,8 @@ Item {
                 width: 175
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
-                text: root.applyStatus
+                visible: applyButton.visible
+                text: root.page === "input" ? root.inputStatus : root.displayStatus
                 color: Theme.grey1
                 font.family: Theme.fontFamily
                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -1653,7 +1689,7 @@ Item {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     font.weight: Font.DemiBold
-                    TapHandler { onTapped: root.applyAll() }
+                    TapHandler { onTapped: root.settings.save() }
                 }
             }
 
@@ -1679,7 +1715,7 @@ Item {
                         font.pixelSize: Theme.fontSize
                     }
                     Text {
-                        text: "Apply saves changes across categories; close to discard."
+                        text: "Shell options save immediately. Input and Displays need Apply."
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -1689,6 +1725,7 @@ Item {
                         model: [
                             { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
                             { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
+                            { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
                             { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
                             { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
                             { "key": "about", "label": "About", "description": "Mori shell information" }
@@ -1918,6 +1955,89 @@ Item {
                 }
 
                 Column {
+                    visible: root.page === "clock"
+                    width: parent.width
+                    spacing: 12
+
+                    Text {
+                        text: "↑↓ setting · ←→ / Enter change"
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+
+                    Repeater {
+                        model: root.clockOptions
+                        delegate: Column {
+                            id: clockRow
+                            required property var modelData
+                            required property int index
+                            width: parent.width
+                            spacing: 6
+
+                            Text {
+                                text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
+                                    + clockRow.modelData.label
+                                color: clockRow.index === root.keyboardClockIndex
+                                    ? Theme.fg : Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+
+                            Row {
+                                spacing: 8
+                                Repeater {
+                                    model: clockRow.modelData.values
+                                    delegate: Rectangle {
+                                        id: clockChoice
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool selected: root.clockOptionValue(
+                                            clockRow.modelData.key) === modelData
+                                        width: Math.max(92, choiceText.implicitWidth + 20)
+                                        height: 30
+                                        color: choiceHover.hovered ? Theme.bg2 : Theme.bg1
+                                        border.width: 1
+                                        border.color: Theme.bg4
+
+                                        Text {
+                                            id: choiceText
+                                            anchors.centerIn: parent
+                                            text: clockRow.modelData.labels[clockChoice.index]
+                                            color: clockChoice.selected || choiceHover.hovered
+                                                ? Theme.fg : Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                        HoverHandler { id: choiceHover }
+                                        TapHandler {
+                                            onTapped: {
+                                                root.keyboardClockIndex = clockRow.index
+                                                root.settings.setClockOption(
+                                                    clockRow.modelData.key, clockChoice.modelData)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Preview: " + root.clockPreview()
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+                    Text {
+                        text: "Time format also applies to calendar events."
+                        color: Theme.grey1
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                    }
+                }
+
+                Column {
                     visible: root.page === "input"
                     width: parent.width
                     spacing: 10
@@ -2121,7 +2241,7 @@ Item {
 
                         Text {
                             text: root.keyboardDisplaySection === "outputs"
-                                ? "Arrows: output · Tab: editor · R: refresh · S: Apply all"
+                                ? "Arrows: output · Tab: editor · R: refresh · S: Apply"
                                 : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
                             color: Theme.grey1
                             font.family: Theme.fontFamily

@@ -146,6 +146,7 @@ PanelWindow {
                 id: calendar
                 panelWindow: barWindow
                 popupCoordinator: barWindow
+                settings: barWindow.settings
                 accent: barWindow.settings.moduleColor("calendar")
             }
         }

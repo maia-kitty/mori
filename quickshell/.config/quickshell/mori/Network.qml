@@ -15,6 +15,7 @@ RowLayout {
     property bool wiredConnected: false
     property string wiredName: ""
     property bool wifiConnected: false
+    property int nativeWifiNetworkCount: 0
     property string wifiName: ""
     property real signal: 0
     // Quickshell.Networking currently gets its Wi-Fi state from
@@ -24,14 +25,26 @@ RowLayout {
     property bool fallbackWifiConnected: false
     property string fallbackWifiName: ""
     property real fallbackWifiSignal: 0
+    property var wpaKnownNetworks: ({})
+    property string wpaError: ""
+    property string pendingWpaName: ""
+    property string pendingWpaPassword: ""
+    property bool pendingWpaOpen: false
+    property var wpaCommands: []
+    property int wpaCommandCount: 0
+    property bool wpaSavingProfile: false
+    property bool passwordForWpa: false
     property var vpnConnections: []
     property string passwordNetworkName: ""
     property var pendingNetwork: null
+    property int keyboardNetworkIndex: 0
     // Supplied by Bar.qml: PopupWindow requires the real Quickshell window,
     // not the Qt content window exposed through Window.window.
     required property var panelWindow
     required property var popupCoordinator
     readonly property bool popupVisible: popup.visible
+    readonly property bool useWpaFallback: fallbackWifiInterface.length > 0
+        && (!wifiDevice || (!wifiConnected && nativeWifiNetworkCount === 0))
     readonly property bool hasWifiConnection: wifiConnected || fallbackWifiConnected
     readonly property bool wifiRadioEnabled: Networking.wifiEnabled || fallbackWifiInterface.length > 0
     readonly property string currentWifiName: wifiConnected ? wifiName : fallbackWifiName
@@ -59,6 +72,52 @@ RowLayout {
 
     function close() { popup.visible = false }
 
+    function networkCount() { return useWpaFallback ? wpaNetworks.count : wifiNetworks.count }
+    function moveNetworkSelection(offset) {
+        keyboardNetworkIndex = Math.max(0, Math.min(networkCount() - 1,
+            keyboardNetworkIndex + offset))
+        const item = networkRepeater.itemAt(keyboardNetworkIndex)
+        if (item) {
+            const y = item.mapToItem(listCol.contentItem, 0, 0).y
+            if (y < listCol.contentY)
+                listCol.contentY = y
+            else if (y + item.height > listCol.contentY + listCol.height)
+                listCol.contentY = y + item.height - listCol.height
+        }
+    }
+    function activateNetwork(name, securityType, isKnown, isConnected, networkId) {
+        if (isConnected) return
+        if (useWpaFallback) {
+            if (networkId < 0 && securityType === -2) {
+                wpaError = "Only open and WPA-Personal networks can be added here"
+                return
+            }
+            connectWpaNetwork(name, networkId, securityType === WifiSecurityType.Open)
+            return
+        }
+        const network = findNetwork(name)
+        if (!network) return
+        if (isKnown || securityType === WifiSecurityType.Open)
+            connectKnownNetwork(network)
+        else
+            requestPassword(network)
+    }
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Escape) close()
+        else if (event.key === Qt.Key_Up) moveNetworkSelection(-1)
+        else if (event.key === Qt.Key_Down) moveNetworkSelection(1)
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (networkCount() > 0) {
+                const index = Math.min(keyboardNetworkIndex, networkCount() - 1)
+                keyboardNetworkIndex = index
+                const entry = (useWpaFallback ? wpaNetworks : wifiNetworks).get(index)
+                activateNetwork(entry.networkName, entry.securityType, entry.isKnown,
+                    entry.isConnected, entry.networkId)
+            }
+        } else return
+        event.accepted = true
+    }
+
     function findNetwork(name) {
         if (!wifiDevice)
             return null
@@ -68,6 +127,117 @@ RowLayout {
     function connectKnownNetwork(network) {
         pendingNetwork = network
         network.connect()
+    }
+
+    function refreshWpaNetworks() {
+        if (!useWpaFallback || !popup.visible)
+            return
+        if (!wpaScan.running)
+            wpaScan.exec(["wpa_cli", "-i", fallbackWifiInterface, "scan"])
+        if (!wpaKnownQuery.running)
+            wpaKnownQuery.exec(["wpa_cli", "-i", fallbackWifiInterface, "list_networks"])
+    }
+
+    function parseWpaNetworks(text) {
+        const known = Object.create(null)
+        for (const line of text.trim().split(/\r?\n/).slice(1)) {
+            const fields = line.split("\t")
+            if (fields.length >= 2 && /^\d+$/.test(fields[0]))
+                known[fields[1]] = Number(fields[0])
+        }
+        wpaKnownNetworks = known
+        refreshWpaScanResults()
+    }
+
+    function refreshWpaScanResults() {
+        if (useWpaFallback && popup.visible && !wpaResults.running)
+            wpaResults.exec(["wpa_cli", "-i", fallbackWifiInterface, "scan_results"])
+    }
+
+    function parseWpaScanResults(text) {
+        const strongest = Object.create(null)
+        for (const line of text.trim().split(/\r?\n/).slice(1)) {
+            const fields = line.split("\t")
+            if (fields.length < 5)
+                continue
+            const name = fields.slice(4).join("\t")
+            if (!name)
+                continue
+            const dbm = Number(fields[2])
+            const strength = isFinite(dbm)
+                ? Math.max(0, Math.min(1, (dbm + 90) / 50)) : 0
+            const flags = fields[3]
+            const securityType = /PSK/.test(flags) ? -1
+                : /(?:WPA|WEP|SAE|OWE|EAP)/.test(flags)
+                    ? -2 : WifiSecurityType.Open
+            if (!strongest[name] || strength > strongest[name].strength)
+                strongest[name] = { "name": name, "strength": strength,
+                    "securityType": securityType }
+        }
+        const entries = Object.values(strongest)
+        if (fallbackWifiConnected && fallbackWifiName && !strongest[fallbackWifiName])
+            entries.push({ "name": fallbackWifiName,
+                "strength": fallbackWifiSignal, "securityType": -1 })
+        entries.sort((left, right) => {
+            if ((left.name === fallbackWifiName) !== (right.name === fallbackWifiName))
+                return left.name === fallbackWifiName ? -1 : 1
+            return right.strength - left.strength
+        })
+        wpaNetworks.clear()
+        for (const entry of entries)
+            wpaNetworks.append({
+                "networkName": entry.name,
+                "strength": entry.strength,
+                "securityType": entry.securityType,
+                "networkId": wpaKnownNetworks[entry.name] ?? -1,
+                "isKnown": entry.name in wpaKnownNetworks,
+                "isConnected": fallbackWifiConnected && entry.name === fallbackWifiName
+            })
+    }
+
+    function runWpaAction(commands) {
+        if (wpaAction.running)
+            return
+        wpaError = ""
+        wpaCommandCount = commands.length
+        wpaSavingProfile = commands[commands.length - 1] === "save_config"
+        wpaCommands = commands
+        wpaAction.exec(["wpa_cli", "-i", fallbackWifiInterface])
+    }
+
+    function wpaValue(value) {
+        // Commands go to wpa_cli's stdin, never into a process argument.
+        return "\"" + value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\""
+    }
+
+    function connectWpaNetwork(name, networkId, isOpen, password) {
+        if (networkId >= 0) {
+            runWpaAction(["select_network " + networkId])
+            return
+        }
+        if (!isOpen && !password) {
+            if (passwordDialog.running)
+                return
+            passwordForWpa = true
+            requestPassword(name)
+            return
+        }
+        if (/[\r\n]/.test(name) || /[\r\n]/.test(password || "")) {
+            wpaError = "Network name or password contains an unsupported newline"
+            return
+        }
+        if (!isOpen && !((password.length >= 8 && password.length <= 63)
+                || /^[0-9a-fA-F]{64}$/.test(password))) {
+            wpaError = "WPA password must be 8–63 characters or a 64-digit key"
+            return
+        }
+        if (wpaAddNetwork.running || wpaAction.running)
+            return
+        pendingWpaName = name
+        pendingWpaPassword = password || ""
+        pendingWpaOpen = isOpen
+        wpaError = ""
+        wpaAddNetwork.exec(["wpa_cli", "-i", fallbackWifiInterface, "add_network"])
     }
 
     Connections {
@@ -114,6 +284,7 @@ RowLayout {
         }
 
         const networks = wifiDevice ? wifiDevice.networks.values.slice() : []
+        nativeWifiNetworkCount = networks.length
         networks.sort((left, right) => {
             if (left.connected !== right.connected)
                 return left.connected ? -1 : 1
@@ -129,6 +300,7 @@ RowLayout {
                 "networkName": String(network.name || "Unknown"),
                 "strength": Number(network.signalStrength || 0),
                 "securityType": Number(network.security),
+                "networkId": -1,
                 "isKnown": !!network.known,
                 "isConnected": !!network.connected
             })
@@ -144,6 +316,7 @@ RowLayout {
 
     ListModel { id: wiredDevices }
     ListModel { id: wifiNetworks }
+    ListModel { id: wpaNetworks }
 
     Timer {
         interval: 2000
@@ -170,6 +343,97 @@ RowLayout {
     }
 
     Process {
+        id: wpaScan
+        onExited: exitCode => {
+            if (exitCode === 0)
+                wpaScanDelay.restart()
+            else
+                root.wpaError = "Could not scan Wi-Fi networks"
+        }
+    }
+
+    Timer {
+        id: wpaScanDelay
+        interval: 1200
+        onTriggered: root.refreshWpaScanResults()
+    }
+
+    Process {
+        id: wpaKnownQuery
+        stdout: StdioCollector {
+            onStreamFinished: root.parseWpaNetworks(this.text)
+        }
+    }
+
+    Process {
+        id: wpaResults
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim() === "FAIL")
+                    root.wpaError = "Could not read Wi-Fi scan results"
+                else
+                    root.parseWpaScanResults(this.text)
+            }
+        }
+    }
+
+    Process {
+        id: wpaAddNetwork
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const id = Number(this.text.trim())
+                if (!Number.isInteger(id) || id < 0) {
+                    root.wpaError = "Could not create Wi-Fi connection"
+                    root.pendingWpaPassword = ""
+                    return
+                }
+                const commands = [
+                    "set_network " + id + " ssid " + root.wpaValue(root.pendingWpaName),
+                    "set_network " + id + " key_mgmt "
+                        + (root.pendingWpaOpen ? "NONE" : "WPA-PSK")
+                ]
+                if (!root.pendingWpaOpen)
+                    commands.push("set_network " + id + " psk "
+                        + root.wpaValue(root.pendingWpaPassword))
+                commands.push("enable_network " + id)
+                commands.push("select_network " + id)
+                commands.push("save_config")
+                root.pendingWpaPassword = ""
+                root.runWpaAction(commands)
+            }
+        }
+    }
+
+    Process {
+        id: wpaAction
+        stdinEnabled: true
+        onStarted: {
+            wpaAction.write(root.wpaCommands.join("\n") + "\nquit\n")
+            root.wpaCommands = []
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const replies = this.text.split(/\r?\n/)
+                    .map(line => line.trim().replace(/^>\s*/, ""))
+                    .filter(line => line === "OK" || line === "FAIL")
+                const failedAt = replies.indexOf("FAIL")
+                if (failedAt >= 0) {
+                    root.wpaError = root.wpaSavingProfile
+                        && failedAt === root.wpaCommandCount - 1
+                        ? "Connected, but wpa_supplicant could not save this network"
+                        : "Wi-Fi action failed; check wpa_supplicant permissions"
+                }
+                root.refreshWpaSupplicantState()
+                root.refreshWpaNetworks()
+            }
+        }
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                root.wpaError = "Could not control wpa_supplicant"
+        }
+    }
+
+    Process {
         id: wifiProbe
 
         stdout: StdioCollector {
@@ -180,10 +444,12 @@ RowLayout {
                     root.fallbackWifiConnected = false
                     root.fallbackWifiName = ""
                     root.fallbackWifiSignal = 0
+                    wpaNetworks.clear()
                     return
                 }
                 if (!wpaStatus.running)
                     wpaStatus.exec(["wpa_cli", "-i", root.fallbackWifiInterface, "status"])
+                root.refreshWpaNetworks()
             }
         }
     }
@@ -227,14 +493,14 @@ RowLayout {
         if (passwordDialog.running)
             return
 
-        passwordNetworkName = network.name
+        passwordNetworkName = typeof network === "string" ? network : network.name
         // Unmap the layer-shell dismiss surface before Zenity appears.
         close()
         passwordDialog.exec([
             "zenity",
             "--password",
             "--title=Wi-Fi Password",
-            "--text=Password for \"" + network.name + "\""
+            "--text=Password for \"" + passwordNetworkName + "\""
         ])
     }
 
@@ -246,9 +512,15 @@ RowLayout {
                 // Zenity appends one newline to its result; preserve every
                 // other character in case the passphrase contains spaces.
                 const password = this.text.replace(/\r?\n$/, "")
-                const network = root.findNetwork(root.passwordNetworkName)
-                if (password.length && network)
-                    network.connectWithPsk(password)
+                if (root.passwordForWpa) {
+                    if (password.length)
+                        root.connectWpaNetwork(root.passwordNetworkName, -1, false, password)
+                    root.passwordForWpa = false
+                } else {
+                    const network = root.findNetwork(root.passwordNetworkName)
+                    if (password.length && network)
+                        network.connectWithPsk(password)
+                }
                 root.passwordNetworkName = ""
             }
         }
@@ -329,6 +601,7 @@ RowLayout {
             if (visible) {
                 root.refreshNetworkModel()
                 root.refreshVpn()
+                root.refreshWpaNetworks()
             }
             if (!visible)
                 root.popupCoordinator.hidePopup(root)
@@ -338,7 +611,10 @@ RowLayout {
             interval: 5000
             repeat: true
             running: popup.visible
-            onTriggered: root.refreshVpn()
+            onTriggered: {
+                root.refreshVpn()
+                root.refreshWpaNetworks()
+            }
         }
 
         PopupSurface {
@@ -460,8 +736,29 @@ RowLayout {
                         font.pixelSize: Theme.fontSize
                     }
 
+                    Text {
+                        visible: root.useWpaFallback && root.wpaError.length > 0
+                        width: parent.width
+                        text: root.wpaError
+                        color: Theme.red
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                        wrapMode: Text.Wrap
+                    }
+
+                    Text {
+                        visible: root.wifiRadioEnabled
+                            && (root.useWpaFallback ? wpaNetworks.count : wifiNetworks.count) === 0
+                            && root.wpaError.length === 0
+                        text: "No networks found"
+                        color: Theme.grey
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+
                     Repeater {
-                        model: wifiNetworks
+                        id: networkRepeater
+                        model: root.useWpaFallback ? wpaNetworks : wifiNetworks
                         delegate: Column {
                             required property int index
                             required property string networkName
@@ -469,6 +766,7 @@ RowLayout {
                             required property int securityType
                             required property bool isKnown
                             required property bool isConnected
+                            required property int networkId
                             width: parent.width
 
                             RowLayout {
@@ -477,20 +775,18 @@ RowLayout {
 
                                 Text {
                                     Layout.fillWidth: true
-                                    text: networkName + "   " + Math.round(strength * 100) + "%"
-                                    color: isConnected ? root.accent : Theme.fg
+                                    text: (root.keyboardNetworkIndex === index ? "› " : "  ")
+                                        + networkName + "   " + Math.round(strength * 100) + "%"
+                                    color: isConnected || root.keyboardNetworkIndex === index
+                                        ? root.accent : Theme.fg
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
 
                                     TapHandler {
                                         onTapped: {
-                                            if (isConnected) return
-                                            const network = root.findNetwork(networkName)
-                                            if (!network) return
-                                            if (isKnown || securityType === WifiSecurityType.Open)
-                                                root.connectKnownNetwork(network)
-                                            else
-                                                root.requestPassword(network)
+                                            root.keyboardNetworkIndex = index
+                                            root.activateNetwork(networkName, securityType, isKnown,
+                                                isConnected, networkId)
                                         }
                                     }
                                 }
@@ -514,6 +810,10 @@ RowLayout {
 
                                     TapHandler {
                                         onTapped: {
+                                            if (root.useWpaFallback) {
+                                                root.runWpaAction(["disconnect"])
+                                                return
+                                            }
                                             const network = root.findNetwork(networkName)
                                             if (network)
                                                 network.disconnect()
@@ -525,7 +825,8 @@ RowLayout {
                             Rectangle {
                                 width: parent.width
                                 height: 1
-                                visible: index < wifiNetworks.count - 1
+                                visible: index < (root.useWpaFallback
+                                    ? wpaNetworks.count : wifiNetworks.count) - 1
                                 color: Theme.bg4
                             }
                         }
@@ -538,16 +839,23 @@ RowLayout {
 
     // Dismiss clicks below the bar without blocking the network pill itself.
     PanelWindow {
+        id: dismissLayer
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea {
+        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
+
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+            Keys.onPressed: event => root.handleKeyPressed(event)
+            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 

@@ -34,7 +34,7 @@ The shell imports `org.kde.kdeconnect`, so **KDE Connect and its QML module are 
 
 On a standalone `wpa_supplicant` setup, the network popup can add open and WPA-Personal networks. Saving new connections across restarts also requires `wpa_supplicant` to allow `SAVE_CONFIG` (`update_config=1`).
 
-The shell settings menu also edits Niri input settings. `niri/config.kdl` includes `niri/mori/input.kdl`; the Input page controls mouse and touchpad acceleration speed, tap-to-click, natural scrolling, and disable-while-typing. Changes are saved to that KDL file and Niri reloads them.
+The shell settings menu also edits Niri input settings. `niri/config.kdl` includes `niri/mori/input.kdl`; the Input page controls keyboard layout, mouse and touchpad acceleration speed, tap-to-click, natural scrolling, and disable-while-typing. Leaving keyboard layout empty follows the system setting. Apply saves changes across categories; closing settings discards pending changes. Shell changes preview before Apply, while display changes require a timed confirmation.
 
 ### Fonts and appearance
 

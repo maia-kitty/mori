@@ -47,6 +47,7 @@ Item {
     // Delegates use this to update bindings that access a setting by name.
     property int revision: 0
     property bool loading: true
+    property string saveError: ""
 
     readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || ""
     readonly property string configRoot: xdgConfigHome.length > 0
@@ -312,5 +313,10 @@ Item {
         blockLoading: true
         printErrors: false
         atomicWrites: true
+        onSaved: root.saveError = ""
+        onSaveFailed: error => {
+            root.saveError = FileViewError.toString(error)
+            console.warn("Could not save Mori settings:", root.saveError)
+        }
     }
 }

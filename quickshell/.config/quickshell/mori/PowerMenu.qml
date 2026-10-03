@@ -12,12 +12,15 @@ Item {
     required property var popupCoordinator
     property color accent: Theme.red
     property int heldActionKey: 0
+    property int selectedActionIndex: 0
+    property bool heldEnter: false
 
     function toggle() {
         if (menu.visible)
             close()
         else {
             popupCoordinator.showPopup(root)
+            selectedActionIndex = 0
             menu.visible = true
         }
     }
@@ -26,17 +29,29 @@ Item {
 
     function runAction(command) {
         heldActionKey = 0
+        heldEnter = false
         menu.visible = false
         actionProcess.exec(command)
     }
 
     function handleKeyPressed(event) {
-        if (event.isAutoRepeat)
-            return
-
         const actionKeys = [Qt.Key_L, Qt.Key_X, Qt.Key_S, Qt.Key_R, Qt.Key_P]
-        if (actionKeys.indexOf(event.key) !== -1) {
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            heldEnter = false
+            heldActionKey = 0
+            selectedActionIndex = Math.max(0, Math.min(powerActions.count - 1,
+                selectedActionIndex + (event.key === Qt.Key_Up ? -1 : 1)))
+            event.accepted = true
+        } else if (event.isAutoRepeat) {
+            return
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            heldActionKey = 0
+            heldEnter = true
+            event.accepted = true
+        } else if (actionKeys.indexOf(event.key) !== -1) {
+            heldEnter = false
             heldActionKey = event.key
+            selectedActionIndex = actionKeys.indexOf(event.key)
             event.accepted = true
         } else if (event.key === Qt.Key_Escape) {
             close()
@@ -45,7 +60,12 @@ Item {
     }
 
     function handleKeyReleased(event) {
-        if (!event.isAutoRepeat && heldActionKey === event.key) {
+        if (event.isAutoRepeat)
+            return
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            heldEnter = false
+            event.accepted = true
+        } else if (heldActionKey === event.key) {
             heldActionKey = 0
             event.accepted = true
         }
@@ -78,6 +98,7 @@ Item {
         onVisibleChanged: {
             if (!visible) {
                 root.heldActionKey = 0
+                root.heldEnter = false
                 root.popupCoordinator.hidePopup(root)
             }
         }
@@ -136,8 +157,10 @@ Item {
                         Text {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.label
-                            color: modelData.label === "Power off" ? root.accent : Theme.fg
+                            text: (index === root.selectedActionIndex ? "› " : "  ")
+                                + modelData.label
+                            color: index === root.selectedActionIndex
+                                || modelData.label === "Power off" ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
@@ -165,7 +188,8 @@ Item {
                             interval: 25
                             repeat: true
                             running: (buttonArea.pressed && buttonArea.containsMouse)
-                                     || (menu.visible && root.heldActionKey === parent.modelData.key)
+                                     || (menu.visible && (root.heldActionKey === parent.modelData.key
+                                         || root.heldEnter && root.selectedActionIndex === parent.index))
 
                             onRunningChanged: {
                                 if (!running && parent.holdProgress < 1)
@@ -186,7 +210,10 @@ Item {
                         MouseArea {
                             id: buttonArea
                             anchors.fill: parent
-                            onPressed: parent.holdProgress = 0
+                            onPressed: {
+                                root.selectedActionIndex = parent.index
+                                parent.holdProgress = 0
+                            }
                             onReleased: parent.holdProgress = 0
                             onCanceled: parent.holdProgress = 0
                             onExited: if (pressed) parent.holdProgress = 0

@@ -33,7 +33,12 @@ Item {
     }
 
     function handleKeyPressed(event) {
-        if (event.modifiers !== Qt.NoModifier)
+        if (event.key === Qt.Key_Escape) {
+            close()
+            event.accepted = true
+            return
+        }
+        if (event.modifiers !== Qt.NoModifier || event.isAutoRepeat)
             return
 
         if (event.key === Qt.Key_C) {
@@ -230,7 +235,7 @@ Item {
                         spacing: 12
 
                         Text {
-                            text: root.doNotDisturb ? "DND on" : "DND off"
+                            text: root.doNotDisturb ? "DND on  D" : "DND off  D"
                             color: root.doNotDisturb ? root.accent : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
@@ -242,7 +247,7 @@ Item {
 
                         Text {
                             id: clearAll
-                            text: "Clear all"
+                            text: "Clear all  C"
                             visible: root.notificationCount > 0
                             color: Theme.grey1
                             font.family: Theme.fontFamily

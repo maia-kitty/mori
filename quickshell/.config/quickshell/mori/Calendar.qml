@@ -18,6 +18,7 @@ Item {
     property string syncMessage: ""
     property bool queryPending: false
     property bool monthQueryPending: false
+    property bool dayNavigation: false
     readonly property bool busy: syncProcess.running || eventQuery.running || monthQuery.running
     readonly property var weekdayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     readonly property date today: clock.date
@@ -64,6 +65,18 @@ Item {
         const now = new Date()
         shownMonth = new Date(now.getFullYear(), now.getMonth(), 1, 12)
         selectDate(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12))
+        queryMonthEvents()
+    }
+
+    function navigateDay(offset) {
+        const next = new Date(selectedDate.getFullYear(), selectedDate.getMonth(),
+            selectedDate.getDate() + offset, 12)
+        if (next.getFullYear() !== shownMonth.getFullYear()
+                || next.getMonth() !== shownMonth.getMonth()) {
+            shownMonth = new Date(next.getFullYear(), next.getMonth(), 1, 12)
+            queryMonthEvents()
+        }
+        selectDate(next)
     }
 
     function parseEvents(output) {
@@ -148,6 +161,7 @@ Item {
         } else {
             popupCoordinator.showPopup(root)
             popup.visible = true
+            dayNavigation = false
             const now = new Date()
             shownMonth = new Date(now.getFullYear(), now.getMonth(), 1, 12)
             selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)
@@ -158,6 +172,37 @@ Item {
 
     function close() {
         popup.visible = false
+    }
+
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Tab) {
+            dayNavigation = !dayNavigation
+            event.accepted = true
+        } else if (event.key === Qt.Key_Backtab) {
+            dayNavigation = false
+            event.accepted = true
+        } else if (dayNavigation && event.key === Qt.Key_Left) {
+            navigateDay(-1)
+            event.accepted = true
+        } else if (dayNavigation && event.key === Qt.Key_Right) {
+            navigateDay(1)
+            event.accepted = true
+        } else if (dayNavigation && event.key === Qt.Key_Up) {
+            navigateDay(-7)
+            event.accepted = true
+        } else if (dayNavigation && event.key === Qt.Key_Down) {
+            navigateDay(7)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Left) {
+            changeMonth(-1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            changeMonth(1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Escape) {
+            close()
+            event.accepted = true
+        }
     }
 
     SystemClock {
@@ -305,6 +350,15 @@ Item {
                     }
                 }
 
+                Text {
+                    text: root.dayNavigation
+                        ? "Days: arrows move date · Tab: months"
+                        : "Months: ← / → · Tab: days"
+                    color: Theme.grey1
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                }
+
                 Grid {
                     width: parent.width
                     columns: 7
@@ -335,12 +389,13 @@ Item {
                             required property int index
                             readonly property date value: root.dateForCell(index)
                             readonly property bool selected: root.sameDay(value, root.selectedDate)
+                            readonly property bool keyboardFocused: root.dayNavigation && selected
                             readonly property bool current: root.sameDay(value, root.today)
                             readonly property bool inMonth: value.getMonth() === root.shownMonth.getMonth()
 
                             width: (parent.width - 12) / 7
                             height: 28
-                            color: selected ? Theme.bg3 : "transparent"
+                            color: "transparent"
                             border.width: current ? 1 : 0
                             border.color: root.accent
 
@@ -348,9 +403,10 @@ Item {
                                 anchors.centerIn: parent
                                 text: dayCell.value.getDate()
                                 color: dayCell.selected ? root.accent
-                                     : dayCell.inMonth ? root.accent : Theme.grey
+                                     : dayCell.inMonth ? Theme.grey1 : Theme.grey
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
+                                font.underline: dayCell.keyboardFocused
                             }
 
                             Rectangle {
@@ -487,16 +543,31 @@ Item {
     }
 
     PanelWindow {
+        id: dismissLayer
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea {
+        onVisibleChanged: {
+            if (visible)
+                Qt.callLater(() => keyCapture.forceActiveFocus())
+        }
+
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+
+            Keys.onPressed: event => root.handleKeyPressed(event)
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.close()
+            }
         }
     }
 }

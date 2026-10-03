@@ -53,6 +53,21 @@ Item {
         }
     }
     function close() { popup.visible = false }
+    function sendClipboard() {
+        if (!root.connected || !clipboardPlugin.available || clipboardSend.running)
+            return
+        feedback = ""
+        clipboardSend.exec(["kdeconnect-cli", "--device", deviceId, "--send-clipboard"])
+    }
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Escape) {
+            close()
+            event.accepted = true
+        } else if (event.key === Qt.Key_S && !event.isAutoRepeat) {
+            sendClipboard()
+            event.accepted = true
+        }
+    }
 
     onDeviceChanged: {
         feedback = ""
@@ -216,7 +231,7 @@ Item {
                     border.color: canSend ? root.accent : Theme.grey
                     Text {
                         anchors.centerIn: parent
-                        text: clipboardSend.running ? "Sending…" : "Send clipboard"
+                        text: clipboardSend.running ? "Sending…" : "Send clipboard  S"
                         color: parent.canSend ? root.accent : Theme.grey
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
@@ -227,10 +242,7 @@ Item {
                         hoverEnabled: true
                         enabled: parent.canSend
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.feedback = ""
-                            clipboardSend.exec(["kdeconnect-cli", "--device", root.deviceId, "--send-clipboard"])
-                        }
+                        onClicked: root.sendClipboard()
                     }
                 }
                 Text {
@@ -247,16 +259,29 @@ Item {
     }
 
     PanelWindow {
+        id: dismissLayer
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height
         exclusionMode: ExclusionMode.Ignore
         color: "transparent"
         WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-        MouseArea {
+        onVisibleChanged: {
+            if (visible)
+                Qt.callLater(() => keyCapture.forceActiveFocus())
+        }
+
+        Item {
+            id: keyCapture
             anchors.fill: parent
-            onClicked: root.close()
+            focus: dismissLayer.visible
+            Keys.onPressed: event => root.handleKeyPressed(event)
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.close()
+            }
         }
     }
 }

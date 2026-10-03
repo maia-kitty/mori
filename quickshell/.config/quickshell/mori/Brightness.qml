@@ -61,6 +61,14 @@ RowLayout {
 
     function close() { brightnessPopup.visible = false }
 
+    function handleKeyPressed(event) {
+        if (event.key === Qt.Key_Escape) close()
+        else if (event.key === Qt.Key_Left) requestBrightness(brightness - 0.05)
+        else if (event.key === Qt.Key_Right) requestBrightness(brightness + 0.05)
+        else if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down) return
+        event.accepted = true
+    }
+
     Component.onCompleted: refresh()
 
     Process {
@@ -189,7 +197,7 @@ RowLayout {
                 Row {
                     width: parent.width
                     Text {
-                        text: "Brightness"
+                        text: "› Brightness"
                         color: root.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
@@ -239,6 +247,26 @@ RowLayout {
                     }
                 }
             }
+        }
+    }
+
+    PanelWindow {
+        id: dismissLayer
+        visible: brightnessPopup.visible
+        anchors { top: true; bottom: true; left: true; right: true }
+        margins.top: root.panelWindow.height
+        exclusionMode: ExclusionMode.Ignore
+        color: "transparent"
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
+
+        Item {
+            id: keyCapture
+            anchors.fill: parent
+            focus: dismissLayer.visible
+            Keys.onPressed: event => root.handleKeyPressed(event)
+            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 }

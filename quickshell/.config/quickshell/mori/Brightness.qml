@@ -105,7 +105,7 @@ RowLayout {
     }
 
     Timer {
-        interval: 2000
+        interval: brightnessPopup.visible ? 2000 : 10000
         repeat: true
         running: root.available
         onTriggered: root.refresh()
@@ -169,7 +169,10 @@ RowLayout {
         visible: false
         color: "transparent"
         grabFocus: false
-        onVisibleChanged: if (!visible) root.popupCoordinator.hidePopup(root)
+        onVisibleChanged: {
+            if (visible) root.refresh()
+            else root.popupCoordinator.hidePopup(root)
+        }
 
         anchor.window: root.panelWindow
         anchor.rect {

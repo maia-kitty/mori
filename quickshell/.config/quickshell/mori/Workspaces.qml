@@ -92,7 +92,16 @@ Item {
         running: true
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: workspaceRefresh.restart()
+            onRead: line => {
+                try {
+                    const event = JSON.parse(line)
+                    if (event.WorkspacesChanged || event.WorkspaceActivated
+                            || event.WorkspaceUrgencyChanged)
+                        workspaceRefresh.restart()
+                } catch (error) {
+                    console.warn("Could not read Niri workspace event:", error)
+                }
+            }
         }
         onExited: eventStreamRetry.restart()
     }

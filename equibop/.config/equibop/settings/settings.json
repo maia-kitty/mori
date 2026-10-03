@@ -1102,7 +1102,7 @@
             "notifyOnNewExcludedQuests": false,
             "notifyOnNewQuests": true,
             "questButtonIndicator": "both",
-            "questButtonBadgeCount": 32,
+            "questButtonBadgeCount": 20,
             "questButtonBadgeColor": 2842239,
             "questButtonLeftClickAction": "open-quests",
             "questButtonMiddleClickAction": "plugin-settings",
@@ -1405,7 +1405,8 @@
             "noBulletPoints": false,
             "disableAdoptTagPrompt": true,
             "jsonGateway": false,
-            "hideVoiceIndicatorForMutedChannels": false
+            "hideVoiceIndicatorForMutedChannels": false,
+            "noOnboarding": false
         },
         "Settings": {
             "enabled": true,
@@ -1631,7 +1632,7 @@
         "authenticated": false,
         "url": "https://api.vencord.dev/",
         "settingsSync": false,
-        "settingsSyncVersion": 1790332388340
+        "settingsSyncVersion": 1791045726296
     },
     "ignoreResetWarning": false,
     "userCssVars": {},

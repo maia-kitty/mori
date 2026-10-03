@@ -1,6 +1,7 @@
 input {
     keyboard {
         xkb {
+            layout "sk"
         }
         numlock
     }

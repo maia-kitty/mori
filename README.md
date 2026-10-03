@@ -30,7 +30,7 @@ I personally use CachyOs so it was made with it in mind.
 | Bash and jq | Helper scripts |
 | Zenity | Wallpaper folder picker and Wi-Fi password dialog |
 
-The shell imports `org.kde.kdeconnect`, so **KDE Connect and its QML module are required by the current shell**, even if you do not pair a phone.
+KDE Connect is optional. If its QML module is unavailable, the KDE Connect bar widget stays hidden while the rest of the shell loads. Sending the clipboard from that widget requires `kdeconnect-cli`.
 
 On a standalone `wpa_supplicant` setup, the network popup can add open and WPA-Personal networks. Saving new connections across restarts also requires `wpa_supplicant` to allow `SAVE_CONFIG` (`update_config=1`).
 

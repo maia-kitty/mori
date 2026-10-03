@@ -169,12 +169,25 @@ PanelWindow {
     Component {
         id: kdeConnectComponent
         Row {
-            readonly property alias module: kdeConnect
-            KdeConnect {
-                id: kdeConnect
-                panelWindow: barWindow
-                popupCoordinator: barWindow
-                accent: barWindow.settings.moduleColor("kdeConnect")
+            readonly property var module: kdeConnectLoader.item
+            readonly property bool available: kdeConnectLoader.status === Loader.Ready
+                && kdeConnectLoader.item !== null
+
+            // Keep KDE Connect's QML import out of Bar.qml's required types.
+            // If its package is absent, only this loader fails.
+            Loader {
+                id: kdeConnectLoader
+                Component.onCompleted: setSource(Qt.resolvedUrl("KdeConnect.qml"), {
+                    "panelWindow": barWindow,
+                    "popupCoordinator": barWindow,
+                    "accent": barWindow.settings.moduleColor("kdeConnect")
+                })
+            }
+            Binding {
+                target: kdeConnectLoader.item
+                property: "accent"
+                value: barWindow.settings.moduleColor("kdeConnect")
+                when: kdeConnectLoader.item !== null
             }
         }
     }
@@ -347,7 +360,8 @@ PanelWindow {
                     required property string modelData
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
+                    visible: active && (moduleKey !== "kdeConnect"
+                        || (item && item.available))
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }
@@ -367,7 +381,8 @@ PanelWindow {
                     required property string modelData
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
+                    visible: active && (moduleKey !== "kdeConnect"
+                        || (item && item.available))
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }
@@ -388,7 +403,8 @@ PanelWindow {
                     required property string modelData
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
+                    visible: active && (moduleKey !== "kdeConnect"
+                        || (item && item.available))
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }

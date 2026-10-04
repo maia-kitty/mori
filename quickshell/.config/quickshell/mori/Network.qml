@@ -17,7 +17,6 @@ RowLayout {
     property bool wifiConnected: false
     property int nativeWifiNetworkCount: 0
     property string wifiName: ""
-    property real signal: 0
     // Quickshell.Networking currently gets its Wi-Fi state from
     // NetworkManager. This setup uses wpa_supplicant, so keep a small
     // read-only fallback for the bar when that model has no active network.
@@ -48,17 +47,10 @@ RowLayout {
     readonly property bool hasWifiConnection: wifiConnected || fallbackWifiConnected
     readonly property bool wifiRadioEnabled: Networking.wifiEnabled || fallbackWifiInterface.length > 0
     readonly property string currentWifiName: wifiConnected ? wifiName : fallbackWifiName
-    readonly property real currentWifiSignal: wifiConnected ? signal : fallbackWifiSignal
-
     readonly property string icon: {
         if (wiredConnected) return String.fromCodePoint(0xf0200)
         if (!wifiRadioEnabled || !hasWifiConnection) return String.fromCodePoint(0xf092d)
-
-        let tier = currentWifiSignal >= 0.75 ? 4
-                 : currentWifiSignal >= 0.50 ? 3
-                 : currentWifiSignal >= 0.25 ? 2
-                 : 1
-        return String.fromCodePoint(0xf091f + (tier + 1) * 3)
+        return String.fromCodePoint(0xf0928)
     }
 
     function toggle() {
@@ -301,7 +293,6 @@ RowLayout {
 
         wifiConnected = false
         wifiName = ""
-        signal = 0
         const wifiEntries = []
         for (const network of networks) {
             wifiEntries.push({
@@ -315,7 +306,6 @@ RowLayout {
             if (network.connected && !wifiConnected) {
                 wifiConnected = true
                 wifiName = String(network.name || "Wi-Fi")
-                signal = Number(network.signalStrength || 0)
             }
         }
         syncNetworkList(wifiNetworks, wifiEntries)
@@ -528,6 +518,14 @@ RowLayout {
             vpnQuery.exec(["nmcli", "-t", "--escape", "no", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"])
     }
 
+    Timer {
+        interval: popup.visible ? 5000 : 10000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.refreshVpn()
+    }
+
     function requestPassword(network) {
         if (passwordDialog.running)
             return
@@ -600,6 +598,14 @@ RowLayout {
     }
 
     Text {
+        visible: root.vpnConnections.length > 0
+        text: String.fromCodePoint(0xf033e)
+        color: root.accent
+        font.family: Theme.nerdFontFamily
+        font.pixelSize: Theme.fontSize
+    }
+
+    Text {
         text: root.wiredConnected ? root.wiredName
               : !root.wifiRadioEnabled ? "off"
               : root.hasWifiConnection ? root.currentWifiName : "N/A"
@@ -651,7 +657,6 @@ RowLayout {
             repeat: true
             running: popup.visible
             onTriggered: {
-                root.refreshVpn()
                 root.refreshWpaNetworks()
             }
         }

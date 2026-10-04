@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.UPower
 import Quickshell.Wayland
 import "./theme"
@@ -12,6 +13,9 @@ Row {
     required property var popupCoordinator
     property color accent: Theme.green
     property int keyboardProfileIndex: 0
+    property bool profilesAvailable: false
+    property bool performanceAvailable: false
+    property string currentProfile: ""
     readonly property var device: UPower.displayDevice
     readonly property int charge: Math.round(Math.max(0, Math.min(1,
         device ? device.percentage : 0)) * 100)
@@ -24,32 +28,42 @@ Row {
             close()
         } else {
             popupCoordinator.showPopup(root)
-            keyboardProfileIndex = profileIndex(PowerProfiles.profile)
+            keyboardProfileIndex = profileIndex(currentProfile)
+            probeProfiles()
             popup.visible = true
         }
     }
 
     function close() { popup.visible = false }
 
+    function probeProfiles() {
+        if (!profileProbe.running)
+            profileProbe.exec(["sh", "-c", "command -v powerprofilesctl >/dev/null 2>&1 && exec powerprofilesctl get"])
+        if (!profileList.running)
+            profileList.exec(["sh", "-c", "command -v powerprofilesctl >/dev/null 2>&1 && exec powerprofilesctl list"])
+    }
+
     function selectProfile(profile) {
-        if (profile === PowerProfile.Performance && !PowerProfiles.hasPerformanceProfile)
+        if (!profilesAvailable || profileSet.running
+                || (profile === "performance" && !performanceAvailable))
             return
-        PowerProfiles.profile = profile
+        profileSet.exec(["powerprofilesctl", "set", profile])
     }
 
     function profileAt(index) {
-        return [PowerProfile.PowerSaver, PowerProfile.Balanced,
-            PowerProfile.Performance][index]
+        return ["power-saver", "balanced", "performance"][index]
     }
     function profileIndex(profile) {
-        if (profile === PowerProfile.PowerSaver) return 0
-        if (profile === PowerProfile.Performance) return 2
+        if (profile === "power-saver") return 0
+        if (profile === "performance") return 2
         return 1
     }
     function moveProfileSelection(offset) {
+        if (!profilesAvailable)
+            return
         let next = keyboardProfileIndex + offset
         while (next >= 0 && next < 3) {
-            if (next !== 2 || PowerProfiles.hasPerformanceProfile) {
+            if (next !== 2 || performanceAvailable) {
                 keyboardProfileIndex = next
                 return
             }
@@ -63,6 +77,8 @@ Row {
             event.accepted = true
             return
         }
+        if (!profilesAvailable)
+            return
         if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             moveProfileSelection(event.key === Qt.Key_Up ? -1 : 1)
             event.accepted = true
@@ -79,15 +95,15 @@ Row {
 
         let profile = null
         if (event.key === Qt.Key_S)
-            profile = PowerProfile.PowerSaver
+            profile = "power-saver"
         else if (event.key === Qt.Key_B)
-            profile = PowerProfile.Balanced
+            profile = "balanced"
         else if (event.key === Qt.Key_P)
-            profile = PowerProfile.Performance
+            profile = "performance"
 
         if (profile !== null) {
             selectProfile(profile)
-            if (profile !== PowerProfile.Performance || PowerProfiles.hasPerformanceProfile)
+            if (profile !== "performance" || performanceAvailable)
                 keyboardProfileIndex = profileIndex(profile)
             event.accepted = true
         }
@@ -105,6 +121,44 @@ Row {
         if (charge >= 13)
             return String.fromCodePoint(0xf243)
         return String.fromCodePoint(0xf244)
+    }
+
+    Process {
+        id: profileProbe
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.currentProfile = this.text.trim()
+                root.keyboardProfileIndex = root.profileIndex(root.currentProfile)
+            }
+        }
+        onExited: exitCode => {
+            root.profilesAvailable = exitCode === 0
+            if (exitCode !== 0)
+                root.currentProfile = ""
+        }
+    }
+
+    Process {
+        id: profileList
+        stdout: StdioCollector {
+            onStreamFinished: root.performanceAvailable = /^\s*\*?\s*performance:/m.test(this.text)
+        }
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                root.performanceAvailable = false
+        }
+    }
+
+    Process {
+        id: profileSet
+        onExited: exitCode => root.probeProfiles()
+    }
+
+    Timer {
+        interval: 3000
+        running: popup.visible && !root.profilesAvailable
+        repeat: true
+        onTriggered: root.probeProfiles()
     }
 
     Text {
@@ -160,7 +214,7 @@ Row {
                 spacing: 7
 
                 Text {
-                    text: "Power profile"
+                    text: root.profilesAvailable ? "Power profile" : "Power profile unavailable"
                     color: root.accent
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize
@@ -183,17 +237,18 @@ Row {
 
                 Repeater {
                     model: [
-                        { "label": "Power saver", "shortcut": "S", "profile": PowerProfile.PowerSaver },
-                        { "label": "Balanced", "shortcut": "B", "profile": PowerProfile.Balanced },
-                        { "label": "Performance", "shortcut": "P", "profile": PowerProfile.Performance }
+                        { "label": "Power saver", "shortcut": "S", "profile": "power-saver" },
+                        { "label": "Balanced", "shortcut": "B", "profile": "balanced" },
+                        { "label": "Performance", "shortcut": "P", "profile": "performance" }
                     ]
                     delegate: Rectangle {
                         id: profileRow
                         required property var modelData
                         required property int index
-                        readonly property bool available: modelData.profile !== PowerProfile.Performance
-                            || PowerProfiles.hasPerformanceProfile
-                        readonly property bool selected: PowerProfiles.profile === modelData.profile
+                        readonly property bool available: root.profilesAvailable
+                            && (modelData.profile !== "performance"
+                                || root.performanceAvailable)
+                        readonly property bool selected: root.currentProfile === modelData.profile
                         width: menuColumn.width
                         height: 30
                         color: profileHover.hovered && available

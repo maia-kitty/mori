@@ -109,7 +109,6 @@ animations {
 
 // === Debug ===
 debug {
-   disable-direct-scanout
    honor-xdg-activation-with-invalid-serial
 }
 

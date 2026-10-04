@@ -2,6 +2,7 @@
  * Ported from the DMS Matugen Zen template with fixed dark colors. */
 
 :root {
+  font-family: "Old Standard TT", serif !important;
   --zen-primary-color: #a7c080 !important;
   --toolbarbutton-icon-fill: #a7c080 !important;
   --toolbar-field-color: #d3c6aa !important;
@@ -103,5 +104,4 @@ toolbar .toolbarbutton-1 > .toolbarbutton-icon {
   fill: #a7c080 !important;
   color: #a7c080 !important;
 }
-
 

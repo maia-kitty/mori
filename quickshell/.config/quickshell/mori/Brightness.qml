@@ -120,7 +120,7 @@ RowLayout {
         onTriggered: root.refresh()
     }
 
-    Text {
+    BarLabel {
         text: String.fromCodePoint(0xf185)
         color: root.errorMessage.length > 0 ? Theme.red
             : root.available ? root.accent : Theme.grey1

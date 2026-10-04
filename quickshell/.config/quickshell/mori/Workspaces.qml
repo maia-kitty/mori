@@ -136,7 +136,7 @@ Item {
                 border.color: !modelData.overflow && modelData.is_urgent
                     ? Theme.red : modelData.overflow ? Theme.grey1 : root.accent
 
-                Text {
+                BarLabel {
                     id: workspaceLabel
                     anchors.centerIn: parent
                     text: workspaceBox.modelData.overflow ? ""

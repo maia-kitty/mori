@@ -40,17 +40,16 @@ The shell settings menu also edits Niri input settings. `niri/config.kdl` includ
 
 | Asset | What it is (for) |
 | --- | --- |
-| Geist | Main font |
-| Geist Mono | Main font but mono |
-| Maple Mono | Terminal font |
+| Old Standard TT | GUI font |
+| IBM Plex Mono | Terminal and code font |
 | Symbols Nerd Font | Shell icons |
 | adw-gtk3 | Base GTK 3 theme, styled with color overrides |
 | Adwaita icons | GTK application icons |
-| Bibata Modern Classic | Cursor |
+| Adwaita | Cursor |
 
 Mori’s custom GTK styling is included in `gtk/`: GTK 3 defines the Everforest color overrides in `gtk.css`, and GTK 4 imports the same palette. The GTK settings select `adw-gtk3-dark` as the base theme.
 
-The Everforest terminal theme and Mori application palettes are included in the repository. Fonts, the base GTK theme, icon packs, and cursor themes are not bundled.
+The Everforest terminal theme, Mori application palettes, Old Standard TT, and IBM Plex Mono are included in the repository. The base GTK theme, icon packs, and cursor themes are not bundled. The bundled fonts retain their SIL Open Font License files.
 
 ## Optional software I use
 
@@ -76,13 +75,14 @@ These applications have configurations, themes, or shortcuts here. They are opti
 
 ## Manual installation
 
-Install GNU Stow and the dependencies for the components you want using your package manager. Fonts, cursor themes, and the base GTK theme need to be installed separately.
+Install GNU Stow and the dependencies for the components you want using your package manager. The cursor theme, Symbols Nerd Font, and base GTK theme need to be installed separately.
 
 ```bash
 git clone https://github.com/maia-kitty/mori.git
 cd mori
-stow --simulate -v -t ~ bin niri quickshell systemd kitty fuzzel swaylock
-stow -t ~ bin niri quickshell systemd kitty fuzzel swaylock
+stow --simulate -v -t ~ fonts bin niri quickshell systemd kitty fuzzel swaylock
+stow -t ~ fonts bin niri quickshell systemd kitty fuzzel swaylock
+fc-cache -f ~/.local/share/fonts
 ```
 
 Choose only the packages you want. Other home-directory packages, such as `gtk`, `qt`, `fish`, or `nvim`, can be stowed individually. Back up conflicting files before replacing them. Keep the checkout in place: the installed symlinks point into it.
@@ -116,6 +116,8 @@ With SDDM installed, deploy its theme to the system root rather than your home d
 ```bash
 sudo stow --simulate -v -t / sddm
 sudo stow -t / sddm
+sudo cp -r fonts/.local/share/fonts/old-standard-tt /usr/local/share/fonts/
+sudo fc-cache -f /usr/local/share/fonts/old-standard-tt
 ```
 
 Resolve existing conflicts and check other SDDM theme overrides before deploying. This selects the Mori theme; enabling SDDM as your login manager is a separate step.

@@ -141,6 +141,7 @@ PanelWindow {
     Component {
         id: calendarComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: calendar
             Calendar {
                 id: calendar
@@ -155,6 +156,7 @@ PanelWindow {
     Component {
         id: mediaComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: media
             Media {
                 id: media
@@ -169,6 +171,7 @@ PanelWindow {
     Component {
         id: kdeConnectComponent
         Row {
+            height: Theme.barContentHeight
             readonly property var module: kdeConnectLoader.item
             readonly property bool available: kdeConnectLoader.status === Loader.Ready
                 && kdeConnectLoader.item !== null
@@ -195,10 +198,11 @@ PanelWindow {
     Component {
         id: systemTrayComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: systemTray
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: barWindow.settings.moduleColor("systemTray") }
-            SystemTray { id: systemTray; panelWindow: barWindow }
+            SystemTray { id: systemTray; panelWindow: barWindow; anchors.verticalCenter: parent.verticalCenter }
             BarBracket { text: "]"; color: barWindow.settings.moduleColor("systemTray") }
         }
     }
@@ -206,6 +210,7 @@ PanelWindow {
     Component {
         id: networkComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: network
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: network.accent; action: () => network.toggle() }
@@ -223,6 +228,7 @@ PanelWindow {
     Component {
         id: volumeComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: volume
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: volume.accent; action: () => volume.togglePopup() }
@@ -240,6 +246,7 @@ PanelWindow {
     Component {
         id: brightnessComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: brightness
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: brightness.errorMessage.length > 0 ? Theme.red : brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
@@ -257,6 +264,7 @@ PanelWindow {
     Component {
         id: wallpaperComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: wallpaperPicker
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: wallpaperPicker.accent; action: () => wallpaperPicker.toggle() }
@@ -273,6 +281,7 @@ PanelWindow {
     Component {
         id: notificationComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: notificationCenter
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: notificationCenter.accent; action: () => notificationCenter.toggle() }
@@ -290,6 +299,7 @@ PanelWindow {
     Component {
         id: batteryComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: battery
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: battery.accent; action: () => battery.toggle() }
@@ -306,6 +316,7 @@ PanelWindow {
     Component {
         id: workspacesComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: workspaces
             Workspaces {
                 id: workspaces
@@ -318,6 +329,7 @@ PanelWindow {
     Component {
         id: powerMenuComponent
         Row {
+            height: Theme.barContentHeight
             readonly property alias module: powerMenu
             spacing: barWindow.bracketSpacing
             BarBracket { text: "["; color: powerMenu.accent; action: () => powerMenu.toggle() }
@@ -358,6 +370,7 @@ PanelWindow {
 
                 delegate: Loader {
                     required property string modelData
+                    height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
                     visible: active && (moduleKey !== "kdeConnect"
@@ -379,6 +392,7 @@ PanelWindow {
 
                 delegate: Loader {
                     required property string modelData
+                    height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
                     visible: active && (moduleKey !== "kdeConnect"
@@ -401,6 +415,7 @@ PanelWindow {
 
                 delegate: Loader {
                     required property string modelData
+                    height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
                     visible: active && (moduleKey !== "kdeConnect"

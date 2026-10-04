@@ -75,9 +75,8 @@ Item {
     property real displayLayoutHeight: 1
 
     readonly property var allModules: [
-        "calendar", "media", "kdeConnect", "systemTray", "network",
-        "volume", "brightness", "wallpaper", "notifications", "battery", "workspaces",
-        "powerMenu"
+        "battery", "brightness", "calendar", "kdeConnect", "media", "network",
+        "notifications", "powerMenu", "systemTray", "volume", "wallpaper", "workspaces"
     ]
     readonly property var categoryPages: ["modules", "appearance", "clock", "displays", "input", "about"]
     readonly property var clockOptions: [
@@ -1372,9 +1371,11 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
+                height: 26
                 spacing: 10
 
-                Text {
+                SettingsLabel {
+                    anchors.verticalCenter: parent.verticalCenter
                     text: "≡"
                     color: Theme.fg
                     font.family: Theme.fontFamily
@@ -1393,7 +1394,8 @@ Item {
                     }
                 }
 
-                Text {
+                SettingsLabel {
+                    anchors.verticalCenter: parent.verticalCenter
                     text: (root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
                         + root.moduleLabel(moduleRow.moduleKey)
                     color: root.keyboardModule === moduleRow.moduleKey
@@ -1427,7 +1429,7 @@ Item {
                     Row {
                         anchors.centerIn: parent
                         spacing: 6
-                        Text {
+                        SettingsLabel {
                             text: "Compact"
                             color: moduleRow.moduleCompact ? Theme.fg : Theme.grey1
                             font.family: Theme.fontFamily
@@ -1457,6 +1459,7 @@ Item {
                 Rectangle {
                     width: 36
                     height: 18
+                    anchors.verticalCenter: parent.verticalCenter
                     radius: 0
                     color: moduleRow.moduleEnabled ? Theme.fg : Theme.bg4
                     Rectangle {
@@ -1554,7 +1557,7 @@ Item {
                     border.width: 1
                     border.color: Theme.fg
 
-                    Text {
+                    SettingsLabel {
                         anchors.centerIn: parent
                         text: "←"
                         color: Theme.fg
@@ -1563,7 +1566,7 @@ Item {
                     }
                     TapHandler { onTapped: root.page = "home" }
                 }
-                Text {
+                SettingsLabel {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.pageTitle()
@@ -1583,7 +1586,7 @@ Item {
                     border.width: 1
                     border.color: Theme.fg
 
-                    Text {
+                    SettingsLabel {
                         anchors.centerIn: parent
                         text: "×"
                         color: Theme.fg
@@ -1602,8 +1605,7 @@ Item {
                         && root.displaySavePhase === "idle" && !root.awaitingDisplayConfirmation
                         : false
                 visible: root.page === "input" || root.page === "displays"
-                anchors.top: parent.top
-                anchors.topMargin: 16
+                anchors.verticalCenter: header.verticalCenter
                 anchors.right: parent.right
                 anchors.rightMargin: 90
                 width: 84
@@ -1612,7 +1614,7 @@ Item {
                 border.width: 1
                 border.color: ready ? Theme.fg : Theme.bg4
 
-                Text {
+                SettingsLabel {
                     anchors.centerIn: parent
                     text: "Apply"
                     color: applyButton.ready ? Theme.fg : Theme.grey1
@@ -1625,7 +1627,7 @@ Item {
                 }
             }
 
-            Text {
+            SettingsLabel {
                 anchors.right: applyButton.left
                 anchors.rightMargin: 10
                 anchors.verticalCenter: applyButton.verticalCenter
@@ -1679,7 +1681,7 @@ Item {
                     wrapMode: Text.Wrap
                 }
 
-                Text {
+                SettingsLabel {
                     id: retrySave
                     anchors.right: parent.right
                     anchors.rightMargin: 8
@@ -1708,17 +1710,11 @@ Item {
                     width: parent.width
                     spacing: 8
 
-                    Text {
+                    SettingsLabel {
                         text: "Choose a category · ↑↓ / Enter"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
-                    }
-                    Text {
-                        text: "Shell options save immediately. Input and Displays need Apply."
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
                     }
                     Repeater {
                         id: categoryRepeater
@@ -1744,7 +1740,7 @@ Item {
                                 anchors.leftMargin: 14
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 3
-                                Text {
+                                SettingsLabel {
                                     text: (categoryRow.index === root.keyboardCategoryIndex
                                         ? "› " : "  ") + categoryRow.modelData.label
                                     color: categoryRow.index === root.keyboardCategoryIndex
@@ -1752,14 +1748,14 @@ Item {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.headingFontSize
                                 }
-                                Text {
+                                SettingsLabel {
                                     text: categoryRow.modelData.description
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
                                 }
                             }
-                            Text {
+                            SettingsLabel {
                                 anchors.right: parent.right
                                 anchors.rightMargin: 14
                                 anchors.verticalCenter: parent.verticalCenter
@@ -1792,7 +1788,7 @@ Item {
                         id: modulesColumn
                         width: modulesFlick.width
                         spacing: 8
-                        Text {
+                        SettingsLabel {
                             text: "↑↓ select · Enter toggle · C compact · Shift+arrows move · drag ≡"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
@@ -1832,7 +1828,7 @@ Item {
                                     anchors.margins: 8
                                     spacing: 2
 
-                                    Text {
+                                    SettingsLabel {
                                         width: parent.width
                                         text: anchorBox.anchorKey === "left" ? "Left"
                                             : anchorBox.anchorKey === "center" ? "Center"
@@ -1885,7 +1881,7 @@ Item {
                         id: appearanceColumn
                         width: appearanceFlick.width
                         spacing: 6
-                        Text {
+                        SettingsLabel {
                             text: "↑↓ module · ←→ color · Enter apply"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
@@ -1902,7 +1898,7 @@ Item {
                                 width: parent.width
                                 height: 48
                                 color: colorHover.hovered ? Theme.bg2 : "transparent"
-                                Text {
+                                SettingsLabel {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     anchors.verticalCenter: parent.verticalCenter
@@ -1959,7 +1955,7 @@ Item {
                     width: parent.width
                     spacing: 12
 
-                    Text {
+                    SettingsLabel {
                         text: "↑↓ setting · ←→ / Enter change"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
@@ -1975,7 +1971,7 @@ Item {
                             width: parent.width
                             spacing: 6
 
-                            Text {
+                            SettingsLabel {
                                 text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
                                     + clockRow.modelData.label
                                 color: clockRow.index === root.keyboardClockIndex
@@ -2000,7 +1996,7 @@ Item {
                                         border.width: 1
                                         border.color: Theme.bg4
 
-                                        Text {
+                                        SettingsLabel {
                                             id: choiceText
                                             anchors.centerIn: parent
                                             text: clockRow.modelData.labels[clockChoice.index]
@@ -2023,13 +2019,13 @@ Item {
                         }
                     }
 
-                    Text {
+                    SettingsLabel {
                         text: "Preview: " + root.clockPreview()
                         color: Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
-                    Text {
+                    SettingsLabel {
                         text: "Time format also applies to calendar events."
                         color: Theme.grey1
                         font.family: Theme.fontFamily
@@ -2042,19 +2038,19 @@ Item {
                     width: parent.width
                     spacing: 10
 
-                    Text {
+                    SettingsLabel {
                         text: "Niri input · leave keyboard layout empty for the system default"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
-                    Text {
+                    SettingsLabel {
                         text: "↑↓ select · ←→ adjust · Enter edit/toggle · Ctrl+Enter apply"
                         color: Theme.grey1
                         font.family: Theme.fontFamily
                         font.pixelSize: Math.max(10, Theme.fontSize - 2)
                     }
-                    Text {
+                    SettingsLabel {
                         text: "Sensitivity is Niri acceleration speed: −1 slower, +1 faster."
                         color: Theme.grey1
                         font.family: Theme.fontFamily
@@ -2080,7 +2076,7 @@ Item {
                             border.width: 1
                             border.color: Theme.bg4
 
-                            Text {
+                            SettingsLabel {
                                 anchors.left: parent.left
                                 anchors.leftMargin: 12
                                 anchors.verticalCenter: parent.verticalCenter
@@ -2101,6 +2097,11 @@ Item {
                                 width: 150
                                 height: 28
                                 placeholderText: "System default"
+                                verticalAlignment: TextInput.AlignVCenter
+                                leftPadding: 8
+                                rightPadding: 8
+                                topPadding: 0
+                                bottomPadding: 0
                                 color: Theme.fg
                                 placeholderTextColor: Theme.grey1
                                 selectionColor: Theme.bg4
@@ -2130,7 +2131,7 @@ Item {
                                 }
                             }
 
-                            Text {
+                            SettingsLabel {
                                 visible: inputRow.option.kind === "layout"
                                 anchors.right: parent.right
                                 anchors.rightMargin: 12
@@ -2183,7 +2184,7 @@ Item {
                                         color: Theme.fg
                                     }
                                 }
-                                Text {
+                                SettingsLabel {
                                     width: 42
                                     anchors.verticalCenter: parent.verticalCenter
                                     horizontalAlignment: Text.AlignRight
@@ -2239,7 +2240,7 @@ Item {
                         anchors.fill: parent
                         spacing: 10
 
-                        Text {
+                        SettingsLabel {
                             text: root.keyboardDisplaySection === "outputs"
                                 ? "Arrows: output · Tab: editor · R: refresh · S: Apply"
                                 : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
@@ -2257,7 +2258,7 @@ Item {
                                 color: refreshHover.hovered ? Theme.bg2 : Theme.bg1
                                 border.width: 1
                                 border.color: Theme.fg
-                                Text {
+                                SettingsLabel {
                                     id: refreshLabel
                                     anchors.centerIn: parent
                                     text: displayQuery.running ? "Refreshing…" : "Refresh"
@@ -2274,7 +2275,7 @@ Item {
                                 }
                             }
 
-                            Text {
+                            SettingsLabel {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.displayError.length > 0
                                     ? root.displayError : root.displayStatus
@@ -2284,7 +2285,7 @@ Item {
                             }
                         }
 
-                        Text {
+                        SettingsLabel {
                             text: "Drag displays to arrange them. Nearby edges snap together."
                             color: Theme.grey1
                             font.family: Theme.fontFamily
@@ -2304,7 +2305,7 @@ Item {
                                     border.width: 1
                                     border.color: Theme.bg4
                                     opacity: modelData.enabled ? 1 : 0.6
-                                    Text {
+                                    SettingsLabel {
                                         id: selectorLabel
                                         anchors.centerIn: parent
                                         text: displaySelector.modelData.connector
@@ -2349,7 +2350,7 @@ Item {
                                     x: root.displayCanvasX(modelData) + dragOffsetX
                                     y: root.displayCanvasY(modelData) + dragOffsetY
                                     width: Math.max(54, modelData.width * root.displayViewScale)
-                                    height: Math.max(42, modelData.height * root.displayViewScale)
+                                    height: Math.max(54, modelData.height * root.displayViewScale)
                                     z: displayDrag.active ? 10 : 1
                                     color: Theme.bg1
                                     opacity: modelData.enabled ? 1 : 0.55
@@ -2361,7 +2362,7 @@ Item {
                                         anchors.centerIn: parent
                                         width: parent.width - 10
                                         spacing: 2
-                                        Text {
+                                        SettingsLabel {
                                             width: parent.width
                                             horizontalAlignment: Text.AlignHCenter
                                             elide: Text.ElideRight
@@ -2372,7 +2373,7 @@ Item {
                                             font.pixelSize: Theme.fontSize
                                             font.weight: Font.DemiBold
                                         }
-                                        Text {
+                                        SettingsLabel {
                                             width: parent.width
                                             horizontalAlignment: Text.AlignHCenter
                                             elide: Text.ElideRight
@@ -2422,7 +2423,7 @@ Item {
                         Rectangle {
                             id: displayEditor
                             width: parent.width
-                            height: 180
+                            height: displayEditorColumn.implicitHeight + 24
                             color: Theme.bg1
                             border.width: 1
                             border.color: Theme.bg4
@@ -2443,7 +2444,7 @@ Item {
                                     && (displayEditor.output.enabled
                                         ? root.enabledDisplayCount() > 1 : true) ? 1 : 0.45
 
-                                Text {
+                                SettingsLabel {
                                     id: displayEnabledLabel
                                     anchors.centerIn: parent
                                     text: displayEditor.output && displayEditor.output.enabled
@@ -2465,13 +2466,14 @@ Item {
                             }
 
                             Column {
+                                id: displayEditorColumn
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.top: parent.top
                                 anchors.margins: 12
                                 spacing: 6
 
-                                Text {
+                                SettingsLabel {
                                     text: displayEditor.output
                                         ? displayEditor.output.label + "  ("
                                             + displayEditor.output.connector + ")"
@@ -2484,7 +2486,7 @@ Item {
 
                                 Row {
                                     spacing: 8
-                                    Text {
+                                    SettingsLabel {
                                         width: 95
                                         text: root.keyboardDisplaySection === "editor"
                                             && root.keyboardDisplayField === 1
@@ -2494,14 +2496,14 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "‹"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.headingFontSize
                                         TapHandler { onTapped: root.cycleSelectedResolution(-1) }
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         width: 220
                                         text: displayEditor.output
                                             ? displayEditor.output.modeWidth + "×"
@@ -2512,7 +2514,7 @@ Item {
                                         font.pixelSize: Theme.fontSize
                                         horizontalAlignment: Text.AlignHCenter
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "›"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
@@ -2523,7 +2525,7 @@ Item {
 
                                 Row {
                                     spacing: 8
-                                    Text {
+                                    SettingsLabel {
                                         width: 95
                                         text: root.keyboardDisplaySection === "editor"
                                             && root.keyboardDisplayField === 2
@@ -2533,14 +2535,14 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "‹"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.headingFontSize
                                         TapHandler { onTapped: root.cycleSelectedRefreshRate(-1) }
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         width: 220
                                         text: displayEditor.output
                                             ? (displayEditor.output.refreshRate / 1000)
@@ -2551,7 +2553,7 @@ Item {
                                         font.pixelSize: Theme.fontSize
                                         horizontalAlignment: Text.AlignHCenter
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "›"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
@@ -2562,7 +2564,7 @@ Item {
 
                                 Row {
                                     spacing: 8
-                                    Text {
+                                    SettingsLabel {
                                         width: 95
                                         text: root.keyboardDisplaySection === "editor"
                                             && root.keyboardDisplayField === 3
@@ -2572,14 +2574,14 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "−"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.headingFontSize
                                         TapHandler { onTapped: root.adjustSelectedScale(-0.25) }
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         width: 220
                                         text: displayEditor.output
                                             ? displayEditor.output.scale.toFixed(2) + "×" : "—"
@@ -2588,7 +2590,7 @@ Item {
                                         font.pixelSize: Theme.fontSize
                                         horizontalAlignment: Text.AlignHCenter
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "+"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
@@ -2599,7 +2601,7 @@ Item {
 
                                 Row {
                                     spacing: 8
-                                    Text {
+                                    SettingsLabel {
                                         width: 95
                                         text: root.keyboardDisplaySection === "editor"
                                             && root.keyboardDisplayField === 4
@@ -2609,14 +2611,14 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "‹"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.headingFontSize
                                         TapHandler { onTapped: root.cycleSelectedTransform(-1) }
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         width: 220
                                         text: displayEditor.output
                                             ? displayEditor.output.transform : "—"
@@ -2625,7 +2627,7 @@ Item {
                                         font.pixelSize: Theme.fontSize
                                         horizontalAlignment: Text.AlignHCenter
                                     }
-                                    Text {
+                                    SettingsLabel {
                                         text: "›"
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
@@ -2634,7 +2636,7 @@ Item {
                                     }
                                 }
 
-                                Text {
+                                SettingsLabel {
                                     text: displayEditor.output
                                         ? "Position  " + Math.round(displayEditor.output.x) + ", "
                                             + Math.round(displayEditor.output.y) : ""
@@ -2668,7 +2670,7 @@ Item {
                     border.width: 2
                     border.color: Theme.fg
 
-                    Text {
+                    SettingsLabel {
                         anchors.left: parent.left
                         anchors.leftMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
@@ -2691,7 +2693,7 @@ Item {
                             color: keepHover.hovered ? Theme.bg3 : Theme.bg2
                             border.width: 1
                             border.color: Theme.fg
-                            Text {
+                            SettingsLabel {
                                 id: keepLabel
                                 anchors.centerIn: parent
                                 text: "Keep"
@@ -2711,7 +2713,7 @@ Item {
                             color: revertHover.hovered ? Theme.bg3 : Theme.bg2
                             border.width: 1
                             border.color: Theme.fg
-                            Text {
+                            SettingsLabel {
                                 id: revertLabel
                                 anchors.centerIn: parent
                                 text: "Revert"
@@ -2734,7 +2736,7 @@ Item {
                     visible: root.page === "about"
                     width: parent.width
                     spacing: 12
-                    Text {
+                    SettingsLabel {
                         text: "Mori 森"
                         color: Theme.fg
                         font.family: Theme.fontFamily
@@ -2748,7 +2750,7 @@ Item {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
-                    Text {
+                    SettingsLabel {
                         text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
                         color: Theme.fg
                         font.family: Theme.fontFamily
@@ -2774,7 +2776,7 @@ Item {
                 Drag.keys: ["mori-module"]
                 Drag.hotSpot.x: width / 2
                 Drag.hotSpot.y: height / 2
-                Text {
+                SettingsLabel {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
@@ -2783,7 +2785,7 @@ Item {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                 }
-                Text {
+                SettingsLabel {
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter

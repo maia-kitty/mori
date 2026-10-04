@@ -170,7 +170,7 @@ Item {
         }
     }
 
-    Text {
+    BarLabel {
         id: icon
         anchors.centerIn: parent
         text: String.fromCodePoint(0xf03e)

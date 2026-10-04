@@ -75,7 +75,7 @@ Item {
         id: actionProcess
     }
 
-    Text {
+    BarLabel {
         id: powerIcon
         anchors.centerIn: parent
         text: String.fromCodePoint(0xf0425)

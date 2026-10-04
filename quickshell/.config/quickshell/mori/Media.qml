@@ -104,13 +104,13 @@ Item {
             text: root.trackTitle
         }
 
-        Text {
+        BarLabel {
             text: "["
             color: root.hasPlayer ? root.accent : Theme.grey
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
-        Text {
+        BarLabel {
             // Keep the bar glyph recognisable at a glance. Playback state is
             // represented by the explicit play/pause control in the popup.
             text: "♫"
@@ -118,7 +118,7 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
-        Text {
+        BarLabel {
             id: titleText
             visible: !root.compactMode
             width: root.compactMode ? 0 : Math.min(220, titleMetrics.width)
@@ -128,7 +128,7 @@ Item {
             font.pixelSize: Theme.fontSize
             elide: Text.ElideRight
         }
-        Text {
+        BarLabel {
             text: "]"
             color: root.hasPlayer ? root.accent : Theme.grey
             font.family: Theme.fontFamily

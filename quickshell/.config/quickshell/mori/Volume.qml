@@ -90,7 +90,7 @@ RowLayout {
         objects: Pipewire.nodes.values
     }
 
-    Text {
+    BarLabel {
         text: root.sink && root.sink.audio && root.sink.audio.muted
               ? String.fromCodePoint(0xf0583)
               : String.fromCodePoint(0xf057e)
@@ -150,7 +150,7 @@ RowLayout {
         }
     }
 
-    Text {
+    BarLabel {
         id: deviceArrow
         visible: !root.compactMode
         text: devicePopup.visible ? "▴" : "▾"

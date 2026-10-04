@@ -32,9 +32,10 @@ Singleton {
     readonly property color bgorange: "#4a4037"
     readonly property color bgvisual: "#543a48"
 
-    // Text uses Geist; icon-only labels use Symbols Nerd Font.
-    readonly property string fontFamily: "Geist"
+    // Text uses Old Standard TT; icon-only labels use Symbols Nerd Font.
+    readonly property string fontFamily: "Old Standard TT"
     readonly property string nerdFontFamily: "Symbols Nerd Font"
-    readonly property int fontSize: 13
+    readonly property int fontSize: 14
+    readonly property int barContentHeight: 22
     readonly property int headingFontSize: fontSize + 2
 }

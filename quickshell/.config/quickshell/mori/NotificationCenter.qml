@@ -168,7 +168,7 @@ Item {
         }
     }
 
-    Text {
+    BarLabel {
         id: bell
         anchors.centerIn: parent
         text: String.fromCodePoint(root.doNotDisturb ? 0xf009b : 0xf009a)

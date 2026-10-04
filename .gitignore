@@ -1,6 +1,7 @@
 # Generated and machine-local state
 .cache/
 .local/
+!/fonts/.local/
 *.log
 *.lock
 

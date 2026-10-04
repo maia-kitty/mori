@@ -161,7 +161,7 @@ Row {
         onTriggered: root.probeProfiles()
     }
 
-    Text {
+    BarLabel {
         anchors.verticalCenter: parent.verticalCenter
         text: root.batteryIcon()
         color: root.accent
@@ -169,7 +169,7 @@ Row {
         font.pixelSize: Theme.fontSize
     }
 
-    Text {
+    BarLabel {
         anchors.verticalCenter: parent.verticalCenter
         text: root.charge + "%"
         color: root.accent

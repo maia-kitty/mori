@@ -118,36 +118,46 @@ Item {
     Row {
         id: summary
         spacing: 6
-        Text {
+        BarLabel {
             text: "["
             color: root.connected ? root.accent : Theme.grey
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
-        Text {
+        BarLabel {
             text: String.fromCodePoint(0xf011c)
             color: root.connected ? root.accent : Theme.grey
             font.family: Theme.nerdFontFamily
             font.pixelSize: Theme.fontSize
         }
-        Text {
+        BarLabel {
             text: root.connected ? root.batteryText : "offline"
             color: !root.connected ? Theme.grey
                 : root.batteryKnown && root.battery.charge <= 20 ? Theme.red : root.accent
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
-        Text {
+        Row {
             visible: root.connected
-            text: String.fromCodePoint(0xf009a) + " " + root.notificationText
-            color: root.accent
-            font.family: Theme.nerdFontFamily
-            font.pixelSize: Theme.fontSize
+            spacing: 3
+            BarLabel {
+                text: String.fromCodePoint(0xf009a)
+                color: root.accent
+                font.family: Theme.nerdFontFamily
+                font.pixelSize: Theme.fontSize
+            }
+            BarLabel {
+                text: root.notificationText
+                color: root.accent
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize
+            }
         }
         Row {
             visible: root.connected
             spacing: 2
             height: Theme.fontSize
+            anchors.verticalCenter: parent.verticalCenter
             Repeater {
                 model: 4
                 Rectangle {
@@ -159,7 +169,7 @@ Item {
                 }
             }
         }
-        Text {
+        BarLabel {
             text: "]"
             color: root.connected ? root.accent : Theme.grey
             font.family: Theme.fontFamily

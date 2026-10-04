@@ -1,7 +1,7 @@
 import QtQuick
 import "./theme"
 
-Text {
+BarLabel {
     id: root
     property var action: null
     property real hitMargin: 6

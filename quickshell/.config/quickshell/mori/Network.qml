@@ -646,14 +646,14 @@ RowLayout {
         }
     }
 
-    Text {
+    BarLabel {
         text: root.icon
         color: root.wiredConnected || (root.wifiRadioEnabled && root.hasWifiConnection) ? root.accent : Theme.grey
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
     }
 
-    Text {
+    BarLabel {
         visible: root.vpnConnections.length > 0
         text: String.fromCodePoint(0xf033e)
         color: root.accent
@@ -661,7 +661,7 @@ RowLayout {
         font.pixelSize: Theme.fontSize
     }
 
-    Text {
+    BarLabel {
         text: root.wiredConnected ? root.wiredName
               : !root.wifiRadioEnabled ? "off"
               : root.hasWifiConnection ? root.currentWifiName : "N/A"

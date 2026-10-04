@@ -227,7 +227,7 @@ Item {
             ? SystemClock.Seconds : SystemClock.Minutes
     }
 
-    Text {
+    BarLabel {
         id: clockLabel
         anchors.centerIn: parent
         text: "[ " + Qt.formatDate(clock.date, root.settings.clockDateFormat)

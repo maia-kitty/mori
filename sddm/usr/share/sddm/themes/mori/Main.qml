@@ -14,7 +14,7 @@ Rectangle {
     readonly property color muted: "#9da9a0"
     readonly property color accent: "#a7c080"
     readonly property color red: "#e67e80"
-    readonly property string uiFont: "Geist"
+    readonly property string uiFont: "Old Standard TT"
     property int sessionIndex: session.index
 
     TextConstants { id: textConstants }

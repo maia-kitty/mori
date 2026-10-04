@@ -17,6 +17,7 @@ RowLayout {
     property bool available: false
     property real brightness: 0
     property real requestedBrightness: 0
+    property string errorMessage: ""
 
     function refresh() {
         if (!brightnessQuery.running && !brightnessSet.running
@@ -31,12 +32,12 @@ RowLayout {
     function parseBrightness(text) {
         const line = text.trim().split(/\r?\n/)[0] || ""
         const fields = line.split(",")
-        if (fields.length < 4) {
+        if (fields.length < 5) {
             available = false
             return
         }
         const current = Number(fields[2])
-        const maximum = Number(fields[3])
+        const maximum = Number(fields[4])
         available = isFinite(current) && isFinite(maximum) && maximum > 0
         if (available)
             brightness = Math.max(0, Math.min(1, current / maximum))
@@ -45,6 +46,7 @@ RowLayout {
     function requestBrightness(value) {
         requestedBrightness = Math.max(0.01, Math.min(1, value))
         brightness = requestedBrightness
+        errorMessage = ""
         brightnessApply.restart()
     }
 
@@ -84,7 +86,14 @@ RowLayout {
 
     Process {
         id: brightnessSet
-        onExited: exitCode => root.refresh()
+        stderr: StdioCollector { id: brightnessSetError }
+        onExited: exitCode => {
+            if (exitCode !== 0) {
+                const detail = brightnessSetError.text.trim().split(/\r?\n/)[0]
+                root.errorMessage = detail.length ? detail : "Could not change brightness"
+            }
+            root.refresh()
+        }
     }
 
     Timer {
@@ -105,15 +114,16 @@ RowLayout {
     }
 
     Timer {
-        interval: brightnessPopup.visible ? 2000 : 10000
+        interval: brightnessPopup.visible ? 2000 : root.available ? 10000 : 30000
         repeat: true
-        running: root.available
+        running: true
         onTriggered: root.refresh()
     }
 
     Text {
         text: String.fromCodePoint(0xf185)
-        color: root.available ? root.accent : Theme.grey1
+        color: root.errorMessage.length > 0 ? Theme.red
+            : root.available ? root.accent : Theme.grey1
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
 
@@ -165,7 +175,7 @@ RowLayout {
     PopupWindow {
         id: brightnessPopup
         implicitWidth: 230
-        implicitHeight: 80
+        implicitHeight: root.errorMessage.length > 0 ? 110 : 80
         visible: false
         color: "transparent"
         grabFocus: false
@@ -248,6 +258,16 @@ RowLayout {
                         height: 10
                         color: root.accent
                     }
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.errorMessage.length > 0
+                    text: root.errorMessage
+                    color: Theme.red
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    wrapMode: Text.WordWrap
                 }
             }
         }

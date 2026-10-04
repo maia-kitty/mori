@@ -34,6 +34,9 @@ RowLayout {
     property bool wpaSavingProfile: false
     property bool passwordForWpa: false
     property var vpnConnections: []
+    property string vpnError: ""
+    property string disconnectingVpnUuid: ""
+    property bool vpnRefreshPending: false
     property string passwordNetworkName: ""
     property var pendingNetwork: null
     property int keyboardNetworkIndex: 0
@@ -514,16 +517,50 @@ RowLayout {
     }
 
     function refreshVpn() {
-        if (!vpnQuery.running)
-            vpnQuery.exec(["nmcli", "-t", "--escape", "no", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"])
+        if (vpnQuery.running) {
+            vpnRefreshPending = true
+            return
+        }
+        vpnQuery.exec(["nmcli", "-t", "--escape", "no", "-f", "NAME,UUID,TYPE,DEVICE", "connection", "show", "--active"])
+    }
+
+    function disconnectVpn(uuid) {
+        if (vpnDisconnect.running)
+            return
+        vpnError = ""
+        disconnectingVpnUuid = uuid
+        vpnDisconnect.exec(["nmcli", "connection", "down", "uuid", uuid])
     }
 
     Timer {
-        interval: popup.visible ? 5000 : 10000
+        interval: 10000
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: root.refreshVpn()
+    }
+
+    Process {
+        id: vpnMonitor
+        command: ["nmcli", "monitor"]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: vpnRefreshDelay.restart()
+        }
+        onExited: vpnMonitorRetry.restart()
+    }
+
+    Timer {
+        id: vpnRefreshDelay
+        interval: 200
+        onTriggered: root.refreshVpn()
+    }
+
+    Timer {
+        id: vpnMonitorRetry
+        interval: 3000
+        onTriggered: vpnMonitor.running = true
     }
 
     function requestPassword(network) {
@@ -575,18 +612,37 @@ RowLayout {
                     if (deviceSeparator < 0) continue
                     const typeSeparator = line.lastIndexOf(":", deviceSeparator - 1)
                     if (typeSeparator < 0) continue
+                    const uuidSeparator = line.lastIndexOf(":", typeSeparator - 1)
+                    if (uuidSeparator < 0) continue
 
-                    const name = line.slice(0, typeSeparator)
+                    const name = line.slice(0, uuidSeparator)
+                    const uuid = line.slice(uuidSeparator + 1, typeSeparator)
                     const type = line.slice(typeSeparator + 1, deviceSeparator)
                     const device = line.slice(deviceSeparator + 1)
                     const tunnelDevice = /^(tun|tap|wg|proton)/i.test(device)
                     const vpnProfile = /proton/i.test(name)
 
                     if (type === "vpn" || type === "wireguard" || type === "tun" || tunnelDevice || vpnProfile)
-                        activeVpns.push(name)
+                        activeVpns.push({ "name": name, "uuid": uuid })
                 }
                 root.vpnConnections = activeVpns
             }
+        }
+        onExited: {
+            if (root.vpnRefreshPending) {
+                root.vpnRefreshPending = false
+                vpnRefreshDelay.restart()
+            }
+        }
+    }
+
+    Process {
+        id: vpnDisconnect
+        onExited: exitCode => {
+            root.disconnectingVpnUuid = ""
+            if (exitCode !== 0)
+                root.vpnError = "Could not disconnect VPN"
+            root.refreshVpn()
         }
     }
 
@@ -751,13 +807,51 @@ RowLayout {
 
                     Repeater {
                         model: root.vpnConnections
-                        delegate: Text {
-                            required property string modelData
-                            text: modelData
-                            color: root.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                        delegate: RowLayout {
+                            id: vpnRow
+                            required property var modelData
+                            width: parent.width
+                            spacing: 6
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: vpnRow.modelData.name
+                                color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                implicitWidth: vpnDisconnectLabel.implicitWidth + 10
+                                implicitHeight: vpnDisconnectLabel.implicitHeight + 4
+                                color: Theme.bgred
+                                border.width: 1
+                                border.color: Theme.red
+
+                                Text {
+                                    id: vpnDisconnectLabel
+                                    anchors.centerIn: parent
+                                    text: root.disconnectingVpnUuid === vpnRow.modelData.uuid
+                                        ? "Disconnecting…" : "Disconnect"
+                                    color: Theme.red
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize - 2
+                                }
+
+                                TapHandler {
+                                    onTapped: root.disconnectVpn(vpnRow.modelData.uuid)
+                                }
+                            }
                         }
+                    }
+
+                    Text {
+                        visible: root.vpnError.length > 0
+                        text: root.vpnError
+                        color: Theme.red
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize - 2
                     }
                 }
 

@@ -242,7 +242,7 @@ PanelWindow {
         Row {
             readonly property alias module: brightness
             spacing: barWindow.bracketSpacing
-            BarBracket { text: "["; color: brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
+            BarBracket { text: "["; color: brightness.errorMessage.length > 0 ? Theme.red : brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
             Brightness {
                 id: brightness
                 accent: barWindow.settings.moduleColor("brightness")
@@ -250,7 +250,7 @@ PanelWindow {
                 panelWindow: barWindow
                 popupCoordinator: barWindow
             }
-            BarBracket { text: "]"; color: brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
+            BarBracket { text: "]"; color: brightness.errorMessage.length > 0 ? Theme.red : brightness.available ? brightness.accent : Theme.grey1; action: () => brightness.togglePopup() }
         }
     }
 

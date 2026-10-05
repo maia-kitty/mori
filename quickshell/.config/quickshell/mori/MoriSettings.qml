@@ -445,12 +445,23 @@ Item {
 
     function moveKeyboardModuleInAnchor(offset) {
         if (!keyboardModule) return
+        const anchors = ["left", "center", "right"]
         const side = settings.moduleSide(keyboardModule)
         const order = side === "left" ? settings.leftModuleOrder
             : side === "center" ? settings.centerModuleOrder : settings.rightModuleOrder
         const index = order.indexOf(keyboardModule)
-        if (index < 0 || index + offset < 0 || index + offset >= order.length) return
-        settings.moveModuleTo(keyboardModule, side, index + (offset > 0 ? 2 : -1))
+        if (index < 0) return
+        if (index + offset >= 0 && index + offset < order.length) {
+            settings.moveModuleTo(keyboardModule, side, index + (offset > 0 ? 2 : -1))
+        } else {
+            const targetIndex = anchors.indexOf(side) + offset
+            if (targetIndex < 0 || targetIndex >= anchors.length) return
+            const target = anchors[targetIndex]
+            const targetOrder = target === "left" ? settings.leftModuleOrder
+                : target === "center" ? settings.centerModuleOrder : settings.rightModuleOrder
+            settings.moveModuleTo(keyboardModule, target,
+                offset < 0 ? targetOrder.length : 0)
+        }
         Qt.callLater(scrollToKeyboardModule)
     }
 
@@ -1789,7 +1800,13 @@ Item {
                         width: modulesFlick.width
                         spacing: 8
                         SettingsLabel {
-                            text: "↑↓ select · Enter toggle · C compact · Shift+arrows move · drag ≡"
+                            text: "↑↓ select · Shift+↑↓ reorder and cross sections"
+                            color: Theme.grey1
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+                        SettingsLabel {
+                            text: "Shift+←→ change section · Enter toggle · C compact · drag ≡"
                             color: Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize

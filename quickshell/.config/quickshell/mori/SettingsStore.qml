@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "./theme"
+import "PowerCommands.js" as PowerCommands
 
 Item {
     id: root
@@ -24,6 +25,7 @@ Item {
     property bool wallpaperEnabled: true
     property bool notificationsEnabled: true
     property bool powerMenuEnabled: true
+    property var powerCommands: ({})
     property bool batteryEnabled: true
     property bool workspacesEnabled: true
     property var leftModuleOrder: ["calendar", "media", "kdeConnect"]
@@ -61,6 +63,18 @@ Item {
         revision++
         if (!loading)
             save()
+    }
+
+    function setPowerCommands(commands) {
+        if (!commands || typeof commands !== "object" || Array.isArray(commands))
+            return false
+        for (const name of ["suspend", "reboot", "poweroff"]) {
+            if (name in commands && !PowerCommands.valid(commands[name]))
+                return false
+        }
+        powerCommands = Object.assign({}, commands)
+        noteChange()
+        return true
     }
 
     function moduleEnabled(name) {
@@ -250,10 +264,13 @@ Item {
     }
 
     function load() {
+        loading = true
         const contents = settingsFile.text()
         if (contents.trim().length > 0) {
             try {
                 const parsed = JSON.parse(contents)
+                powerCommands = Object.prototype.hasOwnProperty.call(parsed, "power")
+                    ? parsed.power : ({})
                 const modules = parsed.modules || {}
                 for (const name of Object.keys(modules)) {
                     if (typeof modules[name] === "boolean")
@@ -319,6 +336,7 @@ Item {
                 "right": rightModuleOrder
             },
             "colors": moduleColors,
+            "power": powerCommands,
             "compact": {
                 "media": mediaCompact,
                 "network": networkCompact,
@@ -344,6 +362,9 @@ Item {
         blockWrites: true
         printErrors: false
         atomicWrites: true
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.load()
         onSaved: root.saveError = ""
         onSaveFailed: error => {
             root.saveError = FileViewError.toString(error)

@@ -14,6 +14,10 @@ Item {
     property int heldActionKey: 0
     property int selectedActionIndex: 0
     property bool heldEnter: false
+    property var resolvedActions: ({})
+    property bool resolving: false
+    property bool actionPending: false
+    property string errorMessage: ""
 
     function toggle() {
         if (menu.visible)
@@ -22,16 +26,45 @@ Item {
             popupCoordinator.showPopup(root)
             selectedActionIndex = 0
             menu.visible = true
+            refreshActions()
         }
     }
 
     function close() { menu.visible = false }
 
-    function runAction(command) {
+    function refreshActions() {
+        errorMessage = ""
+        resolvedActions = ({})
+        if (resolveProcess.running)
+            return
+        resolving = true
+        resolveProcess.exec(["mori-power", "--resolve"])
+    }
+
+    function actionAvailable(action) {
+        if (actionPending)
+            return false
+        if (!action.action)
+            return true
+        const resolved = resolvedActions[action.action]
+        return !resolving && !!resolved && resolved.command.length > 0
+    }
+
+    function reportFailure(message) {
+        errorMessage = message
+        popupCoordinator.showPopup(root)
+        menu.visible = true
+    }
+
+    function runAction(action) {
+        if (!actionAvailable(action))
+            return
         heldActionKey = 0
         heldEnter = false
         menu.visible = false
-        actionProcess.exec(command)
+        errorMessage = ""
+        actionPending = true
+        actionProcess.exec(action.action ? ["mori-power", action.action] : action.command)
     }
 
     function handleKeyPressed(event) {
@@ -73,6 +106,56 @@ Item {
 
     Process {
         id: actionProcess
+        stderr: StdioCollector { id: actionError }
+        onExited: exitCode => {
+            root.actionPending = false
+            if (exitCode !== 0)
+                root.reportFailure(actionError.text.trim() || "Power menu action failed")
+        }
+        // Failed-to-start processes do not emit exited.
+        onRunningChanged: {
+            if (!running) Qt.callLater(() => {
+                if (root.actionPending && !actionProcess.running) {
+                    root.actionPending = false
+                    root.reportFailure("Could not start the action. Check that mori-power and the selected command are installed.")
+                }
+            })
+        }
+    }
+
+    Process {
+        id: resolveProcess
+        stdout: StdioCollector { id: resolveOutput }
+        stderr: StdioCollector { id: resolveError }
+        onExited: exitCode => {
+            root.resolving = false
+            if (exitCode !== 0) {
+                root.errorMessage = resolveError.text.trim() || "Could not resolve power actions"
+                return
+            }
+            try {
+                const actions = JSON.parse(resolveOutput.text)
+                const errors = []
+                for (const name of ["suspend", "reboot", "poweroff"]) {
+                    if (!actions[name] || !Array.isArray(actions[name].command))
+                        throw new Error("Invalid power action: " + name)
+                    if (actions[name].error)
+                        errors.push(actions[name].error)
+                }
+                root.resolvedActions = actions
+                root.errorMessage = errors.join("\n")
+            } catch (error) {
+                root.errorMessage = "Could not read power actions: " + error
+            }
+        }
+        onRunningChanged: {
+            if (!running) Qt.callLater(() => {
+                if (root.resolving && !resolveProcess.running) {
+                    root.resolving = false
+                    root.errorMessage = "Could not start mori-power. Stow the bin package and ensure ~/.local/bin is on PATH."
+                }
+            })
+        }
     }
 
     BarLabel {
@@ -90,7 +173,7 @@ Item {
 
     PopupWindow {
         id: menu
-        implicitWidth: 150
+        implicitWidth: root.errorMessage.length > 0 ? 300 : 150
         implicitHeight: menuItems.implicitHeight + 24
         visible: false
         color: "transparent"
@@ -134,15 +217,17 @@ Item {
                     model: [
                         { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["swaylock"] },
                         { label: "Log out", shortcut: "X", key: Qt.Key_X, command: ["niri", "msg", "action", "quit", "--skip-confirmation"] },
-                        { label: "Suspend", shortcut: "S", key: Qt.Key_S, command: ["systemctl", "suspend"] },
-                        { label: "Restart", shortcut: "R", key: Qt.Key_R, command: ["systemctl", "reboot"] },
-                        { label: "Power off", shortcut: "P", key: Qt.Key_P, command: ["systemctl", "poweroff"] }
+                        { label: "Suspend", shortcut: "S", key: Qt.Key_S, action: "suspend" },
+                        { label: "Restart", shortcut: "R", key: Qt.Key_R, action: "reboot" },
+                        { label: "Power off", shortcut: "P", key: Qt.Key_P, action: "poweroff" }
                     ]
 
                     delegate: Item {
                         required property var modelData
                         required property int index
                         property real holdProgress: 0
+                        readonly property bool available: root.actionAvailable(modelData)
+                        opacity: available ? 1 : 0.4
                         width: menuItems.width
                         implicitHeight: 20
 
@@ -187,9 +272,10 @@ Item {
                             id: holdTimer
                             interval: 25
                             repeat: true
-                            running: (buttonArea.pressed && buttonArea.containsMouse)
-                                     || (menu.visible && (root.heldActionKey === parent.modelData.key
-                                         || root.heldEnter && root.selectedActionIndex === parent.index))
+                            running: parent.available && menu.visible
+                                && ((buttonArea.pressed && buttonArea.containsMouse)
+                                    || root.heldActionKey === parent.modelData.key
+                                    || root.heldEnter && root.selectedActionIndex === parent.index)
 
                             onRunningChanged: {
                                 if (!running && parent.holdProgress < 1)
@@ -200,15 +286,16 @@ Item {
                                 parent.holdProgress = Math.min(1, parent.holdProgress + interval / 800)
                                 if (parent.holdProgress === 1) {
                                     stop()
-                                    const command = parent.modelData.command
+                                    const action = parent.modelData
                                     parent.holdProgress = 0
-                                    root.runAction(command)
+                                    root.runAction(action)
                                 }
                             }
                         }
 
                         MouseArea {
                             id: buttonArea
+                            enabled: parent.available
                             anchors.fill: parent
                             onPressed: {
                                 root.selectedActionIndex = parent.index
@@ -219,6 +306,16 @@ Item {
                             onExited: if (pressed) parent.holdProgress = 0
                         }
                     }
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.resolving || root.errorMessage.length > 0
+                    text: root.resolving ? "Checking power actions…" : root.errorMessage
+                    wrapMode: Text.WrapAnywhere
+                    color: Theme.grey1
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Math.max(10, Theme.fontSize - 1)
                 }
             }
         }

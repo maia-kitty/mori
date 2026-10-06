@@ -16,6 +16,7 @@ Item {
 
     property var pendingNotifications: []
     property int nextNotificationId: 0
+    readonly property int historyLimit: 500
     readonly property int notificationCount: notificationHistory.count
     readonly property bool popupVisible: popup.visible
 
@@ -79,6 +80,8 @@ Item {
     function addNotification(notification) {
         // Apps may replace an existing DBus notification. Keep a value copy so
         // the vault preserves every arrival rather than only its replacement.
+        if (pendingNotifications.length >= historyLimit)
+            pendingNotifications.shift()
         pendingNotifications.push({
             "notificationId": nextNotificationId++,
             "appName": String(notification.appName || "Notification"),
@@ -92,6 +95,8 @@ Item {
     function flushNotifications() {
         while (pendingNotifications.length > 0)
             notificationHistory.insert(0, pendingNotifications.shift())
+        if (notificationHistory.count > historyLimit)
+            notificationHistory.remove(historyLimit, notificationHistory.count - historyLimit)
     }
 
     function removeNotification(notificationId) {
@@ -152,7 +157,7 @@ Item {
     }
 
     // Mutate the model after the DBus callback returns; doing it directly can
-    // race a Repeater regeneration in Qt.
+    // race delegate regeneration in Qt.
     Timer {
         id: notificationQueue
         interval: 0
@@ -184,7 +189,7 @@ Item {
     PopupWindow {
         id: popup
         implicitWidth: 360
-        implicitHeight: Math.min(notificationList.implicitHeight + 24, 440)
+        implicitHeight: popupContent.item ? popupContent.item.implicitHeight : 80
         visible: false
         color: "transparent"
         grabFocus: false
@@ -200,158 +205,174 @@ Item {
         anchor.edges: Edges.Top | Edges.Left
         anchor.gravity: Edges.Bottom | Edges.Left
 
-        PopupSurface {
+        Loader {
+            id: popupContent
             anchors.fill: parent
-            shown: popup.visible
-            color: Theme.bg1
-            border.width: 2
-            border.color: root.accent
+            active: popup.visible
 
-            ScrollableColumn {
-                id: notificationList
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 12
-                spacing: 8
+            sourceComponent: Component {
+                PopupSurface {
+                    implicitHeight: notificationList.implicitHeight + 24
+                    anchors.fill: parent
+                    shown: popup.visible
+                    color: Theme.bg1
+                    border.width: 2
+                    border.color: root.accent
 
-                Item {
-                    width: parent.width
-                    height: implicitHeight
-                    implicitHeight: Math.max(headerTitle.implicitHeight, headerActions.implicitHeight)
-
-                    Text {
-                        id: headerTitle
-                        text: "Notifications"
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize
-                    }
-
-                    Row {
-                        id: headerActions
+                    Column {
+                        id: notificationList
+                        anchors.top: parent.top
+                        anchors.left: parent.left
                         anchors.right: parent.right
-                        spacing: 12
+                        anchors.margins: 12
+                        spacing: 8
 
-                        Text {
-                            text: root.doNotDisturb ? "DND on  D" : "DND off  D"
-                            color: root.doNotDisturb ? root.accent : Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-
-                            TapHandler {
-                                onTapped: root.doNotDisturb = !root.doNotDisturb
-                            }
-                        }
-
-                        Text {
-                            id: clearAll
-                            text: "Clear all  C"
-                            visible: root.notificationCount > 0
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-
-                            TapHandler {
-                            onTapped: notificationHistory.clear()
-                            }
-                        }
-                    }
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.notificationCount === 0
-                    text: "No notifications"
-                    color: Theme.grey
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                }
-
-                Repeater {
-                    model: notificationHistory
-
-                    delegate: Rectangle {
-                        required property int notificationId
-                        required property string appName
-                        required property string desktopEntry
-                        required property string summary
-                        required property string body
-                        width: notificationList.width
-                        implicitHeight: notificationText.implicitHeight + 12
-                        radius: 0
-                        color: Theme.bg2
-
-                        function activate() {
-                            root.focusApplication(desktopEntry)
-                            root.removeNotification(notificationId)
-                        }
-
-                        Column {
-                            id: notificationText
-                            anchors.left: parent.left
-                            anchors.right: closeButton.left
-                            anchors.top: parent.top
-                            anchors.margins: 6
-                            spacing: 2
+                        Item {
+                            id: notificationHeader
+                            width: parent.width
+                            height: implicitHeight
+                            implicitHeight: Math.max(headerTitle.implicitHeight, headerActions.implicitHeight)
 
                             Text {
-                                width: parent.width
-                                text: appName
+                                id: headerTitle
+                                text: "Notifications"
                                 color: root.accent
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                elide: Text.ElideRight
+                                font.pixelSize: Theme.headingFontSize
                             }
 
-                            Text {
-                                width: parent.width
-                                text: summary
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                elide: Text.ElideRight
-                            }
+                            Row {
+                                id: headerActions
+                                anchors.right: parent.right
+                                spacing: 12
 
-                            Text {
-                                width: parent.width
-                                visible: body.length > 0
-                                text: body
-                                textFormat: Text.PlainText
-                                color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                wrapMode: Text.Wrap
-                                maximumLineCount: 3
-                                elide: Text.ElideRight
+                                Text {
+                                    text: root.doNotDisturb ? "DND on  D" : "DND off  D"
+                                    color: root.doNotDisturb ? root.accent : Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+
+                                    TapHandler {
+                                        onTapped: root.doNotDisturb = !root.doNotDisturb
+                                    }
+                                }
+
+                                Text {
+                                    id: clearAll
+                                    text: "Clear all  C"
+                                    visible: root.notificationCount > 0
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+
+                                    TapHandler {
+                                    onTapped: notificationHistory.clear()
+                                    }
+                                }
                             }
                         }
 
                         Text {
-                            id: closeButton
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            anchors.margins: 6
-                            text: "×"
-                            color: root.accent
+                            width: parent.width
+                            visible: root.notificationCount === 0
+                            text: "No notifications"
+                            color: Theme.grey
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize + 5
-
-                            TapHandler {
-                                margin: 6
-                                onTapped: root.removeNotification(notificationId)
-                            }
+                            font.pixelSize: Theme.fontSize
                         }
 
-                        MouseArea {
-                            anchors.left: parent.left
-                            anchors.right: closeButton.left
-                            anchors.top: parent.top
-                            anchors.bottom: parent.bottom
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: parent.activate()
+                        ListView {
+                            id: historyView
+                            width: parent.width
+                            height: Math.min(contentHeight, Math.max(0, 440 - 24 - notificationHeader.height - 8))
+                            clip: true
+                            spacing: 8
+                            cacheBuffer: 0
+                            reuseItems: true
+                            model: notificationHistory
+
+                            delegate: Rectangle {
+                                required property int notificationId
+                                required property string appName
+                                required property string desktopEntry
+                                required property string summary
+                                required property string body
+                                width: historyView.width
+                                implicitHeight: notificationText.implicitHeight + 12
+                                radius: 0
+                                color: Theme.bg2
+
+                                function activate() {
+                                    root.focusApplication(desktopEntry)
+                                    root.removeNotification(notificationId)
+                                }
+
+                                Column {
+                                    id: notificationText
+                                    anchors.left: parent.left
+                                    anchors.right: closeButton.left
+                                    anchors.top: parent.top
+                                    anchors.margins: 6
+                                    spacing: 2
+
+                                    Text {
+                                        width: parent.width
+                                        text: appName
+                                        color: root.accent
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: summary
+                                        color: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        visible: body.length > 0
+                                        text: body
+                                        textFormat: Text.PlainText
+                                        color: Theme.grey1
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        wrapMode: Text.Wrap
+                                        maximumLineCount: 3
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                Text {
+                                    id: closeButton
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.margins: 6
+                                    text: "×"
+                                    color: root.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize + 5
+
+                                    TapHandler {
+                                        margin: 6
+                                        onTapped: root.removeNotification(notificationId)
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.left: parent.left
+                                    anchors.right: closeButton.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: parent.activate()
+                                }
+                            }
                         }
                     }
                 }

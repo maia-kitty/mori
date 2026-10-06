@@ -6,6 +6,9 @@
 *.log
 *.lock
 
+# Local verification scripts
+/tests/
+
 # Kew generates its state, library cache, layouts, and bundled theme copies.
 /kew/.config/kew/kewstaterc
 /kew/.config/kew/library.dat

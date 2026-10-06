@@ -324,235 +324,243 @@ Item {
 
         onVisibleChanged: if (!visible) root.popupCoordinator.hidePopup(root)
 
-        PopupSurface {
+        Loader {
+            id: popupContent
             anchors.fill: parent
-            shown: popup.visible
-            color: Theme.bg1
-            border.width: 2
-            border.color: root.accent
+            active: popup.visible
 
-            Column {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
+            sourceComponent: Component {
+                PopupSurface {
+                    anchors.fill: parent
+                    shown: popup.visible
+                    color: Theme.bg1
+                    border.width: 2
+                    border.color: root.accent
 
-                Item {
-                    width: parent.width
-                    height: 24
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
 
-                    Text {
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "‹"
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 20
-                        TapHandler { onTapped: root.changeMonth(-1) }
-                    }
+                        Item {
+                            width: parent.width
+                            height: 24
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: Qt.formatDate(root.shownMonth, "MMMM yyyy")
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize
-                        TapHandler { onTapped: root.goToToday() }
-                    }
-
-                    Text {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "›"
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 20
-                        TapHandler { onTapped: root.changeMonth(1) }
-                    }
-                }
-
-                Text {
-                    text: root.dayNavigation
-                        ? "Days: arrows move date · Tab: months"
-                        : "Months: ← / → · Tab: days"
-                    color: Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                }
-
-                Grid {
-                    width: parent.width
-                    columns: 7
-                    rowSpacing: 2
-                    columnSpacing: 2
-
-                    Repeater {
-                        model: root.weekdayNames
-
-                        delegate: Text {
-                            required property string modelData
-                            width: (parent.width - 12) / 7
-                            height: 20
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            text: modelData
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize - 2
-                        }
-                    }
-
-                    Repeater {
-                        model: 42
-
-                        delegate: Rectangle {
-                            id: dayCell
-                            required property int index
-                            readonly property date value: root.dateForCell(index)
-                            readonly property bool selected: root.sameDay(value, root.selectedDate)
-                            readonly property bool keyboardFocused: root.dayNavigation && selected
-                            readonly property bool current: root.sameDay(value, root.today)
-                            readonly property bool inMonth: value.getMonth() === root.shownMonth.getMonth()
-
-                            width: (parent.width - 12) / 7
-                            height: 28
-                            color: "transparent"
-                            border.width: current ? 1 : 0
-                            border.color: root.accent
+                            Text {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "‹"
+                                color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 20
+                                TapHandler { onTapped: root.changeMonth(-1) }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
-                                text: dayCell.value.getDate()
-                                color: dayCell.selected ? root.accent
-                                     : dayCell.inMonth ? Theme.grey1 : Theme.grey
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                font.underline: dayCell.keyboardFocused
-                            }
-
-                            Rectangle {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                anchors.bottom: parent.bottom
-                                anchors.bottomMargin: 3
-                                width: 4
-                                height: 4
-                                radius: 2
-                                visible: dayCell.inMonth && root.hasEvent(dayCell.value)
+                                text: Qt.formatDate(root.shownMonth, "MMMM yyyy")
                                 color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.headingFontSize
+                                TapHandler { onTapped: root.goToToday() }
                             }
 
-                            TapHandler { onTapped: root.selectDate(dayCell.value) }
+                            Text {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "›"
+                                color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 20
+                                TapHandler { onTapped: root.changeMonth(1) }
+                            }
                         }
-                    }
-                }
 
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Theme.bg4
-                }
+                        Text {
+                            text: root.dayNavigation
+                                ? "Days: arrows move date · Tab: months"
+                                : "Months: ← / → · Tab: days"
+                            color: Theme.grey1
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                        }
 
-                Item {
-                    width: parent.width
-                    height: 22
+                        Grid {
+                            width: parent.width
+                            columns: 7
+                            rowSpacing: 2
+                            columnSpacing: 2
 
-                    Text {
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Qt.formatDate(root.selectedDate, "dddd, MMMM d")
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
+                            Repeater {
+                                model: root.weekdayNames
 
-                    Text {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.busy ? "Working…" : "↻ " + root.syncMessage
-                        color: root.busy ? Theme.yellow : Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize - 2
-                        TapHandler { enabled: !root.busy; onTapped: root.syncAndLoad() }
-                    }
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.errorMessage.length > 0
-                    text: root.errorMessage
-                    color: Theme.red
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize - 2
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    width: parent.width
-                    visible: !root.busy && root.events.length === 0 && root.errorMessage.length === 0
-                    text: "No events"
-                    color: Theme.grey
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                }
-
-                Flickable {
-                    width: parent.width
-                    height: Math.max(0, popup.implicitHeight - y - 24)
-                    contentHeight: eventList.height
-                    clip: true
-
-                    Column {
-                        id: eventList
-                        width: parent.width
-                        spacing: 6
-
-                        Repeater {
-                            model: root.events
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: eventList.width
-                                height: eventText.height + 12
-                                color: Theme.bg2
-
-                                Rectangle {
-                                    width: 3
-                                    height: parent.height
-                                    color: /^#[0-9a-fA-F]{6}$/.test(modelData["calendar-color"] || "")
-                                           ? modelData["calendar-color"] : root.accent
+                                delegate: Text {
+                                    required property string modelData
+                                    width: (parent.width - 12) / 7
+                                    height: 20
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: modelData
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize - 2
                                 }
+                            }
 
-                                Column {
-                                    id: eventText
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 6
-                                    anchors.leftMargin: 10
-                                    spacing: 2
+                            Repeater {
+                                model: 42
+
+                                delegate: Rectangle {
+                                    id: dayCell
+                                    required property int index
+                                    readonly property date value: root.dateForCell(index)
+                                    readonly property bool selected: root.sameDay(value, root.selectedDate)
+                                    readonly property bool keyboardFocused: root.dayNavigation && selected
+                                    readonly property bool current: root.sameDay(value, root.today)
+                                    readonly property bool inMonth: value.getMonth() === root.shownMonth.getMonth()
+
+                                    width: (parent.width - 12) / 7
+                                    height: 28
+                                    color: "transparent"
+                                    border.width: current ? 1 : 0
+                                    border.color: root.accent
 
                                     Text {
-                                        width: parent.width
-                                        text: modelData.title || "Untitled event"
-                                        color: root.accent
+                                        anchors.centerIn: parent
+                                        text: dayCell.value.getDate()
+                                        color: dayCell.selected ? root.accent
+                                             : dayCell.inMonth ? Theme.grey1 : Theme.grey
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
-                                        elide: Text.ElideRight
+                                        font.underline: dayCell.keyboardFocused
                                     }
 
-                                    Text {
-                                        width: parent.width
-                                        text: (modelData["start-time"]
-                                               ? root.formatEventTime(modelData["start-time"])
-                                                   + "–" + root.formatEventTime(modelData["end-time"])
-                                               : "All day")
-                                              + (modelData.calendar ? " · " + modelData.calendar : "")
-                                              + (modelData.location ? " · " + modelData.location : "")
-                                        color: Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize - 2
-                                        elide: Text.ElideRight
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 3
+                                        width: 4
+                                        height: 4
+                                        radius: 2
+                                        visible: dayCell.inMonth && root.hasEvent(dayCell.value)
+                                        color: root.accent
+                                    }
+
+                                    TapHandler { onTapped: root.selectDate(dayCell.value) }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: Theme.bg4
+                        }
+
+                        Item {
+                            width: parent.width
+                            height: 22
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: Qt.formatDate(root.selectedDate, "dddd, MMMM d")
+                                color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+
+                            Text {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.busy ? "Working…" : "↻ " + root.syncMessage
+                                color: root.busy ? Theme.yellow : Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize - 2
+                                TapHandler { enabled: !root.busy; onTapped: root.syncAndLoad() }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: root.errorMessage.length > 0
+                            text: root.errorMessage
+                            color: Theme.red
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize - 2
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: !root.busy && root.events.length === 0 && root.errorMessage.length === 0
+                            text: "No events"
+                            color: Theme.grey
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+
+                        Flickable {
+                            width: parent.width
+                            height: Math.max(0, popup.implicitHeight - y - 24)
+                            contentHeight: eventList.height
+                            clip: true
+
+                            Column {
+                                id: eventList
+                                width: parent.width
+                                spacing: 6
+
+                                Repeater {
+                                    model: root.events
+
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        width: eventList.width
+                                        height: eventText.height + 12
+                                        color: Theme.bg2
+
+                                        Rectangle {
+                                            width: 3
+                                            height: parent.height
+                                            color: /^#[0-9a-fA-F]{6}$/.test(modelData["calendar-color"] || "")
+                                                   ? modelData["calendar-color"] : root.accent
+                                        }
+
+                                        Column {
+                                            id: eventText
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.margins: 6
+                                            anchors.leftMargin: 10
+                                            spacing: 2
+
+                                            Text {
+                                                width: parent.width
+                                                text: modelData.title || "Untitled event"
+                                                color: root.accent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Text {
+                                                width: parent.width
+                                                text: (modelData["start-time"]
+                                                       ? root.formatEventTime(modelData["start-time"])
+                                                           + "–" + root.formatEventTime(modelData["end-time"])
+                                                       : "All day")
+                                                      + (modelData.calendar ? " · " + modelData.calendar : "")
+                                                      + (modelData.location ? " · " + modelData.location : "")
+                                                color: Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize - 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
                                     }
                                 }
                             }

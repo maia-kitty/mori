@@ -8,6 +8,9 @@ import "./theme"
 
 RowLayout {
     id: root
+    readonly property var deviceList: popupContent.item ? popupContent.item.deviceListRef : null
+    readonly property var outputRepeater: popupContent.item ? popupContent.item.outputRepeaterRef : null
+    readonly property var appRepeater: popupContent.item ? popupContent.item.appRepeaterRef : null
     property color accent: Theme.yellow
     property bool compactMode: false
     spacing: 6
@@ -27,7 +30,7 @@ RowLayout {
         }
     }
 
-    function close() { devicePopup.visible = false }
+    function close() { devicePopup.visible = false; keyboardNode = null }
 
     function selectableNodes() {
         const nodes = Pipewire.nodes.values.filter(node => node && node.ready
@@ -42,7 +45,9 @@ RowLayout {
         keyboardNode = nodes[Math.max(0, Math.min(nodes.length - 1,
             (current < 0 ? 0 : current) + offset))]
         Qt.callLater(() => {
+            if (!deviceList) return
             for (const repeater of [outputRepeater, appRepeater]) {
+                if (!repeater) continue
                 for (let i = 0; i < repeater.count; i++) {
                     const item = repeater.itemAt(i)
                     if (!item || item.modelData !== keyboardNode) continue
@@ -87,7 +92,7 @@ RowLayout {
     PwObjectTracker {
         // Track discovery independently of audio readiness. Filtering by audio
         // before tracking can prevent newly discovered nodes from becoming ready.
-        objects: Pipewire.nodes.values
+        objects: devicePopup.visible ? Pipewire.nodes.values : (root.sink ? [root.sink] : [])
     }
 
     BarLabel {
@@ -166,7 +171,7 @@ RowLayout {
     PopupWindow {
         id: devicePopup
         implicitWidth: 320
-        implicitHeight: Math.min(deviceList.implicitHeight + 24, 440)
+        implicitHeight: Math.min(popupContent.item ? popupContent.item.implicitHeight : 80, 440)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -183,207 +188,235 @@ RowLayout {
         anchor.edges: Edges.Top | Edges.Left
         anchor.gravity: Edges.Bottom | Edges.Left
 
-        PopupSurface {
+        Loader {
+            id: popupContent
             anchors.fill: parent
-            shown: devicePopup.visible
-            color: Theme.bg1
-            border.width: 2
-            border.color: root.accent
+            active: devicePopup.visible
 
-            ScrollableColumn {
-                id: deviceList
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 12
-                spacing: 10
+            sourceComponent: Component {
+                PopupSurface {
+                    readonly property alias deviceListRef: deviceList
+                    readonly property alias outputRepeaterRef: outputRepeater
+                    readonly property alias appRepeaterRef: appRepeater
+                    implicitHeight: deviceList.implicitHeight + 24
+                    anchors.fill: parent
+                    shown: devicePopup.visible
+                    color: Theme.bg1
+                    border.width: 2
+                    border.color: root.accent
 
-                Text {
-                    text: "Output Devices"
-                    color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.headingFontSize
-                }
+                    ScrollableColumn {
+                        id: deviceList
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 12
+                        spacing: 10
 
-                Repeater {
-                    id: outputRepeater
-                    // Keep the native object model: insert/remove individual
-                    // delegates instead of rebuilding a filtered JS array.
-                    model: Pipewire.nodes
+                        Text {
+                            text: "Output Devices"
+                            color: root.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.headingFontSize
+                        }
 
-                    delegate: Column {
-                        required property var modelData
-                        required property int index
-                        visible: !!modelData && modelData.ready && modelData.isSink
-                                 && !modelData.isStream && !!modelData.audio
-                        width: deviceList.width
-                        spacing: 5
+                        Repeater {
+                            id: outputRepeater
+                            // Keep the native object model: insert/remove individual
+                            // delegates instead of rebuilding a filtered JS array.
+                            model: Pipewire.nodes
 
-                        RowLayout {
-                            width: parent.width
-                            spacing: 8
+                            delegate: Loader {
+                                id: nodeLoader
+                                required property var modelData
+                                required property int index
+                                active: !!modelData && modelData.ready && modelData.isSink
+                                         && !modelData.isStream && !!modelData.audio
+                                visible: active
+                                width: deviceList.width
+                                sourceComponent: Component {
+                                    Column {
+                                        property var modelData: nodeLoader.modelData
+                                        width: deviceList.width
+                                        spacing: 5
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
-                                    + (modelData.description || modelData.nickname || modelData.name) : ""
-                                color: modelData === root.sink || modelData === root.keyboardNode
-                                    ? root.accent : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                elide: Text.ElideRight
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 8
 
-                                TapHandler {
-                                    onTapped: {
-                                        root.keyboardNode = modelData
-                                        if (modelData && modelData.ready && modelData.audio)
-                                            Pipewire.preferredDefaultAudioSink = modelData
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
+                                                    + (modelData.description || modelData.nickname || modelData.name) : ""
+                                                color: modelData === root.sink || modelData === root.keyboardNode
+                                                    ? root.accent : Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
+
+                                                TapHandler {
+                                                    onTapped: {
+                                                        root.keyboardNode = modelData
+                                                        if (modelData && modelData.ready && modelData.audio)
+                                                            Pipewire.preferredDefaultAudioSink = modelData
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                        }
+
+                                        Slider {
+                                            id: deviceSlider
+                                            width: parent.width
+                                            implicitHeight: 20
+                                            from: 0
+                                            to: 1
+                                            stepSize: 0.01
+                                            enabled: !!modelData && modelData.ready && !!modelData.audio
+                                            value: enabled ? modelData.audio.volume : 0
+                                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
+
+                                            background: Rectangle {
+                                                x: deviceSlider.leftPadding
+                                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
+                                                width: deviceSlider.availableWidth
+                                                height: 4
+                                                radius: 0
+                                                color: Theme.bg4
+
+                                                Rectangle {
+                                                    width: deviceSlider.visualPosition * parent.width
+                                                    height: parent.height
+                                                    radius: 0
+                                                    color: root.accent
+                                                }
+                                            }
+
+                                            handle: Rectangle {
+                                                x: deviceSlider.leftPadding + deviceSlider.visualPosition
+                                                   * (deviceSlider.availableWidth - width)
+                                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
+                                                width: 10
+                                                height: 10
+                                                radius: 0
+                                                color: root.accent
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width
+                                            height: 1
+                                            color: Theme.bg4
+                                        }
                                     }
                                 }
                             }
-
-                            Text {
-                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
                         }
 
-                        Slider {
-                            id: deviceSlider
-                            width: parent.width
-                            implicitHeight: 20
-                            from: 0
-                            to: 1
-                            stepSize: 0.01
-                            enabled: !!modelData && modelData.ready && !!modelData.audio
-                            value: enabled ? modelData.audio.volume : 0
-                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
+                        Text {
+                            text: "Applications"
+                            color: root.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            topPadding: 4
+                        }
 
-                            background: Rectangle {
-                                x: deviceSlider.leftPadding
-                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
-                                width: deviceSlider.availableWidth
-                                height: 4
-                                radius: 0
-                                color: Theme.bg4
+                        Repeater {
+                            id: appRepeater
+                            model: Pipewire.nodes
 
-                                Rectangle {
-                                    width: deviceSlider.visualPosition * parent.width
-                                    height: parent.height
-                                    radius: 0
-                                    color: root.accent
+                            delegate: Loader {
+                                id: nodeLoader
+                                required property var modelData
+                                required property int index
+                                active: !!modelData && modelData.ready && modelData.isSink
+                                         && modelData.isStream && !!modelData.audio
+                                visible: active
+                                width: deviceList.width
+                                sourceComponent: Component {
+                                    Column {
+                                        property var modelData: nodeLoader.modelData
+                                        // Playback streams are sinks; source streams record audio.
+                                        width: deviceList.width
+                                        spacing: 5
+
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 8
+
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
+                                                    + (modelData.properties["application.name"]
+                                                      || modelData.description
+                                                      || modelData.name) : ""
+                                                color: modelData === root.keyboardNode ? root.accent : Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Text {
+                                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                        }
+
+                                        Slider {
+                                            id: appSlider
+                                            width: parent.width
+                                            implicitHeight: 20
+                                            from: 0
+                                            to: 1
+                                            stepSize: 0.01
+                                            enabled: !!modelData && modelData.ready && !!modelData.audio
+                                            value: enabled ? modelData.audio.volume : 0
+                                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
+
+                                            background: Rectangle {
+                                                x: appSlider.leftPadding
+                                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
+                                                width: appSlider.availableWidth
+                                                height: 4
+                                                radius: 0
+                                                color: Theme.bg4
+
+                                                Rectangle {
+                                                    width: appSlider.visualPosition * parent.width
+                                                    height: parent.height
+                                                    radius: 0
+                                                    color: root.accent
+                                                }
+                                            }
+
+                                            handle: Rectangle {
+                                                x: appSlider.leftPadding + appSlider.visualPosition
+                                                   * (appSlider.availableWidth - width)
+                                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
+                                                width: 10
+                                                height: 10
+                                                radius: 0
+                                                color: root.accent
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width
+                                            height: 1
+                                            color: Theme.bg4
+                                        }
+                                    }
                                 }
                             }
-
-                            handle: Rectangle {
-                                x: deviceSlider.leftPadding + deviceSlider.visualPosition
-                                   * (deviceSlider.availableWidth - width)
-                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
-                                width: 10
-                                height: 10
-                                radius: 0
-                                color: root.accent
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.bg4
-                        }
-                    }
-                }
-
-                Text {
-                    text: "Applications"
-                    color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    topPadding: 4
-                }
-
-                Repeater {
-                    id: appRepeater
-                    model: Pipewire.nodes
-
-                    delegate: Column {
-                        required property var modelData
-                        required property int index
-                        // Playback streams are sinks; source streams record audio.
-                        visible: !!modelData && modelData.ready && modelData.isSink
-                                 && modelData.isStream && !!modelData.audio
-                        width: deviceList.width
-                        spacing: 5
-
-                        RowLayout {
-                            width: parent.width
-                            spacing: 8
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
-                                    + (modelData.properties["application.name"]
-                                      || modelData.description
-                                      || modelData.name) : ""
-                                color: modelData === root.keyboardNode ? root.accent : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                        }
-
-                        Slider {
-                            id: appSlider
-                            width: parent.width
-                            implicitHeight: 20
-                            from: 0
-                            to: 1
-                            stepSize: 0.01
-                            enabled: !!modelData && modelData.ready && !!modelData.audio
-                            value: enabled ? modelData.audio.volume : 0
-                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
-
-                            background: Rectangle {
-                                x: appSlider.leftPadding
-                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
-                                width: appSlider.availableWidth
-                                height: 4
-                                radius: 0
-                                color: Theme.bg4
-
-                                Rectangle {
-                                    width: appSlider.visualPosition * parent.width
-                                    height: parent.height
-                                    radius: 0
-                                    color: root.accent
-                                }
-                            }
-
-                            handle: Rectangle {
-                                x: appSlider.leftPadding + appSlider.visualPosition
-                                   * (appSlider.availableWidth - width)
-                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
-                                width: 10
-                                height: 10
-                                radius: 0
-                                color: root.accent
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.bg4
                         }
                     }
                 }

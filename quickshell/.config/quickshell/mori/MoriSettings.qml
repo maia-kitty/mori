@@ -4,9 +4,20 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "./theme"
+import "PowerCommands.js" as PowerCommands
 
 Item {
     id: root
+    // Page controls exist only while that page is open. Saving and rollback
+    // state stays in this controller when a page or the window closes.
+    readonly property var modulesFlick: modulesPage.item
+    readonly property var anchorRepeater: modulesPage.item ? modulesPage.item.anchorRows : null
+    readonly property var appearanceFlick: appearancePage.item
+    readonly property var colorRows: appearancePage.item ? appearancePage.item.rows : null
+    readonly property var powerFlick: powerPage.item
+    readonly property var powerRows: powerPage.item ? powerPage.item.rows : null
+    readonly property var inputRows: inputPage.item ? inputPage.item.rows : null
+    readonly property var displayCanvas: displaysPage.item ? displaysPage.item.canvas : null
 
     required property var panelWindow
     required property var popupCoordinator
@@ -19,12 +30,22 @@ Item {
     onPageChanged: {
         if (page !== "input" && editingKeyboardLayout)
             keyboardScope.forceActiveFocus()
+        if (page !== "power" && editingPowerCommand)
+            keyboardScope.forceActiveFocus()
     }
     property int keyboardCategoryIndex: 0
     property string keyboardModule: ""
     property int keyboardColorRow: 0
     property int keyboardColorIndex: 0
     property int keyboardClockIndex: 0
+    property int keyboardPowerIndex: 0
+    property bool editingPowerCommand: false
+    property var powerDrafts: ({})
+    property var powerErrors: ({})
+    property string powerBaseline: ""
+    property bool powerDirty: false
+    property string powerStatus: ""
+    readonly property bool powerDraftsValid: powerOptions.every(option => !powerErrors[option.key])
     property string keyboardDisplaySection: "outputs"
     property int keyboardDisplayField: 0
     property int keyboardConfirmationIndex: 0
@@ -78,7 +99,12 @@ Item {
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
         "notifications", "powerMenu", "systemTray", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "appearance", "clock", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "appearance", "clock", "power", "displays", "input", "about"]
+    readonly property var powerOptions: [
+        { key: "suspend", label: "Suspend" },
+        { key: "reboot", label: "Restart" },
+        { key: "poweroff", label: "Power off" }
+    ]
     readonly property var clockOptions: [
         { "key": "timeFormat", "label": "Time", "values": ["24h", "12h"],
             "labels": ["24-hour", "12-hour AM/PM"] },
@@ -136,6 +162,7 @@ Item {
         case "modules": return "Modules"
         case "appearance": return "Appearance"
         case "clock": return "Time & date"
+        case "power": return "Power menu"
         case "displays": return "Displays"
         case "input": return "Input"
         case "about": return "About"
@@ -199,6 +226,8 @@ Item {
     function finishClose() {
         closeAfterApply = false
         inputDirty = false
+        powerDirty = false
+        powerStatus = ""
         inputWritePending = false
         keyboardLayoutDraft = keyboardLayout
         displayDirty = false
@@ -234,7 +263,7 @@ Item {
     }
 
     function keyboardLayoutEditor() {
-        const row = inputRows.itemAt(0)
+        const row = inputRows ? inputRows.itemAt(0) : null
         return row ? row.editor : null
     }
 
@@ -251,6 +280,7 @@ Item {
 
     function applyCurrentPage() {
         if (page === "input") applyInput()
+        else if (page === "power") applyPowerCommands()
         else if (page === "displays" && displayDirty) saveDisplayLayout()
     }
 
@@ -264,6 +294,9 @@ Item {
             syncKeyboardColor()
         } else if (name === "clock") {
             keyboardClockIndex = 0
+        } else if (name === "power") {
+            keyboardPowerIndex = 0
+            loadPowerDrafts()
         } else if (name === "displays") {
             keyboardDisplaySection = "outputs"
             keyboardDisplayField = 0
@@ -272,6 +305,65 @@ Item {
         } else if (name === "input") {
             keyboardInputIndex = 0
             loadInputSettings()
+        }
+    }
+
+    function loadPowerDrafts() {
+        const stored = settings.powerCommands
+        const validObject = stored && typeof stored === "object" && !Array.isArray(stored)
+        const drafts = {}
+        const errors = {}
+        for (const option of powerOptions) {
+            const name = option.key
+            if (validObject && Object.prototype.hasOwnProperty.call(stored, name)) {
+                if (PowerCommands.valid(stored[name])) {
+                    drafts[name] = PowerCommands.format(stored[name])
+                } else {
+                    drafts[name] = JSON.stringify(stored[name]) || ""
+                    errors[name] = "Replace the invalid saved command or choose Use automatic."
+                }
+            } else {
+                drafts[name] = ""
+            }
+        }
+        powerDrafts = drafts
+        powerErrors = errors
+        powerBaseline = JSON.stringify(drafts)
+        powerDirty = !validObject
+        powerStatus = validObject ? "" : "Invalid saved power settings"
+    }
+
+    function setPowerDraft(name, text) {
+        powerDrafts = Object.assign({}, powerDrafts, { [name]: text })
+        const errors = Object.assign({}, powerErrors)
+        try {
+            PowerCommands.parse(text)
+            delete errors[name]
+        } catch (error) {
+            errors[name] = error.message
+        }
+        powerErrors = errors
+        const stored = settings.powerCommands
+        powerDirty = JSON.stringify(powerDrafts) !== powerBaseline
+            || !stored || typeof stored !== "object" || Array.isArray(stored)
+        powerStatus = ""
+    }
+
+    function applyPowerCommands() {
+        if (!powerDirty || !powerDraftsValid)
+            return
+        const stored = settings.powerCommands
+        const commands = stored && typeof stored === "object" && !Array.isArray(stored)
+            ? Object.assign({}, stored) : {}
+        for (const option of powerOptions) {
+            const args = PowerCommands.parse(powerDrafts[option.key] || "")
+            if (args.length > 0) commands[option.key] = args
+            else delete commands[option.key]
+        }
+        if (settings.setPowerCommands(commands)) {
+            loadPowerDrafts()
+            powerStatus = settings.saveError ? "Not saved" : "Saved"
+            keyboardScope.forceActiveFocus()
         }
     }
 
@@ -415,7 +507,7 @@ Item {
     }
 
     function scrollIntoView(flick, item) {
-        if (!item) return
+        if (!flick || !item) return
         const y = item.mapToItem(flick.contentItem, 0, 0).y
         if (y < flick.contentY)
             flick.contentY = y
@@ -424,6 +516,7 @@ Item {
     }
 
     function scrollToKeyboardModule() {
+        if (!anchorRepeater) return
         for (let i = 0; i < anchorRepeater.count; ++i) {
             const anchor = anchorRepeater.itemAt(i)
             if (!anchor) continue
@@ -479,11 +572,22 @@ Item {
             keyboardColorRow + offset))
         syncKeyboardColor()
         Qt.callLater(() => scrollIntoView(appearanceFlick,
-            colorRows.itemAt(keyboardColorRow)))
+            colorRows ? colorRows.itemAt(keyboardColorRow) : null))
     }
 
     function handleSettingsKey(event) {
         const key = event.key
+        if (page === "power" && editingPowerCommand) {
+            if ((event.modifiers & Qt.ControlModifier)
+                    && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
+                applyPowerCommands()
+                event.accepted = true
+            } else if (key === Qt.Key_Escape) {
+                keyboardScope.forceActiveFocus()
+                event.accepted = true
+            }
+            return
+        }
         if (page === "input" && editingKeyboardLayout) {
             if (key === Qt.Key_Escape) {
                 keyboardScope.forceActiveFocus()
@@ -515,7 +619,7 @@ Item {
         }
         if ((event.modifiers & Qt.ControlModifier)
                 && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
-            if (page !== "input" && page !== "displays") return
+            if (page !== "input" && page !== "displays" && page !== "power") return
             applyCurrentPage()
             event.accepted = true
             return
@@ -562,6 +666,15 @@ Item {
                     || key === Qt.Key_Return || key === Qt.Key_Enter)
                 cycleClockOption(key === Qt.Key_Left ? -1 : 1)
             else return
+        } else if (page === "power") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down) {
+                keyboardPowerIndex = Math.max(0, Math.min(powerOptions.length - 1,
+                    keyboardPowerIndex + (key === Qt.Key_Up ? -1 : 1)))
+                Qt.callLater(() => scrollIntoView(powerFlick, powerRows ? powerRows.itemAt(keyboardPowerIndex) : null))
+            } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+                const row = powerRows ? powerRows.itemAt(keyboardPowerIndex) : null
+                if (row) row.editor.forceActiveFocus()
+            } else return
         } else if (page === "input") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardInputIndex = Math.max(0, Math.min(inputOptions.length - 1,
@@ -1601,10 +1714,11 @@ Item {
                 id: applyButton
                 readonly property bool ready: root.page === "input"
                     ? root.inputPendingChanges && !root.inputApplyPending && !root.inputRestoring
+                    : root.page === "power" ? root.powerDirty && root.powerDraftsValid
                     : root.page === "displays" ? root.displayDirty
                         && root.displaySavePhase === "idle" && !root.awaitingDisplayConfirmation
                         : false
-                visible: root.page === "input" || root.page === "displays"
+                visible: root.page === "input" || root.page === "displays" || root.page === "power"
                 anchors.verticalCenter: header.verticalCenter
                 anchors.right: parent.right
                 anchors.rightMargin: 90
@@ -1635,7 +1749,8 @@ Item {
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
                 visible: applyButton.visible
-                text: root.page === "input" ? root.inputStatus : root.displayStatus
+                text: root.page === "input" ? root.inputStatus
+                    : root.page === "power" ? root.powerStatus : root.displayStatus
                 color: Theme.grey1
                 font.family: Theme.fontFamily
                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -1705,955 +1820,1134 @@ Item {
                 anchors.margins: 18
                 anchors.topMargin: 12
 
-                Column {
-                    visible: root.page === "home"
-                    width: parent.width
-                    spacing: 8
+                Loader {
+                    id: homePage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "home"
 
-                    SettingsLabel {
-                        text: "Choose a category · ↑↓ / Enter"
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    Repeater {
-                        id: categoryRepeater
-                        model: [
-                            { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
-                            { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
-                            { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
-                            { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
-                            { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
-                            { "key": "about", "label": "About", "description": "Mori shell information" }
-                        ]
-                        delegate: Rectangle {
-                            id: categoryRow
-                            required property var modelData
-                            required property int index
+                    sourceComponent: Component {
+                        Column {
+                            visible: root.page === "home"
                             width: parent.width
-                            height: 62
-                            color: categoryHover.hovered ? Theme.bg2 : Theme.bg1
-                            border.width: 1
-                            border.color: categoryHover.hovered ? Theme.fg : Theme.bg4
-                            Column {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 3
-                                SettingsLabel {
-                                    text: (categoryRow.index === root.keyboardCategoryIndex
-                                        ? "› " : "  ") + categoryRow.modelData.label
-                                    color: categoryRow.index === root.keyboardCategoryIndex
-                                        || categoryHover.hovered ? Theme.fg : Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.headingFontSize
+                            spacing: 8
+
+                            SettingsLabel {
+                                text: "Choose a category · ↑↓ / Enter"
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            Repeater {
+                                id: categoryRepeater
+                                model: [
+                                    { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
+                                    { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
+                                    { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
+                                    { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
+                                    { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
+                                    { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
+                                    { "key": "about", "label": "About", "description": "Mori shell information" }
+                                ]
+                                delegate: Rectangle {
+                                    id: categoryRow
+                                    required property var modelData
+                                    required property int index
+                                    width: parent.width
+                                    height: 62
+                                    color: categoryHover.hovered ? Theme.bg2 : Theme.bg1
+                                    border.width: 1
+                                    border.color: categoryHover.hovered ? Theme.fg : Theme.bg4
+                                    Column {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 14
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 3
+                                        SettingsLabel {
+                                            text: (categoryRow.index === root.keyboardCategoryIndex
+                                                ? "› " : "  ") + categoryRow.modelData.label
+                                            color: categoryRow.index === root.keyboardCategoryIndex
+                                                || categoryHover.hovered ? Theme.fg : Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.headingFontSize
+                                        }
+                                        SettingsLabel {
+                                            text: categoryRow.modelData.description
+                                            color: Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                    }
+                                    SettingsLabel {
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 14
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "›"
+                                        color: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 24
+                                    }
+                                    HoverHandler { id: categoryHover }
+                                    TapHandler {
+                                        onTapped: {
+                                            root.keyboardCategoryIndex = categoryRow.index
+                                            root.openPage(categoryRow.modelData.key)
+                                        }
+                                    }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: modulesPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "modules"
+
+                    sourceComponent: Component {
+                        Flickable {
+                            readonly property alias anchorRows: anchorRepeater
+                            id: modulesFlick
+                            anchors.fill: parent
+                            visible: root.page === "modules"
+                            clip: true
+                            contentWidth: width
+                            contentHeight: modulesColumn.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            Column {
+                                id: modulesColumn
+                                width: modulesFlick.width
+                                spacing: 8
                                 SettingsLabel {
-                                    text: categoryRow.modelData.description
+                                    text: "↑↓ select · Enter toggle · C compact · Shift+arrows move · drag ≡"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
                                 }
-                            }
-                            SettingsLabel {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "›"
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 24
-                            }
-                            HoverHandler { id: categoryHover }
-                            TapHandler {
-                                onTapped: {
-                                    root.keyboardCategoryIndex = categoryRow.index
-                                    root.openPage(categoryRow.modelData.key)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Flickable {
-                    id: modulesFlick
-                    anchors.fill: parent
-                    visible: root.page === "modules"
-                    clip: true
-                    contentWidth: width
-                    contentHeight: modulesColumn.implicitHeight
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: modulesColumn
-                        width: modulesFlick.width
-                        spacing: 8
-                        SettingsLabel {
-                            text: "↑↓ select · Enter toggle · C compact · Shift+arrows move · drag ≡"
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
-                        Repeater {
-                            id: anchorRepeater
-                            model: ["left", "center", "right"]
-                            delegate: Rectangle {
-                                id: anchorBox
-                                required property string modelData
-                                readonly property string anchorKey: modelData
-                                readonly property var anchorOrder: anchorKey === "left"
-                                    ? root.settings.leftModuleOrder
-                                    : anchorKey === "center"
-                                        ? root.settings.centerModuleOrder
-                                        : root.settings.rightModuleOrder
-                                readonly property var rowRepeater: moduleRows
-                                width: parent.width
-                                height: anchorColumn.implicitHeight + 16
-                                    + root.anchorHeightAdjustment(anchorKey)
-                                color: Theme.bg1
-                                border.width: root.draggingModule.length > 0
-                                    && root.dropSide === anchorKey ? 2 : 1
-                                border.color: root.draggingModule.length > 0
-                                    && root.dropSide === anchorKey ? Theme.fg : Theme.bg4
-
-                                Behavior on height {
-                                    NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
-                                }
-
-                                Column {
-                                    id: anchorColumn
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.margins: 8
-                                    spacing: 2
-
-                                    SettingsLabel {
+                                Repeater {
+                                    id: anchorRepeater
+                                    model: ["left", "center", "right"]
+                                    delegate: Rectangle {
+                                        id: anchorBox
+                                        required property string modelData
+                                        readonly property string anchorKey: modelData
+                                        readonly property var anchorOrder: anchorKey === "left"
+                                            ? root.settings.leftModuleOrder
+                                            : anchorKey === "center"
+                                                ? root.settings.centerModuleOrder
+                                                : root.settings.rightModuleOrder
+                                        readonly property var rowRepeater: moduleRows
                                         width: parent.width
-                                        text: anchorBox.anchorKey === "left" ? "Left"
-                                            : anchorBox.anchorKey === "center" ? "Center"
-                                            : "Right"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        font.weight: Font.DemiBold
-                                        DropArea {
-                                            anchors.fill: parent
-                                            keys: ["mori-module"]
-                                            onEntered: root.setDropTarget(
-                                                anchorBox.anchorKey, 0)
+                                        height: anchorColumn.implicitHeight + 16
+                                            + root.anchorHeightAdjustment(anchorKey)
+                                        color: Theme.bg1
+                                        border.width: root.draggingModule.length > 0
+                                            && root.dropSide === anchorKey ? 2 : 1
+                                        border.color: root.draggingModule.length > 0
+                                            && root.dropSide === anchorKey ? Theme.fg : Theme.bg4
+
+                                        Behavior on height {
+                                            NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
                                         }
-                                    }
 
-                                    Repeater {
-                                        id: moduleRows
-                                        model: anchorBox.anchorOrder
-                                        delegate: moduleSettingDelegate
-                                    }
+                                        Column {
+                                            id: anchorColumn
+                                            anchors.top: parent.top
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.margins: 8
+                                            spacing: 2
 
-                                    Item {
-                                        width: parent.width
-                                        height: 8
-                                        DropArea {
-                                            anchors.fill: parent
-                                            keys: ["mori-module"]
-                                            onEntered: root.setDropTarget(
-                                                anchorBox.anchorKey,
-                                                anchorBox.anchorOrder.length)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Flickable {
-                    id: appearanceFlick
-                    anchors.fill: parent
-                    visible: root.page === "appearance"
-                    clip: true
-                    contentWidth: width
-                    contentHeight: appearanceColumn.implicitHeight
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: appearanceColumn
-                        width: appearanceFlick.width
-                        spacing: 6
-                        SettingsLabel {
-                            text: "↑↓ module · ←→ color · Enter apply"
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
-                        Repeater {
-                            id: colorRows
-                            model: root.allModules
-                            delegate: Rectangle {
-                                id: colorRow
-                                required property string modelData
-                                required property int index
-                                readonly property string moduleKey: modelData
-                                width: parent.width
-                                height: 48
-                                color: colorHover.hovered ? Theme.bg2 : "transparent"
-                                SettingsLabel {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: (colorRow.index === root.keyboardColorRow ? "› " : "  ")
-                                        + root.moduleLabel(colorRow.moduleKey)
-                                    color: colorRow.index === root.keyboardColorRow
-                                        ? Theme.fg : Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                Row {
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 7
-                                    Repeater {
-                                        model: root.colorChoices
-                                        delegate: Rectangle {
-                                            id: swatch
-                                            required property var modelData
-                                            required property int index
-                                            readonly property bool selected: {
-                                                const currentRevision = root.settings.revision
-                                                return root.settings.moduleColors[colorRow.moduleKey]
-                                                    === modelData.token
+                                            SettingsLabel {
+                                                width: parent.width
+                                                text: anchorBox.anchorKey === "left" ? "Left"
+                                                    : anchorBox.anchorKey === "center" ? "Center"
+                                                    : "Right"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                font.weight: Font.DemiBold
+                                                DropArea {
+                                                    anchors.fill: parent
+                                                    keys: ["mori-module"]
+                                                    onEntered: root.setDropTarget(
+                                                        anchorBox.anchorKey, 0)
+                                                }
                                             }
-                                            width: 24
-                                            height: 24
-                                            color: modelData.color
-                                            border.width: root.keyboardColorRow === colorRow.index
-                                                && root.keyboardColorIndex === index ? 3 : 1
-                                            border.color: selected || root.keyboardColorRow === colorRow.index
-                                                && root.keyboardColorIndex === index
-                                                ? Theme.fg : Theme.bg4
-                                            TapHandler {
-                                                onTapped: {
-                                                    root.keyboardColorRow = colorRow.index
-                                                    root.keyboardColorIndex = swatch.index
-                                                    root.settings.setModuleColor(
-                                                        colorRow.moduleKey, swatch.modelData.token)
+
+                                            Repeater {
+                                                id: moduleRows
+                                                model: anchorBox.anchorOrder
+                                                delegate: moduleSettingDelegate
+                                            }
+
+                                            Item {
+                                                width: parent.width
+                                                height: 8
+                                                DropArea {
+                                                    anchors.fill: parent
+                                                    keys: ["mori-module"]
+                                                    onEntered: root.setDropTarget(
+                                                        anchorBox.anchorKey,
+                                                        anchorBox.anchorOrder.length)
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                HoverHandler { id: colorHover }
                             }
                         }
                     }
                 }
 
-                Column {
-                    visible: root.page === "clock"
-                    width: parent.width
-                    spacing: 12
+                Loader {
+                    id: appearancePage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "appearance"
 
-                    SettingsLabel {
-                        text: "↑↓ setting · ←→ / Enter change"
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
+                    sourceComponent: Component {
+                        Flickable {
+                            readonly property alias rows: colorRows
+                            id: appearanceFlick
+                            anchors.fill: parent
+                            visible: root.page === "appearance"
+                            clip: true
+                            contentWidth: width
+                            contentHeight: appearanceColumn.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
 
-                    Repeater {
-                        model: root.clockOptions
-                        delegate: Column {
-                            id: clockRow
-                            required property var modelData
-                            required property int index
-                            width: parent.width
-                            spacing: 6
-
-                            SettingsLabel {
-                                text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
-                                    + clockRow.modelData.label
-                                color: clockRow.index === root.keyboardClockIndex
-                                    ? Theme.fg : Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-
-                            Row {
-                                spacing: 8
+                            Column {
+                                id: appearanceColumn
+                                width: appearanceFlick.width
+                                spacing: 6
+                                SettingsLabel {
+                                    text: "↑↓ module · ←→ color · Enter apply"
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
                                 Repeater {
-                                    model: clockRow.modelData.values
+                                    id: colorRows
+                                    model: root.allModules
                                     delegate: Rectangle {
-                                        id: clockChoice
-                                        required property var modelData
+                                        id: colorRow
+                                        required property string modelData
                                         required property int index
-                                        readonly property bool selected: root.clockOptionValue(
-                                            clockRow.modelData.key) === modelData
-                                        width: Math.max(92, choiceText.implicitWidth + 20)
-                                        height: 30
-                                        color: choiceHover.hovered ? Theme.bg2 : Theme.bg1
-                                        border.width: 1
-                                        border.color: Theme.bg4
-
+                                        readonly property string moduleKey: modelData
+                                        width: parent.width
+                                        height: 48
+                                        color: colorHover.hovered ? Theme.bg2 : "transparent"
                                         SettingsLabel {
-                                            id: choiceText
-                                            anchors.centerIn: parent
-                                            text: clockRow.modelData.labels[clockChoice.index]
-                                            color: clockChoice.selected || choiceHover.hovered
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: (colorRow.index === root.keyboardColorRow ? "› " : "  ")
+                                                + root.moduleLabel(colorRow.moduleKey)
+                                            color: colorRow.index === root.keyboardColorRow
                                                 ? Theme.fg : Theme.grey1
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
                                         }
-                                        HoverHandler { id: choiceHover }
-                                        TapHandler {
-                                            onTapped: {
-                                                root.keyboardClockIndex = clockRow.index
-                                                root.settings.setClockOption(
-                                                    clockRow.modelData.key, clockChoice.modelData)
+                                        Row {
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 7
+                                            Repeater {
+                                                model: root.colorChoices
+                                                delegate: Rectangle {
+                                                    id: swatch
+                                                    required property var modelData
+                                                    required property int index
+                                                    readonly property bool selected: {
+                                                        const currentRevision = root.settings.revision
+                                                        return root.settings.moduleColors[colorRow.moduleKey]
+                                                            === modelData.token
+                                                    }
+                                                    width: 24
+                                                    height: 24
+                                                    color: modelData.color
+                                                    border.width: root.keyboardColorRow === colorRow.index
+                                                        && root.keyboardColorIndex === index ? 3 : 1
+                                                    border.color: selected || root.keyboardColorRow === colorRow.index
+                                                        && root.keyboardColorIndex === index
+                                                        ? Theme.fg : Theme.bg4
+                                                    TapHandler {
+                                                        onTapped: {
+                                                            root.keyboardColorRow = colorRow.index
+                                                            root.keyboardColorIndex = swatch.index
+                                                            root.settings.setModuleColor(
+                                                                colorRow.moduleKey, swatch.modelData.token)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        HoverHandler { id: colorHover }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: clockPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "clock"
+
+                    sourceComponent: Component {
+                        Column {
+                            visible: root.page === "clock"
+                            width: parent.width
+                            spacing: 12
+
+                            SettingsLabel {
+                                text: "↑↓ setting · ←→ / Enter change"
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+
+                            Repeater {
+                                model: root.clockOptions
+                                delegate: Column {
+                                    id: clockRow
+                                    required property var modelData
+                                    required property int index
+                                    width: parent.width
+                                    spacing: 6
+
+                                    SettingsLabel {
+                                        text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
+                                            + clockRow.modelData.label
+                                        color: clockRow.index === root.keyboardClockIndex
+                                            ? Theme.fg : Theme.grey1
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                    }
+
+                                    Row {
+                                        spacing: 8
+                                        Repeater {
+                                            model: clockRow.modelData.values
+                                            delegate: Rectangle {
+                                                id: clockChoice
+                                                required property var modelData
+                                                required property int index
+                                                readonly property bool selected: root.clockOptionValue(
+                                                    clockRow.modelData.key) === modelData
+                                                width: Math.max(92, choiceText.implicitWidth + 20)
+                                                height: 30
+                                                color: choiceHover.hovered ? Theme.bg2 : Theme.bg1
+                                                border.width: 1
+                                                border.color: Theme.bg4
+
+                                                SettingsLabel {
+                                                    id: choiceText
+                                                    anchors.centerIn: parent
+                                                    text: clockRow.modelData.labels[clockChoice.index]
+                                                    color: clockChoice.selected || choiceHover.hovered
+                                                        ? Theme.fg : Theme.grey1
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: Theme.fontSize
+                                                }
+                                                HoverHandler { id: choiceHover }
+                                                TapHandler {
+                                                    onTapped: {
+                                                        root.keyboardClockIndex = clockRow.index
+                                                        root.settings.setClockOption(
+                                                            clockRow.modelData.key, clockChoice.modelData)
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    SettingsLabel {
-                        text: "Preview: " + root.clockPreview()
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    SettingsLabel {
-                        text: "Time format also applies to calendar events."
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            SettingsLabel {
+                                text: "Preview: " + root.clockPreview()
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            SettingsLabel {
+                                text: "Time format also applies to calendar events."
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            }
+                        }
                     }
                 }
 
-                Column {
-                    visible: root.page === "input"
-                    width: parent.width
-                    spacing: 10
+                Loader {
+                    id: powerPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "power"
 
-                    SettingsLabel {
-                        text: "Niri input · leave keyboard layout empty for the system default"
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    SettingsLabel {
-                        text: "↑↓ select · ←→ adjust · Enter edit/toggle · Ctrl+Enter apply"
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                    }
-                    SettingsLabel {
-                        text: "Sensitivity is Niri acceleration speed: −1 slower, +1 faster."
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                    }
+                    sourceComponent: Component {
+                        ScrollableColumn {
+                            readonly property alias rows: powerRows
+                            id: powerFlick
+                            visible: root.page === "power"
+                            anchors.fill: parent
+                            spacing: 16
 
-                    Repeater {
-                        id: inputRows
-                        model: root.inputOptions
-                        delegate: Rectangle {
-                            id: inputRow
-                            property alias editor: layoutField
-                            required property var modelData
-                            required property int index
-                            readonly property var option: modelData
-                            readonly property var currentValue: {
-                                const revision = root.inputRevision
-                                return root.inputValue(option.key)
-                            }
-                            width: parent.width
-                            height: 54
-                            color: Theme.bg1
-                            border.width: 1
-                            border.color: Theme.bg4
-
-                            SettingsLabel {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: (inputRow.index === root.keyboardInputIndex ? "› " : "  ")
-                                    + inputRow.option.label
-                                color: inputRow.index === root.keyboardInputIndex
-                                    ? Theme.fg : Theme.grey1
+                            Text {
+                                width: parent.width
+                                text: "Blank commands use automatic selection. Enter a custom command with its arguments, then Apply."
+                                wrapMode: Text.WordWrap
+                                color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
 
-                            TextField {
-                                id: layoutField
-                                visible: inputRow.option.kind === "layout"
-                                anchors.right: parent.right
-                                anchors.rightMargin: 112
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 150
-                                height: 28
-                                placeholderText: "System default"
-                                verticalAlignment: TextInput.AlignVCenter
-                                leftPadding: 8
-                                rightPadding: 8
-                                topPadding: 0
-                                bottomPadding: 0
-                                color: Theme.fg
-                                placeholderTextColor: Theme.grey1
-                                selectionColor: Theme.bg4
-                                selectedTextColor: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                background: Rectangle {
-                                    color: Theme.bg2
-                                    border.width: 1
-                                    border.color: layoutField.activeFocus ? Theme.fg : Theme.bg4
-                                }
-                                onTextChanged: if (visible) root.keyboardLayoutDraft = text
-                                onActiveFocusChanged: {
-                                    root.editingKeyboardLayout = activeFocus
-                                    if (activeFocus)
-                                        root.keyboardInputIndex = inputRow.index
-                                }
-                                Keys.onPressed: event => {
-                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                        keyboardScope.forceActiveFocus()
-                                        event.accepted = true
-                                    } else if (event.key === Qt.Key_Escape) {
-                                        layoutField.text = root.keyboardLayout
-                                        keyboardScope.forceActiveFocus()
-                                        event.accepted = true
+                            Repeater {
+                                id: powerRows
+                                model: root.powerOptions
+                                delegate: Column {
+                                    id: powerRow
+                                    required property var modelData
+                                    required property int index
+                                    readonly property alias editor: commandField
+                                    width: parent.width
+                                    spacing: 6
+
+                                    Item {
+                                        width: parent.width
+                                        height: 24
+                                        SettingsLabel {
+                                            anchors.left: parent.left
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: (powerRow.index === root.keyboardPowerIndex ? "› " : "  ")
+                                                + powerRow.modelData.label
+                                            color: powerRow.index === root.keyboardPowerIndex ? Theme.fg : Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                        SettingsLabel {
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "Use automatic"
+                                            color: (root.powerDrafts[powerRow.modelData.key] || "").length
+                                                ? Theme.fg : Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                            TapHandler {
+                                                onTapped: {
+                                                    root.keyboardPowerIndex = powerRow.index
+                                                    root.setPowerDraft(powerRow.modelData.key, "")
+                                                    keyboardScope.forceActiveFocus()
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    TextField {
+                                        id: commandField
+                                        width: parent.width
+                                        height: 32
+                                        text: root.powerDrafts[powerRow.modelData.key] || ""
+                                        placeholderText: "Automatic"
+                                        color: Theme.fg
+                                        placeholderTextColor: Theme.grey1
+                                        selectionColor: Theme.bg4
+                                        selectedTextColor: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        leftPadding: 8
+                                        rightPadding: 8
+                                        background: Rectangle {
+                                            color: Theme.bg2
+                                            border.width: 1
+                                            border.color: root.powerErrors[powerRow.modelData.key] ? Theme.red
+                                                : commandField.activeFocus ? Theme.fg : Theme.bg4
+                                        }
+                                        onTextEdited: root.setPowerDraft(powerRow.modelData.key, text)
+                                        onActiveFocusChanged: {
+                                            root.editingPowerCommand = activeFocus
+                                            if (activeFocus) root.keyboardPowerIndex = powerRow.index
+                                        }
+                                        Keys.onPressed: event => {
+                                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                if (event.modifiers & Qt.ControlModifier)
+                                                    root.applyPowerCommands()
+                                                keyboardScope.forceActiveFocus()
+                                                event.accepted = true
+                                            } else if (event.key === Qt.Key_Escape) {
+                                                keyboardScope.forceActiveFocus()
+                                                event.accepted = true
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        visible: (root.powerErrors[powerRow.modelData.key] || "").length > 0
+                                        text: root.powerErrors[powerRow.modelData.key] || ""
+                                        wrapMode: Text.WordWrap
+                                        color: Theme.red
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                     }
                                 }
                             }
 
-                            SettingsLabel {
-                                visible: inputRow.option.kind === "layout"
-                                anchors.right: parent.right
-                                anchors.rightMargin: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Use system"
-                                color: Theme.fg
+                            Text {
+                                width: parent.width
+                                text: "↑↓ action · Enter edit · Ctrl+Enter apply\nQuote paths or arguments containing spaces. Commands that need root should use your authorized wrapper."
+                                wrapMode: Text.WordWrap
+                                color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 1)
-                                TapHandler {
-                                    onTapped: {
-                                        root.keyboardInputIndex = inputRow.index
-                                        layoutField.text = ""
-                                        keyboardScope.forceActiveFocus()
-                                    }
-                                }
-                            }
-
-                            Row {
-                                visible: inputRow.option.kind === "speed"
-                                anchors.right: parent.right
-                                anchors.rightMargin: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 10
-
-                                Slider {
-                                    id: speedSlider
-                                    width: 175
-                                    height: 22
-                                    from: -1
-                                    to: 1
-                                    stepSize: 0.05
-                                    value: Number(inputRow.currentValue)
-                                    onMoved: root.setInputValue(inputRow.option, value)
-
-                                    background: Rectangle {
-                                        x: speedSlider.leftPadding
-                                        y: speedSlider.topPadding
-                                            + speedSlider.availableHeight / 2 - height / 2
-                                        width: speedSlider.availableWidth
-                                        height: 4
-                                        color: Theme.bg4
-                                    }
-                                    handle: Rectangle {
-                                        x: speedSlider.leftPadding + speedSlider.visualPosition
-                                            * (speedSlider.availableWidth - width)
-                                        y: speedSlider.topPadding
-                                            + speedSlider.availableHeight / 2 - height / 2
-                                        width: 10
-                                        height: 10
-                                        color: Theme.fg
-                                    }
-                                }
-                                SettingsLabel {
-                                    width: 42
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    horizontalAlignment: Text.AlignRight
-                                    text: Number(inputRow.currentValue).toFixed(2)
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                            }
-
-                            Rectangle {
-                                visible: inputRow.option.kind === "flag"
-                                anchors.right: parent.right
-                                anchors.rightMargin: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 36
-                                height: 18
-                                color: inputRow.currentValue ? Theme.fg : Theme.bg4
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    x: inputRow.currentValue ? parent.width - width - 3 : 3
-                                    width: 12
-                                    height: 12
-                                    color: inputRow.currentValue ? Theme.bg : Theme.grey1
-                                }
-                                TapHandler {
-                                    onTapped: {
-                                        root.keyboardInputIndex = inputRow.index
-                                        root.setInputValue(inputRow.option, !inputRow.currentValue)
-                                    }
-                                }
                             }
                         }
-                    }
-
-                    Text {
-                        visible: root.inputError.length > 0 || root.inputStatus.length > 0
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        text: root.inputError.length > 0 ? root.inputError : root.inputStatus
-                        color: root.inputError.length > 0 ? Theme.red : Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                 }
 
-                Item {
+                Loader {
+                    id: inputPage
                     anchors.fill: parent
-                    visible: root.page === "displays"
+                    active: settingsWindow.visible && root.page === "input"
 
-                    Column {
-                        id: displaysColumn
-                        anchors.fill: parent
-                        spacing: 10
-
-                        SettingsLabel {
-                            text: root.keyboardDisplaySection === "outputs"
-                                ? "Arrows: output · Tab: editor · R: refresh · S: Apply"
-                                : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                        }
-
-                        Row {
+                    sourceComponent: Component {
+                        Column {
+                            readonly property alias rows: inputRows
+                            visible: root.page === "input"
+                            width: parent.width
                             spacing: 10
 
-                            Rectangle {
-                                width: refreshLabel.implicitWidth + 20
-                                height: 30
-                                color: refreshHover.hovered ? Theme.bg2 : Theme.bg1
-                                border.width: 1
-                                border.color: Theme.fg
-                                SettingsLabel {
-                                    id: refreshLabel
-                                    anchors.centerIn: parent
-                                    text: displayQuery.running ? "Refreshing…" : "Refresh"
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                HoverHandler { id: refreshHover }
-                                TapHandler {
-                                    enabled: !displayQuery.running
-                                        && root.displaySavePhase === "idle"
-                                        && !root.awaitingDisplayConfirmation
-                                    onTapped: root.refreshDisplays()
-                                }
-                            }
-
                             SettingsLabel {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: root.displayError.length > 0
-                                    ? root.displayError : root.displayStatus
-                                color: root.displayError.length > 0 ? Theme.red : Theme.grey1
+                                text: "Niri input · leave keyboard layout empty for the system default"
+                                color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
-                        }
+                            SettingsLabel {
+                                text: "↑↓ select · ←→ adjust · Enter edit/toggle · Ctrl+Enter apply"
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            }
+                            SettingsLabel {
+                                text: "Sensitivity is Niri acceleration speed: −1 slower, +1 faster."
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            }
 
-                        SettingsLabel {
-                            text: "Drag displays to arrange them. Nearby edges snap together."
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
-
-                        Row {
-                            spacing: 8
                             Repeater {
-                                model: root.displays
+                                id: inputRows
+                                model: root.inputOptions
                                 delegate: Rectangle {
-                                    id: displaySelector
+                                    id: inputRow
+                                    property alias editor: layoutField
                                     required property var modelData
-                                    width: selectorLabel.implicitWidth + 18
-                                    height: 26
+                                    required property int index
+                                    readonly property var option: modelData
+                                    readonly property var currentValue: {
+                                        const revision = root.inputRevision
+                                        return root.inputValue(option.key)
+                                    }
+                                    width: parent.width
+                                    height: 54
                                     color: Theme.bg1
                                     border.width: 1
                                     border.color: Theme.bg4
-                                    opacity: modelData.enabled ? 1 : 0.6
+
                                     SettingsLabel {
-                                        id: selectorLabel
-                                        anchors.centerIn: parent
-                                        text: displaySelector.modelData.connector
-                                            + (displaySelector.modelData.enabled ? "" : " · off")
-                                        color: root.selectedDisplay === displaySelector.modelData.connector
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: (inputRow.index === root.keyboardInputIndex ? "› " : "  ")
+                                            + inputRow.option.label
+                                        color: inputRow.index === root.keyboardInputIndex
                                             ? Theme.fg : Theme.grey1
-                                        font.underline: root.keyboardDisplaySection === "outputs"
-                                            && root.selectedDisplay === displaySelector.modelData.connector
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                    TapHandler {
-                                        onTapped: root.selectedDisplay
-                                            = displaySelector.modelData.connector
+
+                                    TextField {
+                                        id: layoutField
+                                        text: root.keyboardLayoutDraft
+                                        visible: inputRow.option.kind === "layout"
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 112
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 150
+                                        height: 28
+                                        placeholderText: "System default"
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        leftPadding: 8
+                                        rightPadding: 8
+                                        topPadding: 0
+                                        bottomPadding: 0
+                                        color: Theme.fg
+                                        placeholderTextColor: Theme.grey1
+                                        selectionColor: Theme.bg4
+                                        selectedTextColor: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        background: Rectangle {
+                                            color: Theme.bg2
+                                            border.width: 1
+                                            border.color: layoutField.activeFocus ? Theme.fg : Theme.bg4
+                                        }
+                                        onTextChanged: if (visible) root.keyboardLayoutDraft = text
+                                        onActiveFocusChanged: {
+                                            root.editingKeyboardLayout = activeFocus
+                                            if (activeFocus)
+                                                root.keyboardInputIndex = inputRow.index
+                                        }
+                                        Keys.onPressed: event => {
+                                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                                keyboardScope.forceActiveFocus()
+                                                event.accepted = true
+                                            } else if (event.key === Qt.Key_Escape) {
+                                                layoutField.text = root.keyboardLayout
+                                                keyboardScope.forceActiveFocus()
+                                                event.accepted = true
+                                            }
+                                        }
+                                    }
+
+                                    SettingsLabel {
+                                        visible: inputRow.option.kind === "layout"
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "Use system"
+                                        color: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Math.max(10, Theme.fontSize - 1)
+                                        TapHandler {
+                                            onTapped: {
+                                                root.keyboardInputIndex = inputRow.index
+                                                layoutField.text = ""
+                                                keyboardScope.forceActiveFocus()
+                                            }
+                                        }
+                                    }
+
+                                    Row {
+                                        visible: inputRow.option.kind === "speed"
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 10
+
+                                        Slider {
+                                            id: speedSlider
+                                            width: 175
+                                            height: 22
+                                            from: -1
+                                            to: 1
+                                            stepSize: 0.05
+                                            value: Number(inputRow.currentValue)
+                                            onMoved: root.setInputValue(inputRow.option, value)
+
+                                            background: Rectangle {
+                                                x: speedSlider.leftPadding
+                                                y: speedSlider.topPadding
+                                                    + speedSlider.availableHeight / 2 - height / 2
+                                                width: speedSlider.availableWidth
+                                                height: 4
+                                                color: Theme.bg4
+                                            }
+                                            handle: Rectangle {
+                                                x: speedSlider.leftPadding + speedSlider.visualPosition
+                                                    * (speedSlider.availableWidth - width)
+                                                y: speedSlider.topPadding
+                                                    + speedSlider.availableHeight / 2 - height / 2
+                                                width: 10
+                                                height: 10
+                                                color: Theme.fg
+                                            }
+                                        }
+                                        SettingsLabel {
+                                            width: 42
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            horizontalAlignment: Text.AlignRight
+                                            text: Number(inputRow.currentValue).toFixed(2)
+                                            color: Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: inputRow.option.kind === "flag"
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 36
+                                        height: 18
+                                        color: inputRow.currentValue ? Theme.fg : Theme.bg4
+                                        Rectangle {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            x: inputRow.currentValue ? parent.width - width - 3 : 3
+                                            width: 12
+                                            height: 12
+                                            color: inputRow.currentValue ? Theme.bg : Theme.grey1
+                                        }
+                                        TapHandler {
+                                            onTapped: {
+                                                root.keyboardInputIndex = inputRow.index
+                                                root.setInputValue(inputRow.option, !inputRow.currentValue)
+                                            }
+                                        }
                                     }
                                 }
                             }
+
+                            Text {
+                                visible: root.inputError.length > 0 || root.inputStatus.length > 0
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: root.inputError.length > 0 ? root.inputError : root.inputStatus
+                                color: root.inputError.length > 0 ? Theme.red : Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
                         }
+                    }
+                }
 
-                        Rectangle {
-                            id: displayCanvas
-                            width: parent.width
-                            height: Math.max(110, pageArea.height - 360)
-                            color: Theme.bgdim
-                            border.width: 1
-                            border.color: Theme.bg4
-                            clip: true
-                            onWidthChanged: Qt.callLater(root.fitDisplayLayout)
-                            onHeightChanged: Qt.callLater(root.fitDisplayLayout)
+                Loader {
+                    id: displaysPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "displays"
+                    onLoaded: Qt.callLater(root.fitDisplayLayout)
+                    sourceComponent: Component {
+                        Item {
+                            readonly property alias canvas: displayCanvas
+                            anchors.fill: parent
+                            visible: root.page === "displays"
 
-                            Repeater {
-                                model: root.displays
+                            Column {
+                                id: displaysColumn
+                                anchors.fill: parent
+                                spacing: 10
 
-                                delegate: Rectangle {
-                                    id: displayTile
-                                    required property var modelData
-                                    property real dragOffsetX: 0
-                                    property real dragOffsetY: 0
-                                    property real dragStartLogicalX: 0
-                                    property real dragStartLogicalY: 0
+                                SettingsLabel {
+                                    text: root.keyboardDisplaySection === "outputs"
+                                        ? "Arrows: output · Tab: editor · R: refresh · S: Apply"
+                                        : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                                }
 
-                                    x: root.displayCanvasX(modelData) + dragOffsetX
-                                    y: root.displayCanvasY(modelData) + dragOffsetY
-                                    width: Math.max(54, modelData.width * root.displayViewScale)
-                                    height: Math.max(54, modelData.height * root.displayViewScale)
-                                    z: displayDrag.active ? 10 : 1
+                                Row {
+                                    spacing: 10
+
+                                    Rectangle {
+                                        width: refreshLabel.implicitWidth + 20
+                                        height: 30
+                                        color: refreshHover.hovered ? Theme.bg2 : Theme.bg1
+                                        border.width: 1
+                                        border.color: Theme.fg
+                                        SettingsLabel {
+                                            id: refreshLabel
+                                            anchors.centerIn: parent
+                                            text: displayQuery.running ? "Refreshing…" : "Refresh"
+                                            color: Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                        HoverHandler { id: refreshHover }
+                                        TapHandler {
+                                            enabled: !displayQuery.running
+                                                && root.displaySavePhase === "idle"
+                                                && !root.awaitingDisplayConfirmation
+                                            onTapped: root.refreshDisplays()
+                                        }
+                                    }
+
+                                    SettingsLabel {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.displayError.length > 0
+                                            ? root.displayError : root.displayStatus
+                                        color: root.displayError.length > 0 ? Theme.red : Theme.grey1
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                    }
+                                }
+
+                                SettingsLabel {
+                                    text: "Drag displays to arrange them. Nearby edges snap together."
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+
+                                Row {
+                                    spacing: 8
+                                    Repeater {
+                                        model: root.displays
+                                        delegate: Rectangle {
+                                            id: displaySelector
+                                            required property var modelData
+                                            width: selectorLabel.implicitWidth + 18
+                                            height: 26
+                                            color: Theme.bg1
+                                            border.width: 1
+                                            border.color: Theme.bg4
+                                            opacity: modelData.enabled ? 1 : 0.6
+                                            SettingsLabel {
+                                                id: selectorLabel
+                                                anchors.centerIn: parent
+                                                text: displaySelector.modelData.connector
+                                                    + (displaySelector.modelData.enabled ? "" : " · off")
+                                                color: root.selectedDisplay === displaySelector.modelData.connector
+                                                    ? Theme.fg : Theme.grey1
+                                                font.underline: root.keyboardDisplaySection === "outputs"
+                                                    && root.selectedDisplay === displaySelector.modelData.connector
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            TapHandler {
+                                                onTapped: root.selectedDisplay
+                                                    = displaySelector.modelData.connector
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: displayCanvas
+                                    width: parent.width
+                                    height: Math.max(110, pageArea.height - 360)
+                                    color: Theme.bgdim
+                                    border.width: 1
+                                    border.color: Theme.bg4
+                                    clip: true
+                                    onWidthChanged: Qt.callLater(root.fitDisplayLayout)
+                                    onHeightChanged: Qt.callLater(root.fitDisplayLayout)
+
+                                    Repeater {
+                                        model: root.displays
+
+                                        delegate: Rectangle {
+                                            id: displayTile
+                                            required property var modelData
+                                            property real dragOffsetX: 0
+                                            property real dragOffsetY: 0
+                                            property real dragStartLogicalX: 0
+                                            property real dragStartLogicalY: 0
+
+                                            x: root.displayCanvasX(modelData) + dragOffsetX
+                                            y: root.displayCanvasY(modelData) + dragOffsetY
+                                            width: Math.max(54, modelData.width * root.displayViewScale)
+                                            height: Math.max(54, modelData.height * root.displayViewScale)
+                                            z: displayDrag.active ? 10 : 1
+                                            color: Theme.bg1
+                                            opacity: modelData.enabled ? 1 : 0.55
+                                            border.width: root.selectedDisplay === modelData.connector ? 2 : 1
+                                            border.color: root.selectedDisplay === modelData.connector
+                                                ? Theme.fg : Theme.bg4
+
+                                            Column {
+                                                anchors.centerIn: parent
+                                                width: parent.width - 10
+                                                spacing: 2
+                                                SettingsLabel {
+                                                    width: parent.width
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    elide: Text.ElideRight
+                                                    text: displayTile.modelData.connector
+                                                    color: root.selectedDisplay === displayTile.modelData.connector
+                                                        ? Theme.fg : Theme.grey1
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: Theme.fontSize
+                                                    font.weight: Font.DemiBold
+                                                }
+                                                SettingsLabel {
+                                                    width: parent.width
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    elide: Text.ElideRight
+                                                    text: Math.round(displayTile.modelData.x) + ", "
+                                                        + Math.round(displayTile.modelData.y)
+                                                        + (displayTile.modelData.enabled ? "" : "  ·  OFF")
+                                                    color: Theme.grey1
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: Math.max(9, Theme.fontSize - 2)
+                                                }
+                                            }
+
+                                            HoverHandler { id: displayHover }
+                                            TapHandler {
+                                                onTapped: root.selectedDisplay = displayTile.modelData.connector
+                                            }
+                                            DragHandler {
+                                                id: displayDrag
+                                                target: null
+                                                onActiveChanged: {
+                                                    if (active) {
+                                                        root.selectedDisplay = displayTile.modelData.connector
+                                                        displayTile.dragStartLogicalX = displayTile.modelData.x
+                                                        displayTile.dragStartLogicalY = displayTile.modelData.y
+                                                    } else {
+                                                        const newX = displayTile.dragStartLogicalX
+                                                            + displayTile.dragOffsetX / root.displayViewScale
+                                                        const newY = displayTile.dragStartLogicalY
+                                                            + displayTile.dragOffsetY / root.displayViewScale
+                                                        displayTile.dragOffsetX = 0
+                                                        displayTile.dragOffsetY = 0
+                                                        Qt.callLater(() => root.updateDisplayPosition(
+                                                            displayTile.modelData.connector, newX, newY))
+                                                    }
+                                                }
+                                                onTranslationChanged: {
+                                                    if (active) {
+                                                        displayTile.dragOffsetX = translation.x
+                                                        displayTile.dragOffsetY = translation.y
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: displayEditor
+                                    width: parent.width
+                                    height: displayEditorColumn.implicitHeight + 24
                                     color: Theme.bg1
-                                    opacity: modelData.enabled ? 1 : 0.55
-                                    border.width: root.selectedDisplay === modelData.connector ? 2 : 1
-                                    border.color: root.selectedDisplay === modelData.connector
-                                        ? Theme.fg : Theme.bg4
+                                    border.width: 1
+                                    border.color: Theme.bg4
+
+                                    readonly property var output: root.selectedDisplayData()
+
+                                    Rectangle {
+                                        id: displayEnabledButton
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 10
+                                        width: displayEnabledLabel.implicitWidth + 18
+                                        height: 26
+                                        color: displayEnabledHover.hovered ? Theme.bg2 : Theme.bgdim
+                                        border.width: 1
+                                        border.color: Theme.fg
+                                        opacity: displayEditor.output
+                                            && (displayEditor.output.enabled
+                                                ? root.enabledDisplayCount() > 1 : true) ? 1 : 0.45
+
+                                        SettingsLabel {
+                                            id: displayEnabledLabel
+                                            anchors.centerIn: parent
+                                            text: displayEditor.output && displayEditor.output.enabled
+                                                ? "Disable" : "Enable"
+                                            color: Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                            font.underline: root.keyboardDisplaySection === "editor"
+                                                && root.keyboardDisplayField === 0
+                                        }
+                                        HoverHandler { id: displayEnabledHover }
+                                        TapHandler {
+                                            enabled: displayEditor.output
+                                                && (!displayEditor.output.enabled
+                                                    || root.enabledDisplayCount() > 1)
+                                            onTapped: root.setSelectedDisplayEnabled(
+                                                !displayEditor.output.enabled)
+                                        }
+                                    }
 
                                     Column {
-                                        anchors.centerIn: parent
-                                        width: parent.width - 10
-                                        spacing: 2
+                                        id: displayEditorColumn
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 12
+                                        spacing: 6
+
                                         SettingsLabel {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignHCenter
-                                            elide: Text.ElideRight
-                                            text: displayTile.modelData.connector
-                                            color: root.selectedDisplay === displayTile.modelData.connector
-                                                ? Theme.fg : Theme.grey1
+                                            text: displayEditor.output
+                                                ? displayEditor.output.label + "  ("
+                                                    + displayEditor.output.connector + ")"
+                                                : "No display selected"
+                                            color: Theme.fg
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
                                             font.weight: Font.DemiBold
                                         }
+
+                                        Row {
+                                            spacing: 8
+                                            SettingsLabel {
+                                                width: 95
+                                                text: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 1
+                                                    ? "› Resolution" : "  Resolution"
+                                                color: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 1 ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            SettingsLabel {
+                                                text: "‹"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedResolution(-1) }
+                                            }
+                                            SettingsLabel {
+                                                width: 220
+                                                text: displayEditor.output
+                                                    ? displayEditor.output.modeWidth + "×"
+                                                        + displayEditor.output.modeHeight
+                                                    : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            SettingsLabel {
+                                                text: "›"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedResolution(1) }
+                                            }
+                                        }
+
+                                        Row {
+                                            spacing: 8
+                                            SettingsLabel {
+                                                width: 95
+                                                text: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 2
+                                                    ? "› Refresh" : "  Refresh"
+                                                color: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 2 ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            SettingsLabel {
+                                                text: "‹"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedRefreshRate(-1) }
+                                            }
+                                            SettingsLabel {
+                                                width: 220
+                                                text: displayEditor.output
+                                                    ? (displayEditor.output.refreshRate / 1000)
+                                                        .toFixed(2) + " Hz"
+                                                    : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            SettingsLabel {
+                                                text: "›"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedRefreshRate(1) }
+                                            }
+                                        }
+
+                                        Row {
+                                            spacing: 8
+                                            SettingsLabel {
+                                                width: 95
+                                                text: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 3
+                                                    ? "› Scale" : "  Scale"
+                                                color: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 3 ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            SettingsLabel {
+                                                text: "−"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.adjustSelectedScale(-0.25) }
+                                            }
+                                            SettingsLabel {
+                                                width: 220
+                                                text: displayEditor.output
+                                                    ? displayEditor.output.scale.toFixed(2) + "×" : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            SettingsLabel {
+                                                text: "+"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.adjustSelectedScale(0.25) }
+                                            }
+                                        }
+
+                                        Row {
+                                            spacing: 8
+                                            SettingsLabel {
+                                                width: 95
+                                                text: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 4
+                                                    ? "› Transform" : "  Transform"
+                                                color: root.keyboardDisplaySection === "editor"
+                                                    && root.keyboardDisplayField === 4 ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            SettingsLabel {
+                                                text: "‹"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedTransform(-1) }
+                                            }
+                                            SettingsLabel {
+                                                width: 220
+                                                text: displayEditor.output
+                                                    ? displayEditor.output.transform : "—"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            SettingsLabel {
+                                                text: "›"
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                                TapHandler { onTapped: root.cycleSelectedTransform(1) }
+                                            }
+                                        }
+
                                         SettingsLabel {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignHCenter
-                                            elide: Text.ElideRight
-                                            text: Math.round(displayTile.modelData.x) + ", "
-                                                + Math.round(displayTile.modelData.y)
-                                                + (displayTile.modelData.enabled ? "" : "  ·  OFF")
+                                            text: displayEditor.output
+                                                ? "Position  " + Math.round(displayEditor.output.x) + ", "
+                                                    + Math.round(displayEditor.output.y) : ""
                                             color: Theme.grey1
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: Math.max(9, Theme.fontSize - 2)
-                                        }
-                                    }
-
-                                    HoverHandler { id: displayHover }
-                                    TapHandler {
-                                        onTapped: root.selectedDisplay = displayTile.modelData.connector
-                                    }
-                                    DragHandler {
-                                        id: displayDrag
-                                        target: null
-                                        onActiveChanged: {
-                                            if (active) {
-                                                root.selectedDisplay = displayTile.modelData.connector
-                                                displayTile.dragStartLogicalX = displayTile.modelData.x
-                                                displayTile.dragStartLogicalY = displayTile.modelData.y
-                                            } else {
-                                                const newX = displayTile.dragStartLogicalX
-                                                    + displayTile.dragOffsetX / root.displayViewScale
-                                                const newY = displayTile.dragStartLogicalY
-                                                    + displayTile.dragOffsetY / root.displayViewScale
-                                                displayTile.dragOffsetX = 0
-                                                displayTile.dragOffsetY = 0
-                                                Qt.callLater(() => root.updateDisplayPosition(
-                                                    displayTile.modelData.connector, newX, newY))
-                                            }
-                                        }
-                                        onTranslationChanged: {
-                                            if (active) {
-                                                displayTile.dragOffsetX = translation.x
-                                                displayTile.dragOffsetY = translation.y
-                                            }
+                                            font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                        Rectangle {
-                            id: displayEditor
-                            width: parent.width
-                            height: displayEditorColumn.implicitHeight + 24
-                            color: Theme.bg1
-                            border.width: 1
-                            border.color: Theme.bg4
-
-                            readonly property var output: root.selectedDisplayData()
-
-                            Rectangle {
-                                id: displayEnabledButton
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.margins: 10
-                                width: displayEnabledLabel.implicitWidth + 18
-                                height: 26
-                                color: displayEnabledHover.hovered ? Theme.bg2 : Theme.bgdim
-                                border.width: 1
-                                border.color: Theme.fg
-                                opacity: displayEditor.output
-                                    && (displayEditor.output.enabled
-                                        ? root.enabledDisplayCount() > 1 : true) ? 1 : 0.45
-
-                                SettingsLabel {
-                                    id: displayEnabledLabel
-                                    anchors.centerIn: parent
-                                    text: displayEditor.output && displayEditor.output.enabled
-                                        ? "Disable" : "Enable"
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                    font.underline: root.keyboardDisplaySection === "editor"
-                                        && root.keyboardDisplayField === 0
-                                }
-                                HoverHandler { id: displayEnabledHover }
-                                TapHandler {
-                                    enabled: displayEditor.output
-                                        && (!displayEditor.output.enabled
-                                            || root.enabledDisplayCount() > 1)
-                                    onTapped: root.setSelectedDisplayEnabled(
-                                        !displayEditor.output.enabled)
-                                }
-                            }
-
-                            Column {
-                                id: displayEditorColumn
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.margins: 12
-                                spacing: 6
-
-                                SettingsLabel {
-                                    text: displayEditor.output
-                                        ? displayEditor.output.label + "  ("
-                                            + displayEditor.output.connector + ")"
-                                        : "No display selected"
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                    font.weight: Font.DemiBold
-                                }
-
-                                Row {
-                                    spacing: 8
-                                    SettingsLabel {
-                                        width: 95
-                                        text: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 1
-                                            ? "› Resolution" : "  Resolution"
-                                        color: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 1 ? Theme.fg : Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
-                                    SettingsLabel {
-                                        text: "‹"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedResolution(-1) }
-                                    }
-                                    SettingsLabel {
-                                        width: 220
-                                        text: displayEditor.output
-                                            ? displayEditor.output.modeWidth + "×"
-                                                + displayEditor.output.modeHeight
-                                            : "—"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    SettingsLabel {
-                                        text: "›"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedResolution(1) }
-                                    }
-                                }
-
-                                Row {
-                                    spacing: 8
-                                    SettingsLabel {
-                                        width: 95
-                                        text: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 2
-                                            ? "› Refresh" : "  Refresh"
-                                        color: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 2 ? Theme.fg : Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
-                                    SettingsLabel {
-                                        text: "‹"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedRefreshRate(-1) }
-                                    }
-                                    SettingsLabel {
-                                        width: 220
-                                        text: displayEditor.output
-                                            ? (displayEditor.output.refreshRate / 1000)
-                                                .toFixed(2) + " Hz"
-                                            : "—"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    SettingsLabel {
-                                        text: "›"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedRefreshRate(1) }
-                                    }
-                                }
-
-                                Row {
-                                    spacing: 8
-                                    SettingsLabel {
-                                        width: 95
-                                        text: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 3
-                                            ? "› Scale" : "  Scale"
-                                        color: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 3 ? Theme.fg : Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
-                                    SettingsLabel {
-                                        text: "−"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.adjustSelectedScale(-0.25) }
-                                    }
-                                    SettingsLabel {
-                                        width: 220
-                                        text: displayEditor.output
-                                            ? displayEditor.output.scale.toFixed(2) + "×" : "—"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    SettingsLabel {
-                                        text: "+"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.adjustSelectedScale(0.25) }
-                                    }
-                                }
-
-                                Row {
-                                    spacing: 8
-                                    SettingsLabel {
-                                        width: 95
-                                        text: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 4
-                                            ? "› Transform" : "  Transform"
-                                        color: root.keyboardDisplaySection === "editor"
-                                            && root.keyboardDisplayField === 4 ? Theme.fg : Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
-                                    SettingsLabel {
-                                        text: "‹"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedTransform(-1) }
-                                    }
-                                    SettingsLabel {
-                                        width: 220
-                                        text: displayEditor.output
-                                            ? displayEditor.output.transform : "—"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    SettingsLabel {
-                                        text: "›"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.headingFontSize
-                                        TapHandler { onTapped: root.cycleSelectedTransform(1) }
-                                    }
-                                }
-
-                                SettingsLabel {
-                                    text: displayEditor.output
-                                        ? "Position  " + Math.round(displayEditor.output.x) + ", "
-                                            + Math.round(displayEditor.output.y) : ""
+                                Text {
+                                    text: "Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                 }
                             }
-                        }
-
-                        Text {
-                            text: "Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Math.max(10, Theme.fontSize - 1)
                         }
                     }
                 }
@@ -2732,29 +3026,37 @@ Item {
                     }
                 }
 
-                Column {
-                    visible: root.page === "about"
-                    width: parent.width
-                    spacing: 12
-                    SettingsLabel {
-                        text: "Mori 森"
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize + 4
-                    }
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        text: "A personal Quickshell configuration built around Niri and the Everforest palette."
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    SettingsLabel {
-                        text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                Loader {
+                    id: aboutPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "about"
+
+                    sourceComponent: Component {
+                        Column {
+                            visible: root.page === "about"
+                            width: parent.width
+                            spacing: 12
+                            SettingsLabel {
+                                text: "Mori 森"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.headingFontSize + 4
+                            }
+                            Text {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "A personal Quickshell configuration built around Niri and the Everforest palette."
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            SettingsLabel {
+                                text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                        }
                     }
                 }
             }

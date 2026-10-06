@@ -6,7 +6,6 @@ import Quickshell.Services.Notifications
 
 ShellRoot {
     id: root
-    property bool niriOverviewOpen: false
 
     SettingsStore {
         id: settings
@@ -14,33 +13,7 @@ ShellRoot {
 
     BatteryWarning {}
 
-    // Super+Tab invokes niri's toggle-overview action. Its event stream emits
-    // the overview state immediately on connection and whenever it changes.
-    Process {
-        id: niriEvents
-        command: ["niri", "msg", "event-stream"]
-        running: true
-
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: line => {
-                const match = /^Overview toggled:\s*(true|false)\s*$/.exec(line)
-                if (match)
-                    root.niriOverviewOpen = match[1] === "true"
-            }
-        }
-
-        onExited: exitCode => {
-            if (exitCode !== 0)
-                niriEventsRetry.restart()
-        }
-    }
-
-    Timer {
-        id: niriEventsRetry
-        interval: 3000
-        onTriggered: niriEvents.running = true
-    }
+    NiriEvents { id: niriState }
 
     NotificationServer {
         id: notificationServer
@@ -52,7 +25,8 @@ ShellRoot {
     Bar {
         id: bar
         notificationServer: notificationServer
-        overviewOpen: root.niriOverviewOpen
+        overviewOpen: niriState.overviewOpen
+        niriEvents: niriState
         settings: settings
         // Keep the bar on the primary output. Without an explicit screen,
         // Quickshell may remap the panel to the currently active monitor.

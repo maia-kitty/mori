@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+# Select desktop power tools, independently of the distribution's init system.
+# Requires Bash 4.4+ for mapfile's NUL-delimited argument loading.
+set -o pipefail
+
+fail() { printf 'mori-power: %s\n' "$*" >&2; exit 1; }
+available() { type -P "$1" >/dev/null; }
+
+case "${1:-}" in
+    --resolve|suspend|reboot|poweroff) action="$1" ;;
+    *) fail 'Usage: mori-power --resolve|suspend|reboot|poweroff' ;;
+esac
+[[ $# == 1 ]] || fail 'Expected exactly one action'
+available jq || fail 'Install jq to resolve power commands'
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/mori-settings.json"
+overrides='{}'
+if [[ -e "$config" ]]; then
+    overrides=$(jq -cse 'if length == 1 and (.[0] | type) == "object" then
+        .[0] | if has("power") then .power else {} end |
+        if type == "object" then . else error("power must be an object") end
+        else error("expected one settings object") end' "$config") \
+        || fail "Cannot read power settings in $config; expected a power object with command arrays"
+fi
+
+backend='native'
+if [[ -d /run/systemd/system ]] && available systemctl; then
+    backend='systemd'
+elif available loginctl; then
+    # systemd's loginctl does not provide elogind's power verbs. Also check
+    # that the login manager is reachable, rather than just installed.
+    help=$(loginctl --help 2>/dev/null)
+    if [[ "$help" =~ (^|[[:space:]])suspend([[:space:]]|$) \
+       && "$help" =~ (^|[[:space:]])reboot([[:space:]]|$) \
+       && "$help" =~ (^|[[:space:]])poweroff([[:space:]]|$) ]] \
+       && loginctl list-sessions --no-legend --no-pager >/dev/null 2>&1; then
+        backend='elogind'
+    fi
+fi
+
+resolve() {
+    local name="$1"
+    command=()
+    error=''
+    if jq -e --arg name "$name" 'has($name)' <<<"$overrides" >/dev/null; then
+        if ! jq -e --arg name "$name" '
+            .[$name] | if type == "array" then
+                length > 0 and all(.[]; if type == "string" then
+                    length > 0 and (contains("\u0000") | not)
+                else false end)
+            else false end' <<<"$overrides" >/dev/null; then
+            error="Invalid $name override in $config: use a nonempty array of nonempty strings"
+            return
+        fi
+        # NUL separators preserve spaces, newlines, and shell metacharacters.
+        mapfile -d '' -t command < <(jq -j --arg name "$name" '.[$name][] | ., "\u0000"' <<<"$overrides")
+    elif [[ "$backend" == systemd ]]; then
+        command=(systemctl "$name")
+    elif [[ "$backend" == elogind ]]; then
+        command=(loginctl "$name")
+    elif [[ "$name" == suspend ]]; then
+        if available zzz; then
+            command=(zzz)
+        elif available pm-suspend; then
+            command=(pm-suspend)
+        else
+            error="No suspend tool found; configure suspend in $config"
+            return
+        fi
+    else
+        command=("$name")
+    fi
+
+    if ! available "${command[0]}"; then
+        error="Command ${command[0]} is unavailable; configure $name in $config"
+        command=()
+    fi
+}
+
+if [[ "$action" == --resolve ]]; then
+    result='{}'
+    for name in suspend reboot poweroff; do
+        resolve "$name"
+        # Stop jq option parsing so command flags remain literal arguments.
+        argv=$(jq -cn --args '$ARGS.positional' -- "${command[@]}") || fail 'Cannot encode power command'
+        result=$(jq -cn --argjson result "$result" --arg name "$name" \
+            --argjson command "$argv" --arg error "$error" \
+            '$result + {($name): {command: $command, error: $error}}') || fail 'Cannot encode power actions'
+    done
+    printf '%s\n' "$result"
+else
+    resolve "$action"
+    [[ ${#command[@]} -gt 0 ]] || fail "$error"
+    "${command[@]}"
+    status=$?
+    if [[ $status != 0 ]]; then
+        printf 'mori-power: %s failed (exit %s). Check permissions or configure a wrapper in %s.\n' \
+            "$action" "$status" "$config" >&2
+    fi
+    exit "$status"
+fi

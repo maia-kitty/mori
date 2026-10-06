@@ -6,6 +6,7 @@ import "./theme"
 
 PanelWindow {
     id: barWindow
+    required property var niriEvents
     required property var notificationServer
     required property bool overviewOpen
     required property var settings
@@ -320,6 +321,7 @@ PanelWindow {
             readonly property alias module: workspaces
             Workspaces {
                 id: workspaces
+                niriEvents: barWindow.niriEvents
                 panelWindow: barWindow
                 accent: barWindow.settings.moduleColor("workspaces")
             }

@@ -6,6 +6,7 @@ import "./theme"
 Item {
     id: root
 
+    required property var niriEvents
     required property var panelWindow
     property color accent: Theme.fg
     property var workspaces: []
@@ -86,36 +87,15 @@ Item {
         onExited: exitCode => root.refresh()
     }
 
-    Process {
-        id: niriEvents
-        command: ["niri", "msg", "--json", "event-stream"]
-        running: true
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: line => {
-                try {
-                    const event = JSON.parse(line)
-                    if (event.WorkspacesChanged || event.WorkspaceActivated
-                            || event.WorkspaceUrgencyChanged)
-                        workspaceRefresh.restart()
-                } catch (error) {
-                    console.warn("Could not read Niri workspace event:", error)
-                }
-            }
-        }
-        onExited: eventStreamRetry.restart()
+    Connections {
+        target: root.niriEvents
+        function onWorkspacesChanged() { workspaceRefresh.restart() }
     }
 
     Timer {
         id: workspaceRefresh
         interval: 40
         onTriggered: root.refresh()
-    }
-
-    Timer {
-        id: eventStreamRetry
-        interval: 3000
-        onTriggered: niriEvents.running = true
     }
 
     Row {

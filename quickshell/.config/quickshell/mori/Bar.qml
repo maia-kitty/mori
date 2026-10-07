@@ -10,6 +10,7 @@ PanelWindow {
     required property var notificationServer
     required property bool overviewOpen
     required property var settings
+    required property var updateService
     readonly property bool fullscreen: {
         const active = ToplevelManager.activeToplevel
         if (!active || !active.fullscreen || !barWindow.screen)
@@ -56,6 +57,7 @@ PanelWindow {
         case "media": return mediaComponent
         case "kdeConnect": return kdeConnectComponent
         case "systemTray": return systemTrayComponent
+        case "updates": return updatesComponent
         case "network": return networkComponent
         case "volume": return volumeComponent
         case "brightness": return brightnessComponent
@@ -205,6 +207,24 @@ PanelWindow {
             BarBracket { text: "["; color: barWindow.settings.moduleColor("systemTray") }
             SystemTray { id: systemTray; panelWindow: barWindow; anchors.verticalCenter: parent.verticalCenter }
             BarBracket { text: "]"; color: barWindow.settings.moduleColor("systemTray") }
+        }
+    }
+
+    Component {
+        id: updatesComponent
+        Row {
+            height: Theme.barContentHeight
+            readonly property alias module: updates
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: updates.statusColor; action: () => updates.toggle() }
+            Updates {
+                id: updates
+                panelWindow: barWindow
+                popupCoordinator: barWindow
+                updateService: barWindow.updateService
+                accent: barWindow.settings.moduleColor("updates")
+            }
+            BarBracket { text: "]"; color: updates.statusColor; action: () => updates.toggle() }
         }
     }
 

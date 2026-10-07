@@ -214,11 +214,9 @@ RowLayout {
                         anchors.margins: 12
                         spacing: 10
 
-                        Text {
+                        WidgetHeader {
                             text: "Output Devices"
                             color: root.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.headingFontSize
                         }
 
                         Repeater {
@@ -251,8 +249,10 @@ RowLayout {
                                                     + (modelData.description || modelData.nickname || modelData.name) : ""
                                                 leftPadding: 6
                                                 rightPadding: 6
-                                                topPadding: 4
-                                                bottomPadding: 4
+                                                Layout.preferredHeight: Theme.controlHeight
+                                                verticalAlignment: Text.AlignVCenter
+                                                topPadding: 0
+                                                bottomPadding: 0
                                                 Rectangle {
                                                     anchors.fill: parent
                                                     z: -1
@@ -333,11 +333,9 @@ RowLayout {
                             }
                         }
 
-                        Text {
+                        WidgetHeader {
                             text: "Applications"
                             color: root.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.headingFontSize
                             topPadding: 4
                         }
 
@@ -370,7 +368,21 @@ RowLayout {
                                                     + (modelData.properties["application.name"]
                                                       || modelData.description
                                                       || modelData.name) : ""
-                                                color: modelData === root.keyboardNode ? root.accent : Theme.fg
+                                                color: Theme.fg
+                                                leftPadding: 6
+                                                rightPadding: 6
+                                                Layout.preferredHeight: Theme.controlHeight
+                                                verticalAlignment: Text.AlignVCenter
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    z: -1
+                                                    color: Theme.controlBackground(false,
+                                                        modelData === root.keyboardNode, appHover.hovered)
+                                                    border.width: 1
+                                                    border.color: Theme.controlBorder(false,
+                                                        modelData === root.keyboardNode, appHover.hovered, root.accent)
+                                                }
+                                                HoverHandler { id: appHover }
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                                 elide: Text.ElideRight

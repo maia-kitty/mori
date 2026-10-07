@@ -200,13 +200,11 @@ Item {
                     height: titleLabel.implicitHeight + artistLabel.implicitHeight + 8
                         + (albumLabel.visible ? albumLabel.implicitHeight + 8 : 0)
 
-                    Text {
+                    WidgetHeader {
                         id: titleLabel
                         width: parent.width
                         text: root.hasPlayer ? root.trackTitle : "No media player"
                         color: root.hasPlayer ? root.accent : Theme.grey
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize
                         elide: Text.ElideRight
                     }
                     Text {
@@ -316,7 +314,7 @@ Item {
                             height: Theme.controlHeight
                             color: Theme.controlBackground(false, false, available && playbackHover.hovered)
                             border.width: 1
-                            border.color: available ? root.accent : Theme.bg4
+                            border.color: Theme.controlBorder(false, false, available && playbackHover.hovered, root.accent)
                             Text {
                                 anchors.centerIn: parent
                                 text: String.fromCodePoint(modelData.icon)

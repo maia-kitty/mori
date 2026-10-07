@@ -209,11 +209,9 @@ RowLayout {
 
                 Row {
                     width: parent.width
-                    Text {
+                    WidgetHeader {
                         text: "Brightness"
                         color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize
                     }
                     Text {
                         width: parent.width - x

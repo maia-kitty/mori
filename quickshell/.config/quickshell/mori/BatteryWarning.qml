@@ -76,12 +76,9 @@ Item {
                 anchors.margins: 12
                 spacing: 4
 
-                Text {
+                WidgetHeader {
                     text: root.warningLevel === 2 ? "Battery critically low" : "Battery low"
                     color: root.warningLevel === 2 ? Theme.red : Theme.yellow
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.headingFontSize
-                    font.weight: Font.DemiBold
                 }
 
                 Text {

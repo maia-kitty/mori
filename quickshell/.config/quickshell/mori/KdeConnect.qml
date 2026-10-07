@@ -210,14 +210,12 @@ Item {
                 anchors.right: parent.right
                 spacing: 12
 
-                Text {
+                WidgetHeader {
                     width: parent.width
                     text: root.device ? root.device.name : "KDE Connect"
                     textFormat: Text.PlainText
                     elide: Text.ElideRight
                     color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.headingFontSize
                 }
                 Text {
                     width: parent.width
@@ -238,7 +236,7 @@ Item {
                     readonly property bool canSend: root.connected && clipboardPlugin.available && !clipboardSend.running
                     color: Theme.controlBackground(false, false, canSend && sendMouse.containsMouse)
                     border.width: 1
-                    border.color: canSend ? root.accent : Theme.bg4
+                    border.color: Theme.controlBorder(false, false, canSend && sendMouse.containsMouse, root.accent)
                     Text {
                         anchors.centerIn: parent
                         text: clipboardSend.running ? "Sending…" : "Send clipboard  S"

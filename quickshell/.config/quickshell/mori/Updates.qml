@@ -105,12 +105,9 @@ Row {
                     anchors.margins: 12
                     spacing: 10
 
-                    Text {
-                        text: "Mori updates"
+                    WidgetHeader {
+                        text: "Updates"
                         color: root.statusColor
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.headingFontSize
-                        font.weight: Font.DemiBold
                     }
                     Text {
                         width: parent.width
@@ -191,7 +188,6 @@ Row {
                                     color: sourceRow.modelData.status === "error" ? Theme.red : root.accent
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
-                                    font.weight: Font.DemiBold
                                 }
                             }
                         }
@@ -224,7 +220,7 @@ Row {
                                 height: Theme.controlHeight
                                 color: Theme.controlBackground(false, false, actionHover.hovered && available)
                                 border.width: 1
-                                border.color: available ? root.accent : Theme.bg4
+                                border.color: Theme.controlBorder(false, false, available && actionHover.hovered, root.accent)
                                 Text {
                                     anchors.centerIn: parent
                                     text: actionButton.modelData.label

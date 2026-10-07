@@ -212,6 +212,11 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
+                WidgetHeader {
+                    text: "Power"
+                    color: root.accent
+                }
+
                 Repeater {
                     id: powerActions
                     model: [
@@ -236,8 +241,8 @@ Item {
                             color: Theme.controlBackground(false, index === root.selectedActionIndex,
                                 buttonArea.containsMouse && available)
                             border.width: 1
-                            border.color: available && (buttonArea.containsMouse || index === root.selectedActionIndex)
-                                ? root.accent : Theme.bg4
+                            border.color: Theme.controlBorder(false, available && index === root.selectedActionIndex,
+                                available && buttonArea.containsMouse, root.accent)
                         }
                         Rectangle {
                             anchors.left: parent.left
@@ -254,8 +259,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: (index === root.selectedActionIndex ? "› " : "  ")
                                 + modelData.label
-                            color: index === root.selectedActionIndex
-                                || modelData.label === "Power off" ? root.accent : Theme.fg
+                            color: modelData.label === "Power off" ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }

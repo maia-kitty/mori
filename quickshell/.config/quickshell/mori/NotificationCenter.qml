@@ -233,12 +233,10 @@ Item {
                             height: implicitHeight
                             implicitHeight: Math.max(headerTitle.implicitHeight, headerActions.implicitHeight)
 
-                            Text {
+                            WidgetHeader {
                                 id: headerTitle
                                 text: "Notifications"
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize
                             }
 
                             Row {

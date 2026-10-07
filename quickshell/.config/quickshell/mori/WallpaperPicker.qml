@@ -260,11 +260,9 @@ Item {
                 anchors.margins: 12
                 spacing: 8
 
-                Text {
+                WidgetHeader {
                     text: "Wallpapers"
                     color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.headingFontSize
                 }
 
                 Row {
@@ -292,7 +290,7 @@ Item {
                             readonly property bool available: files.folder.toString() !== root.wallpaperFolder.toString()
                             color: Theme.controlBackground(false, false, available && upHover.hovered)
                             border.width: 1
-                            border.color: available ? root.accent : Theme.bg4
+                            border.color: Theme.controlBorder(false, false, available && upHover.hovered, root.accent)
                             Text {
                                 id: upText
                                 anchors.centerIn: parent
@@ -312,7 +310,7 @@ Item {
                             height: Theme.controlHeight
                             color: Theme.controlBackground(false, false, folderHover.hovered)
                             border.width: 1
-                            border.color: root.accent
+                            border.color: Theme.controlBorder(false, false, folderHover.hovered, root.accent)
                             Text {
                                 id: folderText
                                 anchors.centerIn: parent
@@ -379,9 +377,8 @@ Item {
                         color: Theme.controlBackground(false,
                             root.keyboardMode === "files" && root.keyboardIndex === tile.index, hover.hovered)
                         border.width: 1
-                        border.color: hover.hovered || root.keyboardMode === "files" && root.keyboardIndex === tile.index
-                            || root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl)
-                            ? root.accent : Theme.bg4
+                        border.color: Theme.controlBorder(root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl),
+                            root.keyboardMode === "files" && root.keyboardIndex === tile.index, hover.hovered, root.accent)
 
                         Image {
                             id: preview
@@ -406,9 +403,7 @@ Item {
                             anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 5 }
                             text: (root.keyboardMode === "files" && root.keyboardIndex === tile.index ? "› " : "  ") + tile.fileName
                             elide: Text.ElideRight
-                            color: root.keyboardMode === "files"
-                                && root.keyboardIndex === tile.index
-                                ? root.accent : Theme.fg
+                            color: Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }

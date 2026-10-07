@@ -124,6 +124,31 @@ Replace those examples with your installed commands or executable wrapper paths.
 
 Run `mori-power --resolve` to inspect the selected commands without executing a power action. Starting the shell directly with `qs --no-duplicate -c mori` also works without systemd; init-specific session startup is separate from the power menu.
 
+### Portable updates
+
+`mori-update` is an interactive terminal helper in the `bin` package, requiring Python 3.9+. Run `stow -R -t ~ bin` after pulling to install it, then:
+
+```bash
+mori-update                    # Check each source, ask before upgrading it
+mori-update --check            # Check only; no package installations
+mori-update --check --refresh  # Also refresh cached metadata/channels
+mori-update --backend none     # Only AUR-independent sources: Flatpak and Nix
+```
+
+It selects the system manager from `/etc/os-release`: pacman for Arch/CachyOS, APT for Debian/Ubuntu, DNF for Fedora/RHEL, Zypper for openSUSE, XBPS for Void, and APK for Alpine. Arch checks require `checkupdates` from `pacman-contrib`; they use a temporary database to avoid a partial system upgrade. Tumbleweed/Slowroll use `zypper dup`. Void may need a second run when XBPS updates itself. Immutable and declaratively managed operating systems need their own system update workflows; NixOS system rebuilds are not included. Use `--backend none` on those systems or choose a supported backend explicitly.
+
+It also checks AUR packages with `paru` or `yay` on Arch, Flatpak when installed, and Nix user packages. Nix profiles with `manifest.json` use `nix profile upgrade --all --dry-run --refresh` (Nix 2.22+); legacy profiles with `manifest.nix` use `nix-env --upgrade --dry-run`. The default profile is `~/.nix-profile`, falling back to `$XDG_STATE_HOME/nix/profiles/profile` (normally `~/.local/state/nix/profiles/profile`). Choose another with `--nix-profile /path/to/profile`. Modern Nix only upgrades packages installed from unlocked flake references; pinned packages stay pinned. Legacy Nix checks use the current user's channels; `--refresh` updates those channels first. Home Manager, project flake locks, root profiles, and the Nix daemon are managed separately. See the [Nix profile upgrade manual](https://nix.dev/manual/nix/2.35/command-ref/new-cli/nix3-profile-upgrade.html).
+
+APT, Zypper, APK, and legacy Nix checks use cached metadata unless `--refresh` is supplied. Other checks can contact repositories and populate caches, but do not install packages. Refreshing system metadata may require a password. Run the helper as your normal user: only system refresh/upgrade commands use `sudo` or `doas`; Nix and AUR commands run as you. Package managers retain their own transaction prompts. Failed checks skip that source, continue checking the others, and return a nonzero exit status; check timeouts default to 180 seconds and can be changed with `--timeout`. Use `--no-nix`, `--no-aur`, or `--no-flatpak` to skip sources.
+
+The terminal interface uses Everforest colors, clear sections, package/version columns, and compact Nix flake summaries. `--verbose` shows the underlying commands and full check output. Color is disabled when output is piped, `NO_COLOR` is set, or `TERM=dumb`.
+
+After an interactive system update session, Mori checks for reboot markers and a running kernel that has been removed or replaced on disk. It also uses an installed `needrestart` (batch/list mode), `checkservices` (with reloads, config processing, and restarts disabled), or standalone `needs-restarting` to find services that need restarting. Scans may request your sudo/doas password. Choose numbered services or `all` to restart them, or press Enter to skip; systemd service definitions are reloaded before selected services restart. Display managers and core session services are excluded and flagged for logout/reboot. On other init systems, `needrestart` results can use OpenRC, runit, or SysV restart commands when available. A recommended reboot always gets a separate confirmation prompt. If no detector is installed or scanning fails, the helper reports that limitation.
+
+Run `mori-update --maintenance` to do these checks without checking packages, or `mori-update --maintenance --check` to report findings without restarting services or rebooting. Ordinary `--check` only checks reboot markers/kernel files; it does not run privileged service scans. Use `--no-maintenance` to skip all reboot/service checks. The reboot hints are best effort; retained kernel files, containers, or an unavailable detector can limit detection. See [needrestart's batch mode documentation](https://github.com/liske/needrestart/blob/master/README.batch.md) for the service and kernel findings it reports.
+
+This helper does not enable a tray app or scheduled checks or remove packages/caches.
+
 ### Zen Browser
 
 Launch Zen once to create a profile. Find its root directory in `about:profiles`, close Zen, and link the theme into that profile:

@@ -1559,8 +1559,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: (root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
                         + root.moduleLabel(moduleRow.moduleKey)
-                    color: root.keyboardModule === moduleRow.moduleKey
-                        || moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
+                    color: moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     TapHandler {
@@ -1923,8 +1922,7 @@ Item {
                                             SettingsLabel {
                                                 text: (categoryRow.index === root.keyboardCategoryIndex
                                                     ? "› " : "  ") + categoryRow.modelData.label
-                                                color: categoryRow.index === root.keyboardCategoryIndex
-                                                    ? Theme.fg : Theme.grey1
+                                                color: Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                             }
@@ -2111,8 +2109,7 @@ Item {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: (colorRow.index === root.keyboardColorRow ? "› " : "  ")
                                                 + root.moduleLabel(colorRow.moduleKey)
-                                            color: colorRow.index === root.keyboardColorRow
-                                                ? Theme.fg : Theme.grey1
+                                            color: Theme.grey1
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
                                         }
@@ -2137,9 +2134,9 @@ Item {
                                                     color: modelData.color
                                                     border.width: root.keyboardColorRow === colorRow.index
                                                         && root.keyboardColorIndex === index ? 3 : 1
-                                                    border.color: selected || root.keyboardColorRow === colorRow.index
-                                                        && root.keyboardColorIndex === index
-                                                        ? Theme.fg : Theme.bg4
+                                                    border.color: root.controlBorder(selected, root.keyboardColorRow === colorRow.index
+                                                        && root.keyboardColorIndex === index, swatchHover.hovered)
+                                                    HoverHandler { id: swatchHover }
                                                     TapHandler {
                                                         onTapped: {
                                                             root.keyboardColorRow = colorRow.index
@@ -2189,8 +2186,7 @@ Item {
                                     SettingsLabel {
                                         text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
                                             + clockRow.modelData.label
-                                        color: clockRow.index === root.keyboardClockIndex
-                                            ? Theme.fg : Theme.grey1
+                                        color: Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -2218,7 +2214,7 @@ Item {
                                                     spacing: 6
                                                     SettingsLabel {
                                                         text: clockRow.modelData.labels[clockChoice.index]
-                                                        color: clockChoice.selected || clockChoice.focused ? Theme.fg : Theme.grey1
+                                                        color: clockChoice.selected ? Theme.fg : Theme.grey1
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: Theme.fontSize
                                                     }
@@ -2293,7 +2289,7 @@ Item {
                                             spacing: 6
                                             SettingsLabel {
                                                 text: (updateChoice.focused ? "› " : "  ") + updateChoice.modelData.label
-                                                color: updateChoice.selected || updateChoice.focused ? Theme.fg : Theme.grey1
+                                                color: updateChoice.selected ? Theme.fg : Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -2362,7 +2358,7 @@ Item {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: (powerRow.index === root.keyboardPowerIndex ? "› " : "  ")
                                                 + powerRow.modelData.label
-                                            color: powerRow.index === root.keyboardPowerIndex ? Theme.fg : Theme.grey1
+                                            color: Theme.grey1
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
                                         }
@@ -2387,7 +2383,7 @@ Item {
                                     TextField {
                                         id: commandField
                                         width: parent.width
-                                        height: 32
+                                        height: Theme.controlHeight
                                         text: root.powerDrafts[powerRow.modelData.key] || ""
                                         placeholderText: "Automatic"
                                         color: Theme.fg
@@ -2503,8 +2499,7 @@ Item {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: (inputRow.index === root.keyboardInputIndex ? "› " : "  ")
                                             + inputRow.option.label
-                                        color: inputRow.index === root.keyboardInputIndex
-                                            ? Theme.fg : Theme.grey1
+                                        color: Theme.grey1
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
@@ -2928,8 +2923,7 @@ Item {
                                                 text: root.keyboardDisplaySection === "editor"
                                                     && root.keyboardDisplayField === 1
                                                     ? "› Resolution" : "  Resolution"
-                                                color: root.keyboardDisplaySection === "editor"
-                                                    && root.keyboardDisplayField === 1 ? Theme.fg : Theme.grey1
+                                                color: Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -2967,8 +2961,7 @@ Item {
                                                 text: root.keyboardDisplaySection === "editor"
                                                     && root.keyboardDisplayField === 2
                                                     ? "› Refresh" : "  Refresh"
-                                                color: root.keyboardDisplaySection === "editor"
-                                                    && root.keyboardDisplayField === 2 ? Theme.fg : Theme.grey1
+                                                color: Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -3006,8 +2999,7 @@ Item {
                                                 text: root.keyboardDisplaySection === "editor"
                                                     && root.keyboardDisplayField === 3
                                                     ? "› Scale" : "  Scale"
-                                                color: root.keyboardDisplaySection === "editor"
-                                                    && root.keyboardDisplayField === 3 ? Theme.fg : Theme.grey1
+                                                color: Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -3043,8 +3035,7 @@ Item {
                                                 text: root.keyboardDisplaySection === "editor"
                                                     && root.keyboardDisplayField === 4
                                                     ? "› Transform" : "  Transform"
-                                                color: root.keyboardDisplaySection === "editor"
-                                                    && root.keyboardDisplayField === 4 ? Theme.fg : Theme.grey1
+                                                color: Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -3131,13 +3122,12 @@ Item {
                             height: Theme.controlHeight
                             color: Theme.controlBackground(false, root.keyboardConfirmationIndex === 0, keepHover.hovered)
                             border.width: 1
-                            border.color: Theme.fg
+                            border.color: root.controlBorder(false, root.keyboardConfirmationIndex === 0, keepHover.hovered)
                             SettingsLabel {
                                 id: keepLabel
                                 anchors.centerIn: parent
                                 text: (root.keyboardConfirmationIndex === 0 ? "› " : "  ") + "Keep"
-                                color: root.keyboardConfirmationIndex === 0
-                                    ? Theme.fg : Theme.grey1
+                                color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
@@ -3150,13 +3140,12 @@ Item {
                             height: Theme.controlHeight
                             color: Theme.controlBackground(false, root.keyboardConfirmationIndex === 1, revertHover.hovered)
                             border.width: 1
-                            border.color: Theme.fg
+                            border.color: root.controlBorder(false, root.keyboardConfirmationIndex === 1, revertHover.hovered)
                             SettingsLabel {
                                 id: revertLabel
                                 anchors.centerIn: parent
                                 text: (root.keyboardConfirmationIndex === 1 ? "› " : "  ") + "Revert"
-                                color: root.keyboardConfirmationIndex === 1
-                                    ? Theme.fg : Theme.grey1
+                                color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }

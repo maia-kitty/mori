@@ -356,12 +356,10 @@ Item {
                                 TapHandler { onTapped: root.changeMonth(-1) }
                             }
 
-                            Text {
+                            WidgetHeader {
                                 anchors.centerIn: parent
                                 text: Qt.formatDate(root.shownMonth, "MMMM yyyy")
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize
                                 TapHandler { onTapped: root.goToToday() }
                             }
 
@@ -420,10 +418,10 @@ Item {
                                     readonly property bool inMonth: value.getMonth() === root.shownMonth.getMonth()
 
                                     width: (parent.width - 12) / 7
-                                    height: 28
+                                    height: Theme.controlHeight
                                     color: Theme.controlBackground(selected, keyboardFocused, dayHover.hovered)
                                     border.width: 1
-                                    border.color: selected || keyboardFocused || current ? root.accent : Theme.bg4
+                                    border.color: Theme.controlBorder(selected || current, keyboardFocused, dayHover.hovered, root.accent)
                                     HoverHandler { id: dayHover }
 
                                     Text {

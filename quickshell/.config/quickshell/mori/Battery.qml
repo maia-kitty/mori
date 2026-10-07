@@ -213,12 +213,9 @@ Row {
                 anchors.margins: 12
                 spacing: 7
 
-                Text {
+                WidgetHeader {
                     text: root.profilesAvailable ? "Power profile" : "Power profile unavailable"
                     color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.headingFontSize
-                    font.weight: Font.DemiBold
                 }
 
                 Text {

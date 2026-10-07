@@ -40,7 +40,8 @@ Singleton {
     }
 
     function controlBorder(selected, focused, hovered, accent) {
-        return selected || focused || hovered ? (accent === undefined ? fg : accent) : bg4
+        if (selected) return accent === undefined ? fg : accent
+        return focused || hovered ? bg5 : bg4
     }
 
     // Text uses Old Standard TT; icon-only labels use Symbols Nerd Font.

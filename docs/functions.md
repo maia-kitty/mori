@@ -51,6 +51,8 @@ Module, appearance, clock, and update interval settings save immediately. Input,
 | KDE Connect | Paired phone status and clipboard sending; shows “Unavailable” when its QML module is missing |
 | Updates | Per-source update counts, errors, last check time, and reboot hints |
 
+In the network popup, use **Up/Down** to select Ethernet, an active VPN, or Wi-Fi; **Enter** connects and **D** disconnects the selected connection.
+
 ## Power menu
 
 The power menu uses the `mori-power` helper from the `bin` package; keep `~/.local/bin` on your graphical session's PATH. It selects `systemctl` on a running systemd system, or elogind's `loginctl` when its power commands and login manager are available. On other setups it uses the installed `reboot` and `poweroff` commands, and `zzz` or `pm-suspend` for suspend. This supports runit, OpenRC, dinit, and SysV setups through their available power tools. Missing actions are dimmed and disabled, and command failures appear in the popup.

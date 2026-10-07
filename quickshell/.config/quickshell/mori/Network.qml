@@ -9,6 +9,8 @@ import "./theme"
 RowLayout {
     id: root
     readonly property var listCol: popupContent.item ? popupContent.item.listColRef : null
+    readonly property var wiredRepeater: popupContent.item ? popupContent.item.wiredRepeaterRef : null
+    readonly property var vpnRepeater: popupContent.item ? popupContent.item.vpnRepeaterRef : null
     readonly property var networkRepeater: popupContent.item ? popupContent.item.networkRepeaterRef : null
     spacing: 4
     property color accent: Theme.blue
@@ -70,16 +72,81 @@ RowLayout {
     function close() { popup.visible = false }
 
     function networkCount() { return useWpaFallback ? wpaNetworks.count : wifiNetworks.count }
+    function selectionCount() { return wiredDevices.count + vpnConnections.length + networkCount() }
     function moveNetworkSelection(offset) {
-        keyboardNetworkIndex = Math.max(0, Math.min(networkCount() - 1,
+        keyboardNetworkIndex = Math.max(0, Math.min(selectionCount() - 1,
             keyboardNetworkIndex + offset))
-        const item = networkRepeater ? networkRepeater.itemAt(keyboardNetworkIndex) : null
-        if (item) {
+        let index = keyboardNetworkIndex
+        let repeater = wiredRepeater
+        if (index >= wiredDevices.count) {
+            index -= wiredDevices.count
+            repeater = vpnRepeater
+            if (index >= vpnConnections.length) {
+                index -= vpnConnections.length
+                repeater = networkRepeater
+            }
+        }
+        const item = repeater ? repeater.itemAt(index) : null
+        if (item && listCol) {
             const y = item.mapToItem(listCol.contentItem, 0, 0).y
             if (y < listCol.contentY)
                 listCol.contentY = y
             else if (y + item.height > listCol.contentY + listCol.height)
                 listCol.contentY = y + item.height - listCol.height
+        }
+    }
+
+    function findWiredDevice(name) {
+        return Networking.devices.values.find(device => device.type === DeviceType.Wired
+            && device.name === name)
+    }
+
+    function connectWiredDevice(name) {
+        const device = findWiredDevice(name)
+        if (device && !device.connected && device.network)
+            device.network.connect()
+    }
+
+    function disconnectWiredDevice(name) {
+        const device = findWiredDevice(name)
+        if (device && device.connected)
+            device.disconnect()
+    }
+
+    function disconnectNetwork(name) {
+        if (useWpaFallback) {
+            if (fallbackWifiConnected && fallbackWifiName === name)
+                runWpaAction(["disconnect"])
+            return
+        }
+        const network = findNetwork(name)
+        if (network && network.connected)
+            network.disconnect()
+    }
+
+    function actOnSelection(disconnect) {
+        if (selectionCount() === 0) return
+        keyboardNetworkIndex = Math.max(0, Math.min(keyboardNetworkIndex, selectionCount() - 1))
+        let index = keyboardNetworkIndex
+        if (index < wiredDevices.count) {
+            const entry = wiredDevices.get(index)
+            if (disconnect) disconnectWiredDevice(entry.deviceName)
+            else connectWiredDevice(entry.deviceName)
+            return
+        }
+        index -= wiredDevices.count
+        if (index < vpnConnections.length) {
+            // The VPN section lists active connections only.
+            if (disconnect) disconnectVpn(vpnConnections[index].uuid)
+            return
+        }
+        index -= vpnConnections.length
+        const entry = (useWpaFallback ? wpaNetworks : wifiNetworks).get(index)
+        if (disconnect) {
+            if (entry.isConnected) disconnectNetwork(entry.networkName)
+        } else {
+            activateNetwork(entry.networkName, entry.securityType, entry.isKnown,
+                entry.isConnected, entry.networkId)
         }
     }
     function activateNetwork(name, securityType, isKnown, isConnected, networkId) {
@@ -101,16 +168,13 @@ RowLayout {
     }
     function handleKeyPressed(event) {
         if (event.key === Qt.Key_Escape) close()
+        else if (event.modifiers !== Qt.NoModifier) return
         else if (event.key === Qt.Key_Up) moveNetworkSelection(-1)
         else if (event.key === Qt.Key_Down) moveNetworkSelection(1)
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (networkCount() > 0) {
-                const index = Math.min(keyboardNetworkIndex, networkCount() - 1)
-                keyboardNetworkIndex = index
-                const entry = (useWpaFallback ? wpaNetworks : wifiNetworks).get(index)
-                activateNetwork(entry.networkName, entry.securityType, entry.isKnown,
-                    entry.isConnected, entry.networkId)
-            }
+            if (!event.isAutoRepeat) actOnSelection(false)
+        } else if (event.key === Qt.Key_D) {
+            if (!event.isAutoRepeat) actOnSelection(true)
         } else return
         event.accepted = true
     }
@@ -727,6 +791,8 @@ RowLayout {
             sourceComponent: Component {
                 PopupSurface {
                     readonly property alias listColRef: listCol
+                    readonly property alias wiredRepeaterRef: wiredRepeater
+                    readonly property alias vpnRepeaterRef: vpnRepeater
                     readonly property alias networkRepeaterRef: networkRepeater
                     implicitHeight: listCol.implicitHeight + 24
                     anchors.fill: parent
@@ -749,42 +815,78 @@ RowLayout {
                             spacing: 4
                             visible: wiredDevices.count > 0
 
-                            Text {
+                            WidgetHeader {
                                 text: "Ethernet"
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize
                             }
 
                             Repeater {
+                                id: wiredRepeater
                                 model: wiredDevices
-                                delegate: Column {
+                                delegate: Rectangle {
+                                    id: wiredRow
                                     required property int index
                                     required property string deviceName
                                     required property string displayName
                                     required property bool isConnected
+                                    readonly property bool selected: root.keyboardNetworkIndex === index
                                     width: parent.width
-                                    spacing: 1
+                                    implicitHeight: Theme.controlHeight
+                                    color: Theme.controlBackground(isConnected, selected, rowHover.hovered)
+                                    border.width: 1
+                                    border.color: Theme.controlBorder(isConnected, selected, rowHover.hovered, root.accent)
+                                    HoverHandler { id: rowHover }
 
-                                    Text {
-                                        text: displayName
-                                        color: isConnected ? root.accent : Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
+                                    RowLayout {
+                                        id: rowContents
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        spacing: 6
 
-                                    Text {
-                                        text: isConnected ? "Connected" : "Disconnected"
-                                        color: Theme.grey
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize - 2
-                                    }
+                                        Column {
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            spacing: 1
+                                            Text {
+                                                width: parent.width
+                                                text: (wiredRow.selected ? "› " : "  ") + displayName
+                                                color: isConnected ? root.accent : Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
+                                            }
 
-                                    Rectangle {
-                                        width: parent.width
-                                        height: 1
-                                        visible: index < wiredDevices.count - 1
-                                        color: Theme.bg4
+                                            TapHandler {
+                                                onTapped: {
+                                                    root.keyboardNetworkIndex = index
+                                                    root.connectWiredDevice(deviceName)
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: isConnected
+                                            implicitWidth: disconnectLabel.implicitWidth + 10
+                                            implicitHeight: Theme.controlHeight - 8
+                                            color: Theme.bgred
+                                            border.width: 1
+                                            border.color: Theme.red
+
+                                            Text {
+                                                id: disconnectLabel
+                                                anchors.centerIn: parent
+                                                text: "Disconnect"
+                                                color: Theme.red
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize - 2
+                                            }
+                                            TapHandler {
+                                                onTapped: {
+                                                    root.keyboardNetworkIndex = index
+                                                    root.disconnectWiredDevice(deviceName)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -801,11 +903,9 @@ RowLayout {
                             width: parent.width
                             spacing: 4
 
-                            Text {
+                            WidgetHeader {
                                 text: "VPN"
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize
                             }
 
                             Text {
@@ -817,41 +917,70 @@ RowLayout {
                             }
 
                             Repeater {
+                                id: vpnRepeater
                                 model: root.vpnConnections
-                                delegate: RowLayout {
+                                delegate: Rectangle {
                                     id: vpnRow
+                                    required property int index
                                     required property var modelData
+                                    readonly property bool selected: root.keyboardNetworkIndex === wiredDevices.count + index
                                     width: parent.width
-                                    spacing: 6
+                                    implicitHeight: Theme.controlHeight
+                                    color: Theme.controlBackground(true, selected, rowHover.hovered)
+                                    border.width: 1
+                                    border.color: Theme.controlBorder(true, selected, rowHover.hovered, root.accent)
+                                    HoverHandler { id: rowHover }
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: vpnRow.modelData.name
-                                        color: root.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        elide: Text.ElideRight
-                                    }
+                                    RowLayout {
+                                        id: rowContents
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        spacing: 6
 
-                                    Rectangle {
-                                        implicitWidth: vpnDisconnectLabel.implicitWidth + 10
-                                        implicitHeight: vpnDisconnectLabel.implicitHeight + 4
-                                        color: Theme.bgred
-                                        border.width: 1
-                                        border.color: Theme.red
+                                        Column {
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            spacing: 1
+                                            Text {
+                                                width: parent.width
+                                                text: (vpnRow.selected ? "› " : "  ") + vpnRow.modelData.name
+                                                color: root.accent
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
+                                            }
 
-                                        Text {
-                                            id: vpnDisconnectLabel
-                                            anchors.centerIn: parent
-                                            text: root.disconnectingVpnUuid === vpnRow.modelData.uuid
-                                                ? "Disconnecting…" : "Disconnect"
-                                            color: Theme.red
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize - 2
+                                            TapHandler {
+                                                onTapped: {
+                                                    root.keyboardNetworkIndex = wiredDevices.count + index
+                                                    // Already connected.
+                                                }
+                                            }
                                         }
 
-                                        TapHandler {
-                                            onTapped: root.disconnectVpn(vpnRow.modelData.uuid)
+                                        Rectangle {
+                                            visible: true
+                                            implicitWidth: disconnectLabel.implicitWidth + 10
+                                            implicitHeight: Theme.controlHeight - 8
+                                            color: Theme.bgred
+                                            border.width: 1
+                                            border.color: Theme.red
+
+                                            Text {
+                                                id: disconnectLabel
+                                                anchors.centerIn: parent
+                                                text: root.disconnectingVpnUuid === vpnRow.modelData.uuid
+                                                    ? "Disconnecting…" : "Disconnect"
+                                                color: Theme.red
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize - 2
+                                            }
+                                            TapHandler {
+                                                onTapped: {
+                                                    root.keyboardNetworkIndex = wiredDevices.count + index
+                                                    root.disconnectVpn(vpnRow.modelData.uuid)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -870,11 +999,9 @@ RowLayout {
                             width: parent.width
                             spacing: 4
 
-                            Text {
+                            WidgetHeader {
                                 text: "Wi-Fi"
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize
                             }
 
                             Text {
@@ -908,7 +1035,8 @@ RowLayout {
                             Repeater {
                                 id: networkRepeater
                                 model: root.useWpaFallback ? wpaNetworks : wifiNetworks
-                                delegate: Column {
+                                delegate: Rectangle {
+                                    id: wifiRow
                                     required property int index
                                     required property string networkName
                                     required property real strength
@@ -916,40 +1044,37 @@ RowLayout {
                                     required property bool isKnown
                                     required property bool isConnected
                                     required property int networkId
+                                    readonly property bool selected: root.keyboardNetworkIndex === wiredDevices.count + root.vpnConnections.length + index
                                     width: parent.width
+                                    implicitHeight: Theme.controlHeight
+                                    color: Theme.controlBackground(isConnected, selected, rowHover.hovered)
+                                    border.width: 1
+                                    border.color: Theme.controlBorder(isConnected, selected, rowHover.hovered, root.accent)
+                                    HoverHandler { id: rowHover }
 
                                     RowLayout {
-                                        width: parent.width
+                                        id: rowContents
+                                        anchors.fill: parent
+                                        anchors.margins: 4
                                         spacing: 6
 
-                                        Text {
+                                        Column {
                                             Layout.fillWidth: true
-                                            text: (root.keyboardNetworkIndex === index ? "› " : "  ")
-                                                + networkName + "   " + Math.round(strength * 100) + "%"
-                                            leftPadding: 8
-                                            rightPadding: 8
-                                            topPadding: 6
-                                            bottomPadding: 6
-                                            elide: Text.ElideRight
-                                            Rectangle {
-                                                anchors.fill: parent
-                                                z: -1
-                                                color: Theme.controlBackground(isConnected,
-                                                    root.keyboardNetworkIndex === index, networkHover.hovered)
-                                                border.width: 1
-                                                border.color: Theme.controlBorder(isConnected,
-                                                    root.keyboardNetworkIndex === index, networkHover.hovered, root.accent)
+                                            Layout.minimumWidth: 0
+                                            spacing: 1
+                                            Text {
+                                                width: parent.width
+                                                text: (wifiRow.selected ? "› " : "  ") + networkName + "   " + Math.round(strength * 100) + "%"
+                                                color: isConnected ? root.accent : Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                                elide: Text.ElideRight
                                             }
-                                            HoverHandler { id: networkHover }
-                                            color: isConnected ? root.accent : Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
 
                                             TapHandler {
                                                 onTapped: {
-                                                    root.keyboardNetworkIndex = index
-                                                    root.activateNetwork(networkName, securityType, isKnown,
-                                                        isConnected, networkId)
+                                                    root.keyboardNetworkIndex = wiredDevices.count + root.vpnConnections.length + index
+                                                    root.activateNetwork(networkName, securityType, isKnown, isConnected, networkId)
                                                 }
                                             }
                                         }
@@ -957,7 +1082,7 @@ RowLayout {
                                         Rectangle {
                                             visible: isConnected
                                             implicitWidth: disconnectLabel.implicitWidth + 10
-                                            implicitHeight: disconnectLabel.implicitHeight + 4
+                                            implicitHeight: Theme.controlHeight - 8
                                             color: Theme.bgred
                                             border.width: 1
                                             border.color: Theme.red
@@ -970,27 +1095,13 @@ RowLayout {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize - 2
                                             }
-
                                             TapHandler {
                                                 onTapped: {
-                                                    if (root.useWpaFallback) {
-                                                        root.runWpaAction(["disconnect"])
-                                                        return
-                                                    }
-                                                    const network = root.findNetwork(networkName)
-                                                    if (network)
-                                                        network.disconnect()
+                                                    root.keyboardNetworkIndex = wiredDevices.count + root.vpnConnections.length + index
+                                                    root.disconnectNetwork(networkName)
                                                 }
                                             }
                                         }
-                                    }
-
-                                    Rectangle {
-                                        width: parent.width
-                                        height: 1
-                                        visible: index < (root.useWpaFallback
-                                            ? wpaNetworks.count : wifiNetworks.count) - 1
-                                        color: Theme.bg4
                                     }
                                 }
                             }

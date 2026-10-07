@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+"""Interactive updates across Linux package managers; Python 3.9+, no dependencies."""
+
+import argparse
+from dataclasses import dataclass, field
+import fcntl
+import os
+import re
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+
+
+VERBOSE = False
+
+
+def paint(text, tone="green"):
+    colors = {"green": "#a7c080", "blue": "#7fbbb3", "yellow": "#dbbc7f",
+              "red": "#e67e80", "dim": "#859289"}
+    if not sys.stdout.isatty() or "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
+        return text
+    rgb = tuple(int(colors[tone][i:i + 2], 16) for i in (1, 3, 5))
+    return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m{text}\033[0m"
+
+
+def section(title):
+    width = min(shutil.get_terminal_size((88, 24)).columns, 100)
+    print("\n" + paint("── " + title + " " + "─" * max(0, width - len(title) - 4), "blue"), flush=True)
+
+
+def clean(output):
+    output = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output)
+    return "".join(char for char in output if char in "\n\t" or char.isprintable())
+
+
+def detail(output, tone=None):
+    width = max(24, min(shutil.get_terminal_size((88, 24)).columns - 4, 96))
+    for line in clean(output).splitlines():
+        for part in textwrap.wrap(line, width=width, replace_whitespace=False) or [""]:
+            print("  " + (paint(part, tone) if tone else part))
+
+
+def package_rows(output):
+    rows = []
+    for line in clean(output).splitlines():
+        match = re.fullmatch(r"(\S+)\s+(\S+)\s+->\s+(\S+)", line.strip())
+        apt = re.match(r"Inst (\S+)(?: \[([^]]+)\])? \((\S+)", line)
+        if match:
+            rows.append(match.groups())
+        elif apt:
+            rows.append((apt[1], apt[2] or "new", apt[3]))
+    return rows
+
+
+def show_check(output):
+    upgrades = re.findall(r"upgrading '([^']+)' from flake '[^']+' to '[^']+'", clean(output))
+    if upgrades and not VERBOSE:
+        detail(f"{len(upgrades)} Nix package source(s) have newer flake revisions.", "green")
+        for name in upgrades:
+            detail(name.rsplit(".", 1)[-1] + "  →  newer flake revision", "yellow")
+        for line in clean(output).splitlines():
+            if re.search(r"\b(warning|error)\b", line, re.I):
+                detail(line, "yellow")
+        detail("Use --verbose for flake URLs and revision details.", "dim")
+        return
+    rows = package_rows(output)
+    if rows and not VERBOSE:
+        print(paint(f"  {len(rows)} package{'s' if len(rows) != 1 else ''} available", "green"))
+        width = max(30, min(shutil.get_terminal_size((88, 24)).columns - 6, 94))
+        sizes = [width // 3, width // 3, width - 2 * (width // 3)]
+        print(paint("  " + "  ".join(value.ljust(size) for value, size in zip(
+            ("PACKAGE", "INSTALLED", "AVAILABLE"), sizes)), "dim"))
+        for row in rows:
+            columns = [textwrap.wrap(value, width=size) for value, size in zip(row, sizes)]
+            for index in range(max(map(len, columns))):
+                cells = [parts[index] if index < len(parts) else "" for parts in columns]
+                print("  " + "  ".join(paint(cell.ljust(size), tone) for cell, size, tone in zip(
+                    cells, sizes, ("green", "dim", "yellow"))))
+        # Retain warnings alongside the formatted package list.
+        warnings = [line for line in clean(output).splitlines()
+                    if re.search(r"\b(warning|error|held back)\b", line, re.I)]
+        for line in warnings:
+            detail(line, "yellow")
+    else:
+        detail(output.strip() or "Up to date — no changes reported.")
+
+
+def confirm(prompt):
+    try:
+        return input(paint("  " + prompt + " [y/N] ", "yellow")).strip().lower() in ("y", "yes")
+    except EOFError:
+        return False
+
+
+@dataclass
+class Source:
+    name: str
+    check: list
+    upgrade: list
+    refresh: list = field(default_factory=list)
+    privileged: bool = False
+    codes: tuple = (0,)
+    note: str = ""
+
+
+def distro():
+    try:
+        lines = Path("/etc/os-release").read_text().splitlines()
+    except OSError:
+        return {}
+    result = {}
+    for line in lines:
+        if "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
+            result[key] = value.strip().strip('\"\'')
+    return result
+
+
+def backend(info):
+    if Path("/run/ostree-booted").exists() or info.get("VARIANT_ID") in (
+        "silverblue", "kinoite", "sericea", "onyx", "coreos", "iot",
+    ):
+        return "none"
+    ids = [info.get("ID", "")] + info.get("ID_LIKE", "").split()
+    for name in ids:
+        if name in ("arch", "cachyos", "manjaro", "endeavouros"):
+            return "pacman"
+        if name in ("debian", "ubuntu", "linuxmint", "pop"):
+            return "apt"
+        if name in ("fedora", "rhel", "centos", "rocky", "almalinux"):
+            return "dnf"
+        if name.startswith("opensuse") or name in ("suse", "sles"):
+            return "zypper"
+        if name == "void":
+            return "xbps"
+        if name == "alpine":
+            return "apk"
+    return "none"
+
+
+def native_source(manager, info):
+    cached = "Uses cached repository metadata; add --refresh for a fresh check."
+    if manager == "pacman":
+        # checkupdates uses a separate database; never pacman -Sy alone.
+        return Source("System (Arch)", ["checkupdates", "--nocolor"],
+                      ["pacman", "-Syu"], privileged=True, codes=(0, 2))
+    if manager == "apt":
+        return Source("System (APT)", ["apt-get", "--simulate", "upgrade"],
+                      ["apt-get", "upgrade"], ["apt-get", "update"], True, note=cached)
+    if manager == "dnf":
+        return Source("System (DNF)", ["dnf", "check-update"],
+                      ["dnf", "upgrade"], codes=(0, 100), privileged=True)
+    if manager == "zypper":
+        rolling = info.get("ID") in ("opensuse-tumbleweed", "opensuse-slowroll")
+        return Source("System (Zypper)", ["zypper", "--no-refresh", "list-updates"],
+                      ["zypper", "dup" if rolling else "update"],
+                      ["zypper", "refresh"], True, (0, 100), cached)
+    if manager == "xbps":
+        return Source("System (Void)", ["xbps-install", "-Mun"],
+                      ["xbps-install", "-Su"], privileged=True,
+                      note="Void may require a second run after upgrading XBPS itself.")
+    if manager == "apk":
+        return Source("System (Alpine)", ["apk", "version", "-l", "<"],
+                      ["apk", "upgrade"], ["apk", "update"], True, note=cached)
+    return None
+
+
+def nix_source(profile):
+    # The manifest identifies the profile format; a failed modern command must
+    # never silently fall back to nix-env against a different profile.
+    profile = Path(profile).expanduser()
+    if (profile / "manifest.json").exists():
+        command = ["nix", "--extra-experimental-features", "nix-command flakes",
+                   "profile", "upgrade", "--profile", str(profile), "--all"]
+        return Source("Nix profile", command + ["--dry-run", "--refresh"], command,
+                      note="Checks unlocked flake packages in this user profile (Nix 2.22+).")
+    if (profile / "manifest.nix").exists():
+        command = ["nix-env", "--profile", str(profile), "--upgrade"]
+        return Source("Nix legacy profile", command + ["--dry-run"], command,
+                      ["nix-channel", "--update"],
+                      note="Uses this user's channels; --refresh updates them before checking.")
+    return None
+
+
+def sources(args, info):
+    result = []
+    manager = backend(info) if args.backend == "auto" else args.backend
+    native = native_source(manager, info)
+    if native:
+        result.append(native)
+    elif args.backend == "auto":
+        print("No supported system backend detected; checking additional package managers.")
+    if manager == "pacman" and not args.no_aur:
+        helper = next((name for name in ("paru", "yay") if shutil.which(name)), None)
+        if helper:
+            result.append(Source("AUR", [helper, "-Qua"], [helper, "-Sua"]))
+    if not args.no_flatpak and shutil.which("flatpak"):
+        result.append(Source("Flatpak", ["flatpak", "remote-ls", "--updates"],
+                             ["flatpak", "update"]))
+    if not args.no_nix and (shutil.which("nix") or shutil.which("nix-env")):
+        state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
+        default = Path.home() / ".nix-profile"
+        if not default.exists():
+            default = state / "nix/profiles/profile"
+        source = nix_source(args.nix_profile or default)
+        if source:
+            result.append(source)
+        else:
+            print(f"Nix: no supported user profile at {args.nix_profile or default}.")
+        if VERBOSE:
+            detail("NixOS/Home Manager configurations and the Nix daemon are managed separately.", "dim")
+    return result
+
+
+def run(command, privileged=False, capture=False, timeout=None):
+    if not shutil.which(command[0]):
+        raise RuntimeError(f"Missing {command[0]}; install it to use this update source.")
+    if privileged and os.geteuid() != 0:
+        wrapper = next((name for name in ("sudo", "doas") if shutil.which(name)), None)
+        if not wrapper:
+            raise RuntimeError("System updates require sudo or doas.")
+        command = [wrapper] + command
+    if VERBOSE:
+        detail("$ " + shlex.join(command), "dim")
+    env = dict(os.environ, LC_ALL="C")
+    try:
+        return subprocess.run(command, env=env, text=True, timeout=timeout,
+                              stdin=subprocess.DEVNULL if capture and not privileged else None,
+                              stdout=subprocess.PIPE if capture else None,
+                              stderr=subprocess.STDOUT if capture else None)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"Check timed out after {timeout}s.") from error
+    except OSError as error:
+        raise RuntimeError(str(error)) from error
+
+
+def process(source, args):
+    section(source.name)
+    if source.note and (VERBOSE or source.refresh):
+        detail(source.note, "dim")
+    if args.refresh and source.refresh:
+        # Refresh may require a password. It never upgrades installed packages.
+        if run(source.refresh, source.privileged).returncode != 0:
+            raise RuntimeError("Metadata refresh failed; skipping this source.")
+    print(paint("  Checking for updates…", "dim"), flush=True)
+    checked = run(source.check, capture=True, timeout=args.timeout)
+    if checked.returncode not in source.codes:
+        detail(checked.stdout, "red")
+        raise RuntimeError(f"Check failed (exit {checked.returncode}); skipping this source.")
+    show_check(checked.stdout)
+    if args.check:
+        return
+    # Native dry runs contain status text as well as packages. Let the package
+    # manager resolve the final transaction rather than guessing from that text.
+    if not checked.stdout.strip() and checked.returncode != 100:
+        return
+    if VERBOSE:
+        detail("Upgrade command: " + shlex.join(source.upgrade), "dim")
+    if not confirm(f"Install {source.name} updates?"):
+        detail("Skipped.", "dim")
+        return
+    if run(source.upgrade, source.privileged).returncode != 0:
+        raise RuntimeError("Upgrade failed; review the package manager's output.")
+    detail("Update finished.", "green")
+
+
+SESSION_SERVICES = {name + ".service" for name in (
+    "display-manager", "gdm", "plasmalogin", "sddm", "lightdm", "lxdm", "slim",
+    "xdm", "greetd", "nodm", "ly", "lemurs", "systemd-logind", "dbus", "dbus-broker",
+)}
+
+
+def systemd_running():
+    return Path("/run/systemd/system").is_dir() and bool(shutil.which("systemctl"))
+
+
+def reboot_reasons():
+    reasons = []
+    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists() or os.environ.get("container"):
+        return reasons
+    if any(Path(path).exists() for path in ("/run/reboot-required", "/var/run/reboot-required")):
+        reasons.append("The system has marked a reboot as required.")
+    release = os.uname().release
+    modules = Path("/usr/lib/modules")
+    # Missing modules only mean something if this machine has installed kernels.
+    if modules.is_dir() and any(modules.iterdir()) and not (modules / release).is_dir():
+        reasons.append(f"The running kernel ({release}) no longer has installed modules.")
+    elif modules.is_dir() and any(modules.glob("*/vmlinuz")) and not (modules / release / "vmlinuz").exists():
+        reasons.append(f"The running kernel ({release}) has been replaced on disk.")
+    return reasons
+
+
+def restart_scan(timeout):
+    """Read-only probes. Never run a tool's default automatic restart mode."""
+    if shutil.which("needrestart"):
+        command = ["needrestart", "-b", "-r", "l"]
+        kind = "needrestart"
+    elif systemd_running() and shutil.which("checkservices"):
+        command = ["checkservices", "-L", "-F", "-P", "-R"]
+        kind = "checkservices"
+    elif systemd_running() and shutil.which("needs-restarting"):
+        command = ["needs-restarting", "-s"]
+        kind = "dnf"
+    else:
+        return None, []
+    detail("Scanning services (may ask for your password)…", "dim")
+    result = run(command, privileged=True, capture=True, timeout=timeout)
+    if result.returncode != 0:
+        detail(result.stdout, "red")
+        raise RuntimeError("Service scan failed; restart status is unknown.")
+    output = clean(result.stdout)
+    if VERBOSE:
+        detail(output)
+    if kind == "checkservices" and re.search(r"\bError::", output):
+        detail(output, "red")
+        raise RuntimeError("Service scan reported errors; restart status is incomplete.")
+    reasons = []
+    if kind == "needrestart":
+        units = re.findall(r"^NEEDRESTART-SVC:\s*(\S+)\s*$", output, re.M)
+        if re.search(r"^NEEDRESTART-KSTA:\s*[23]\s*$", output, re.M):
+            reasons.append("A kernel upgrade is pending (needrestart).")
+        if re.search(r"^NEEDRESTART-UCSTA:\s*2\s*$", output, re.M):
+            reasons.append("A CPU microcode upgrade is pending (needrestart).")
+    elif kind == "checkservices":
+        units = re.findall(r"^'([^']+\.service)'\s*$", output, re.M)
+    else:
+        units = re.findall(r"^([\w@.\\:-]+\.service)\s*$", output, re.M)
+    # Validate names before giving them to an init tool. Do not include the
+    # display/login/session infrastructure in the restart selection.
+    units = sorted({unit for unit in units if re.fullmatch(r"[A-Za-z0-9_@.\\:-]+", unit)
+                    and not unit.startswith("-")})
+    excluded = [unit for unit in units if unit in SESSION_SERVICES or unit.startswith("user@")]
+    if excluded:
+        detail("Session services need a logout/reboot: " + ", ".join(excluded), "yellow")
+    return [unit for unit in units if unit not in excluded], reasons
+
+
+def service_command(unit):
+    if systemd_running():
+        return ["systemctl", "restart", unit]
+    if shutil.which("rc-service"):
+        return ["rc-service", unit, "restart"]
+    if shutil.which("sv"):
+        for directory in ("/var/service", "/run/runit/service"):
+            path = Path(directory) / unit
+            if path.exists():
+                return ["sv", "restart", str(path)]
+    if shutil.which("service"):
+        return ["service", unit, "restart"]
+    return None
+
+
+def select_services(units):
+    for index, unit in enumerate(units, 1):
+        print("  " + paint(f"{index:>2}", "yellow") + "  " + unit)
+    while True:
+        try:
+            answer = input(paint("  Restart services: numbers, 'all', or Enter to skip: ", "yellow")).strip()
+        except EOFError:
+            return []
+        if not answer:
+            return []
+        if answer.lower() == "all":
+            return units
+        parts = answer.split()
+        if all(part.isdecimal() and 1 <= int(part) <= len(units) for part in parts):
+            return list(dict.fromkeys(units[int(part) - 1] for part in parts))
+        detail("Choose the displayed numbers, 'all', or Enter.", "yellow")
+
+
+def maintenance(args, scan_services=True):
+    section("After updates")
+    reasons = reboot_reasons()
+    failed = False
+    if scan_services:
+        try:
+            units, extra = restart_scan(args.timeout)
+            reasons.extend(extra)
+            if units is None:
+                detail("Service check unavailable — install needrestart, or checkservices on Arch.", "dim")
+            elif not units:
+                detail("No services needing a restart were reported.", "green")
+            else:
+                detail(f"{len(units)} service(s) need restarting.", "yellow")
+                selected = [] if args.check else select_services(units)
+                if args.check:
+                    for unit in units:
+                        detail(unit)
+                if selected and systemd_running():
+                    if run(["systemctl", "daemon-reload"], privileged=True).returncode != 0:
+                        raise RuntimeError("Could not reload service definitions; no services restarted.")
+                for unit in selected:
+                    command = service_command(unit)
+                    if not command:
+                        detail(f"No supported restart command for {unit}.", "yellow")
+                        failed = True
+                    elif run(command, privileged=True).returncode != 0:
+                        detail(f"Failed to restart {unit}.", "red")
+                        failed = True
+                    else:
+                        detail(f"Restarted {unit}.", "green")
+        except RuntimeError as error:
+            detail(str(error), "red")
+            failed = True
+    if reasons:
+        detail("Reboot recommended", "yellow")
+        for reason in dict.fromkeys(reasons):
+            detail(reason)
+        if not args.check and confirm("Reboot now? Save your work first."):
+            command = ["systemctl", "reboot"] if systemd_running() else ["reboot"]
+            if run(command, privileged=not systemd_running()).returncode != 0:
+                raise RuntimeError("Reboot failed.")
+    elif failed:
+        detail("No reboot marker found; the additional restart scan failed.", "yellow")
+    else:
+        detail("No reboot requirement detected by the available checks.", "green")
+    return failed
+
+
+def main():
+    global VERBOSE
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", "--list", action="store_true", help="check only; never install packages")
+    parser.add_argument("--refresh", action="store_true", help="refresh cached metadata/channels (may need sudo)")
+    parser.add_argument("--backend", choices=("auto", "none", "pacman", "apt", "dnf", "zypper", "xbps", "apk"), default="auto")
+    parser.add_argument("--nix-profile", help="Nix user profile to check/upgrade")
+    parser.add_argument("--no-nix", action="store_true")
+    parser.add_argument("--no-aur", action="store_true")
+    parser.add_argument("--no-flatpak", action="store_true")
+    parser.add_argument("--timeout", type=int, default=180, help="seconds per check (default: 180)")
+    parser.add_argument("--verbose", action="store_true", help="show commands and full check output")
+    parser.add_argument("--maintenance", action="store_true", help="only check reboot/services; ask before restarting")
+    parser.add_argument("--no-maintenance", action="store_true", help="skip reboot/service checks")
+    args = parser.parse_args()
+    VERBOSE = args.verbose
+    if args.maintenance and args.no_maintenance:
+        parser.error("--maintenance and --no-maintenance cannot be combined")
+    if args.timeout <= 0:
+        parser.error("--timeout must be positive")
+    if not args.check and not sys.stdin.isatty():
+        parser.error("interactive updates require a terminal; use --check")
+    if os.geteuid() == 0:
+        parser.error("run as your normal user; system commands use sudo/doas when needed")
+    # Private user-owned directory avoids predictable /tmp lockfile symlinks.
+    cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "mori-update"
+    cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (cache / "lock").open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("mori-update is already running.", file=sys.stderr)
+            return 1
+        section("Mori · updates")
+        detail("Check only" if args.check else "Review updates · choose what to install", "dim")
+        if args.maintenance:
+            return int(maintenance(args))
+        available = sources(args, distro())
+        if not available:
+            print("No supported package sources found.", file=sys.stderr)
+            return 1
+        failed = False
+        # checkupdates uses a private temporary database, removed even on failure.
+        with tempfile.TemporaryDirectory(prefix="mori-update-") as database:
+            os.environ["CHECKUPDATES_DB"] = database
+            for source in available:
+                try:
+                    process(source, args)
+                except RuntimeError as error:
+                    detail(f"{source.name}: {error}", "red")
+                    failed = True
+        if not args.no_maintenance and any(source.privileged for source in available):
+            try:
+                failed = maintenance(args, scan_services=not args.check) or failed
+            except RuntimeError as error:
+                detail(str(error), "red")
+                failed = True
+        section("Finished")
+        detail("Some checks or actions failed — review the messages above." if failed else
+               "Checks complete." if args.check else "Update session complete.", "yellow" if failed else "green")
+        return int(failed)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nCancelled.", file=sys.stderr)
+        sys.exit(130)
+    except RuntimeError as error:
+        print(f"mori-update: {error}", file=sys.stderr)
+        sys.exit(1)

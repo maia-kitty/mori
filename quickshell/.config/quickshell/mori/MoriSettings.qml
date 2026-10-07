@@ -10,6 +10,8 @@ Item {
     id: root
     // Page controls exist only while that page is open. Saving and rollback
     // state stays in this controller when a page or the window closes.
+    readonly property var categoriesFlick: homePage.item ? homePage.item.flick : null
+    readonly property var categoryRows: homePage.item ? homePage.item.rows : null
     readonly property var modulesFlick: modulesPage.item
     readonly property var anchorRepeater: modulesPage.item ? modulesPage.item.anchorRows : null
     readonly property var appearanceFlick: appearancePage.item
@@ -37,6 +39,7 @@ Item {
     property string keyboardModule: ""
     property int keyboardColorRow: 0
     property int keyboardColorIndex: 0
+    property int keyboardUpdateIndex: 0
     property int keyboardClockIndex: 0
     property int keyboardPowerIndex: 0
     property bool editingPowerCommand: false
@@ -97,9 +100,13 @@ Item {
 
     readonly property var allModules: [
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
-        "notifications", "powerMenu", "systemTray", "volume", "wallpaper", "workspaces"
+        "notifications", "powerMenu", "systemTray", "updates", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "appearance", "clock", "power", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "appearance", "clock", "updates", "power", "displays", "input", "about"]
+    readonly property var updateIntervals: [
+        { label: "15 min", minutes: 15 }, { label: "1 hour", minutes: 60 },
+        { label: "3 hours", minutes: 180 }, { label: "Manual", minutes: 0 }
+    ]
     readonly property var powerOptions: [
         { key: "suspend", label: "Suspend" },
         { key: "reboot", label: "Restart" },
@@ -145,6 +152,7 @@ Item {
         case "media": return "Media"
         case "kdeConnect": return "KDE Connect"
         case "systemTray": return "System tray"
+        case "updates": return "Updates"
         case "network": return "Network"
         case "volume": return "Volume"
         case "brightness": return "Brightness"
@@ -157,11 +165,20 @@ Item {
         }
     }
 
+    function controlBackground(selected, focused, hovered) {
+        return selected ? Theme.bg3 : focused || hovered ? Theme.bg2 : Theme.bg1
+    }
+
+    function controlBorder(selected, focused, hovered) {
+        return selected || focused || hovered ? Theme.fg : Theme.bg4
+    }
+
     function pageTitle() {
         switch (page) {
         case "modules": return "Modules"
         case "appearance": return "Appearance"
         case "clock": return "Time & date"
+        case "updates": return "Updates"
         case "power": return "Power menu"
         case "displays": return "Displays"
         case "input": return "Input"
@@ -294,6 +311,9 @@ Item {
             syncKeyboardColor()
         } else if (name === "clock") {
             keyboardClockIndex = 0
+        } else if (name === "updates") {
+            keyboardUpdateIndex = Math.max(0, updateIntervals.findIndex(
+                choice => choice.minutes === settings.updateIntervalMinutes))
         } else if (name === "power") {
             keyboardPowerIndex = 0
             loadPowerDrafts()
@@ -515,6 +535,10 @@ Item {
             flick.contentY = y + item.height - flick.height
     }
 
+    function scrollToKeyboardCategory() {
+        scrollIntoView(categoriesFlick, categoryRows ? categoryRows.itemAt(keyboardCategoryIndex) : null)
+    }
+
     function scrollToKeyboardModule() {
         if (!anchorRepeater) return
         for (let i = 0; i < anchorRepeater.count; ++i) {
@@ -636,10 +660,11 @@ Item {
             return
         }
         if (page === "home") {
-            if (key === Qt.Key_Up || key === Qt.Key_Down)
+            if (key === Qt.Key_Up || key === Qt.Key_Down) {
                 keyboardCategoryIndex = Math.max(0, Math.min(categoryPages.length - 1,
                     keyboardCategoryIndex + (key === Qt.Key_Up ? -1 : 1)))
-            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                Qt.callLater(scrollToKeyboardCategory)
+            } else if (key === Qt.Key_Return || key === Qt.Key_Enter)
                 openPage(categoryPages[keyboardCategoryIndex])
             else return
         } else if (page === "modules") {
@@ -676,6 +701,13 @@ Item {
             else if (key === Qt.Key_Left || key === Qt.Key_Right
                     || key === Qt.Key_Return || key === Qt.Key_Enter)
                 cycleClockOption(key === Qt.Key_Left ? -1 : 1)
+            else return
+        } else if (page === "updates") {
+            if (key === Qt.Key_Left || key === Qt.Key_Right)
+                keyboardUpdateIndex = Math.max(0, Math.min(updateIntervals.length - 1,
+                    keyboardUpdateIndex + (key === Qt.Key_Left ? -1 : 1)))
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                settings.setUpdateInterval(updateIntervals[keyboardUpdateIndex].minutes)
             else return
         } else if (page === "power") {
             if (key === Qt.Key_Up || key === Qt.Key_Down) {
@@ -1835,73 +1867,90 @@ Item {
                     id: homePage
                     anchors.fill: parent
                     active: settingsWindow.visible && root.page === "home"
+                    onLoaded: {
+                        item.flick.forceLayout()
+                        item.flick.contentY = 0
+                    }
 
                     sourceComponent: Component {
-                        Column {
-                            visible: root.page === "home"
-                            width: parent.width
-                            spacing: 8
+                        Item {
+                            readonly property alias flick: categoryList
+                            readonly property alias rows: categoryRepeater
+                            readonly property alias navigationHint: categoryHint
+                            anchors.fill: parent
 
                             SettingsLabel {
+                                id: categoryHint
+                                anchors.top: parent.top
                                 text: "Choose a category · ↑↓ / Enter"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
-                            Repeater {
-                                id: categoryRepeater
-                                model: [
-                                    { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
-                                    { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
-                                    { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
-                                    { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
-                                    { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
-                                    { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
-                                    { "key": "about", "label": "About", "description": "Mori shell information" }
-                                ]
-                                delegate: Rectangle {
-                                    id: categoryRow
-                                    required property var modelData
-                                    required property int index
-                                    width: parent.width
-                                    height: 62
-                                    color: categoryHover.hovered ? Theme.bg2 : Theme.bg1
-                                    border.width: 1
-                                    border.color: categoryHover.hovered ? Theme.fg : Theme.bg4
-                                    Column {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 14
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 3
-                                        SettingsLabel {
-                                            text: (categoryRow.index === root.keyboardCategoryIndex
-                                                ? "› " : "  ") + categoryRow.modelData.label
-                                            color: categoryRow.index === root.keyboardCategoryIndex
-                                                || categoryHover.hovered ? Theme.fg : Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.headingFontSize
+                            ScrollableColumn {
+                                id: categoryList
+                                anchors.top: categoryHint.bottom
+                                anchors.topMargin: 8
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                spacing: 8
+                                Repeater {
+                                    id: categoryRepeater
+                                    model: [
+                                        { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
+                                        { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
+                                        { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
+                                        { "key": "updates", "label": "Updates", "description": "Package update check interval" },
+                                        { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
+                                        { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
+                                        { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
+                                        { "key": "about", "label": "About", "description": "Mori shell information" }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: categoryRow
+                                        required property var modelData
+                                        required property int index
+                                        width: parent.width
+                                        height: 62
+                                        color: root.controlBackground(false, index === root.keyboardCategoryIndex, categoryHover.hovered)
+                                        border.width: 1
+                                        border.color: root.controlBorder(false, index === root.keyboardCategoryIndex, categoryHover.hovered)
+                                        Column {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 14
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 3
+                                            SettingsLabel {
+                                                text: (categoryRow.index === root.keyboardCategoryIndex
+                                                    ? "› " : "  ") + categoryRow.modelData.label
+                                                color: categoryRow.index === root.keyboardCategoryIndex
+                                                    || categoryHover.hovered ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.headingFontSize
+                                            }
+                                            SettingsLabel {
+                                                text: categoryRow.modelData.description
+                                                color: Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
                                         }
                                         SettingsLabel {
-                                            text: categoryRow.modelData.description
-                                            color: Theme.grey1
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 14
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "›"
+                                            color: Theme.fg
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
+                                            font.pixelSize: 24
                                         }
-                                    }
-                                    SettingsLabel {
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 14
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: "›"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 24
-                                    }
-                                    HoverHandler { id: categoryHover }
-                                    TapHandler {
-                                        onTapped: {
-                                            root.keyboardCategoryIndex = categoryRow.index
-                                            root.openPage(categoryRow.modelData.key)
+                                        HoverHandler { id: categoryHover }
+                                        TapHandler {
+                                            onTapped: {
+                                                root.keyboardCategoryIndex = categoryRow.index
+                                                root.openPage(categoryRow.modelData.key)
+                                            }
                                         }
                                     }
                                 }
@@ -2155,20 +2204,31 @@ Item {
                                                 required property int index
                                                 readonly property bool selected: root.clockOptionValue(
                                                     clockRow.modelData.key) === modelData
-                                                width: Math.max(92, choiceText.implicitWidth + 20)
+                                                readonly property bool focused: clockRow.index === root.keyboardClockIndex && selected
+                                                width: Math.max(92, choiceContent.implicitWidth + 20)
                                                 height: 30
-                                                color: choiceHover.hovered ? Theme.bg2 : Theme.bg1
+                                                color: root.controlBackground(selected, focused, choiceHover.hovered)
                                                 border.width: 1
-                                                border.color: Theme.bg4
+                                                border.color: root.controlBorder(selected, focused, choiceHover.hovered)
 
-                                                SettingsLabel {
-                                                    id: choiceText
+                                                Row {
+                                                    id: choiceContent
                                                     anchors.centerIn: parent
-                                                    text: clockRow.modelData.labels[clockChoice.index]
-                                                    color: clockChoice.selected || choiceHover.hovered
-                                                        ? Theme.fg : Theme.grey1
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: Theme.fontSize
+                                                    spacing: 6
+                                                    SettingsLabel {
+                                                        text: clockRow.modelData.labels[clockChoice.index]
+                                                        color: clockChoice.selected || choiceHover.hovered ? Theme.fg : Theme.grey1
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: Theme.fontSize
+                                                    }
+                                                    Rectangle {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        width: 10
+                                                        height: 10
+                                                        color: clockChoice.selected ? Theme.fg : "transparent"
+                                                        border.width: 1
+                                                        border.color: Theme.fg
+                                                    }
                                                 }
                                                 HoverHandler { id: choiceHover }
                                                 TapHandler {
@@ -2192,6 +2252,82 @@ Item {
                             }
                             SettingsLabel {
                                 text: "Time format also applies to calendar events."
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: updatesPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "updates"
+                    sourceComponent: Component {
+                        Column {
+                            width: parent.width
+                            spacing: 12
+                            SettingsLabel {
+                                text: "←→ interval · Enter select"
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            SettingsLabel {
+                                text: "› Check interval"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            Row {
+                                spacing: 8
+                                Repeater {
+                                    model: root.updateIntervals
+                                    delegate: Rectangle {
+                                        id: updateChoice
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool focused: index === root.keyboardUpdateIndex
+                                        readonly property bool selected: root.settings.updateIntervalMinutes === modelData.minutes
+                                        width: 92
+                                        height: 30
+                                        color: root.controlBackground(selected, focused, updateHover.hovered)
+                                        border.width: 1
+                                        border.color: root.controlBorder(selected, focused, updateHover.hovered)
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+                                            SettingsLabel {
+                                                text: updateChoice.modelData.label
+                                                color: updateChoice.selected || updateChoice.focused || updateHover.hovered ? Theme.fg : Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            Rectangle {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 10
+                                                height: 10
+                                                color: updateChoice.selected ? Theme.fg : "transparent"
+                                                border.width: 1
+                                                border.color: Theme.fg
+                                            }
+                                        }
+                                        HoverHandler { id: updateHover }
+                                        TapHandler {
+                                            onTapped: {
+                                                root.keyboardUpdateIndex = updateChoice.index
+                                                root.settings.setUpdateInterval(updateChoice.modelData.minutes)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Text {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                textFormat: Text.PlainText
+                                text: "Changes save immediately. Manual disables scheduled checks; use Check now in the Updates popup. Disabling the Updates module stops checks."
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -2278,7 +2414,7 @@ Item {
                                         leftPadding: 8
                                         rightPadding: 8
                                         background: Rectangle {
-                                            color: Theme.bg2
+                                            color: root.controlBackground(false, commandField.activeFocus, commandField.hovered)
                                             border.width: 1
                                             border.color: root.powerErrors[powerRow.modelData.key] ? Theme.red
                                                 : commandField.activeFocus ? Theme.fg : Theme.bg4
@@ -2371,9 +2507,9 @@ Item {
                                     }
                                     width: parent.width
                                     height: 54
-                                    color: Theme.bg1
+                                    color: root.controlBackground(false, index === root.keyboardInputIndex, false)
                                     border.width: 1
-                                    border.color: Theme.bg4
+                                    border.color: root.controlBorder(false, index === root.keyboardInputIndex, false)
 
                                     SettingsLabel {
                                         anchors.left: parent.left
@@ -2609,10 +2745,12 @@ Item {
                                             id: displaySelector
                                             required property var modelData
                                             width: selectorLabel.implicitWidth + 18
-                                            height: 26
-                                            color: Theme.bg1
+                                            height: 30
+                                            color: root.controlBackground(root.selectedDisplay === modelData.connector,
+                                                root.keyboardDisplaySection === "outputs" && root.selectedDisplay === modelData.connector, displaySelectorHover.hovered)
                                             border.width: 1
-                                            border.color: Theme.bg4
+                                            border.color: root.controlBorder(root.selectedDisplay === modelData.connector,
+                                                root.keyboardDisplaySection === "outputs" && root.selectedDisplay === modelData.connector, displaySelectorHover.hovered)
                                             opacity: modelData.enabled ? 1 : 0.6
                                             SettingsLabel {
                                                 id: selectorLabel
@@ -2626,6 +2764,7 @@ Item {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
+                                            HoverHandler { id: displaySelectorHover }
                                             TapHandler {
                                                 onTapped: root.selectedDisplay
                                                     = displaySelector.modelData.connector

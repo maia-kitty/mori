@@ -2,8 +2,11 @@
 """Interactive updates across Linux package managers; Python 3.9+, no dependencies."""
 
 import argparse
+import contextlib
 from dataclasses import dataclass, field
 import fcntl
+import io
+import json
 import os
 import re
 from pathlib import Path
@@ -13,9 +16,13 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+from datetime import datetime, timezone
+import time
 
 
 VERBOSE = False
+SESSION_CACHE = None
+WAIT_ON_EXIT = False
 
 
 def paint(text, tone="green"):
@@ -89,9 +96,11 @@ def show_check(output):
         detail(output.strip() or "Up to date — no changes reported.")
 
 
-def confirm(prompt):
+def confirm(prompt, default=False):
     try:
-        return input(paint("  " + prompt + " [y/N] ", "yellow")).strip().lower() in ("y", "yes")
+        choices = " [Y/n] " if default else " [y/N] "
+        answer = input(paint("  " + prompt + choices, "yellow")).strip().lower()
+        return default if not answer else answer in ("y", "yes")
     except EOFError:
         return False
 
@@ -105,6 +114,162 @@ class Source:
     privileged: bool = False
     codes: tuple = (0,)
     note: str = ""
+
+
+@dataclass
+class CacheCleanup:
+    name: str
+    commands: list
+    note: str
+    privileged: bool = False
+    previews: list = field(default_factory=list)
+    kind: str = ""
+
+
+def cache_jobs(manager, available):
+    jobs = []
+    if manager == "pacman":
+        if shutil.which("paccache"):
+            jobs.append(CacheCleanup("Arch package archives",
+                [["paccache", "--nocolor", "-r", "-k", "3"],
+                 ["paccache", "--nocolor", "-r", "-u", "-k", "0"]],
+                "Keep the newest 3 cached versions; remove archives of uninstalled packages.", True,
+                [["paccache", "--nocolor", "-d", "-k", "3"],
+                 ["paccache", "--nocolor", "-d", "-u", "-k", "0"]], "paccache"))
+        else:
+            jobs.append(CacheCleanup("Arch package archives", [["pacman", "-Sc"]],
+                "Remove uninstalled package archives and unused sync databases. Install pacman-contrib to keep 3 cached versions instead.", True))
+    elif manager == "apt":
+        jobs.append(CacheCleanup("APT package archives", [["apt-get", "autoclean"]],
+            "Remove obsolete downloaded packages that are no longer available from repositories.", True,
+            [["apt-get", "--simulate", "autoclean"]]))
+    elif manager == "dnf":
+        jobs.append(CacheCleanup("DNF package archives", [["dnf", "clean", "packages"]],
+            "Remove downloaded package archives; keep repository metadata.", True))
+    elif manager == "zypper":
+        jobs.append(CacheCleanup("Zypper package archives", [["zypper", "clean"]],
+            "Remove downloaded package archives; keep repository metadata.", True))
+    elif manager == "xbps":
+        jobs.append(CacheCleanup("XBPS package archives", [["xbps-remove", "-OO"]],
+            "Remove outdated archives and cached packages that are no longer installed.", True,
+            [["xbps-remove", "-n", "-OO"]]))
+    elif manager == "apk":
+        jobs.append(CacheCleanup("APK package archives", [["apk", "cache", "clean"]],
+            "Remove obsolete or no-longer-needed archives from the configured APK cache.", True,
+            [["apk", "--simulate", "cache", "clean"]]))
+    for source in available:
+        if source.name == "AUR":
+            helper = source.check[0]
+            jobs.append(CacheCleanup(f"AUR ({helper}) build cache", [[helper, "-Sc", "--aur"]],
+                "Clean obsolete AUR build caches and sources; the helper keeps its own confirmation prompts."))
+        elif source.name.startswith("Nix"):
+            jobs.append(CacheCleanup("Nix unused store paths", [["nix-store", "--gc"]],
+                "Collect unreachable store objects. Keep all profile generations and rollback roots.", False,
+                [["nix-store", "--gc", "--print-dead"]], "nix"))
+        elif source.name == "Flatpak":
+            # Expand installed scopes later, isolating discovery failures from
+            # the native/AUR/Nix cleanup jobs.
+            jobs.append(CacheCleanup("Flatpak object store", [], "", kind="flatpak-discover"))
+    return jobs
+
+
+def flatpak_cache_jobs(timeout):
+    result = run(["flatpak", "list", "--columns=installation:full"], capture=True, timeout=timeout)
+    if result.returncode != 0:
+        detail(result.stdout, "red")
+        raise RuntimeError("Cannot discover Flatpak installations; skipping Flatpak cleanup.")
+    scopes = {line.strip() for line in clean(result.stdout).splitlines() if line.strip()}
+    # Empty installations can still contain an object cache.
+    data = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
+    if (data / "flatpak/repo").is_dir():
+        scopes.add("user")
+    if (Path(os.environ.get("FLATPAK_SYSTEM_DIR", "/var/lib/flatpak")) / "repo").is_dir():
+        scopes.add("system")
+    jobs = []
+    for scope in sorted(scopes):
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", scope):
+            raise RuntimeError("Unrecognized Flatpak installation name; skipping Flatpak cleanup.")
+        option = f"--{scope}" if scope in ("user", "system") else f"--installation={scope}"
+        command = ["flatpak", "repair", option]
+        jobs.append(CacheCleanup(f"Flatpak ({scope}) object store", [command],
+            "Prune unused objects and verify this installation; damaged objects may be downloaded again. Installed apps and runtimes are retained.",
+            scope != "user", [command + ["--dry-run"]]))
+    return jobs
+
+
+def cleanup_job(job, args):
+    detail(job.name, "blue")
+    detail(job.note, "dim")
+    # Check executable availability before asking permission to run it.
+    for command in job.commands + job.previews:
+        if not shutil.which(command[0]):
+            raise RuntimeError(f"Missing {command[0]}; skipping this cleanup.")
+    outputs = []
+    for command in job.previews:
+        result = run(command, capture=True, timeout=args.timeout)
+        if result.returncode != 0:
+            detail(result.stdout, "red")
+            raise RuntimeError("Cache preview failed; skipping this cleanup.")
+        outputs.append(clean(result.stdout))
+    if job.kind == "nix":
+        store = os.environ.get("NIX_STORE_DIR", "/nix/store").rstrip("/") + "/"
+        count = sum(line.startswith(store) for output in outputs for line in output.splitlines())
+        detail(f"{count} unreachable store path(s).", "green" if count else "dim")
+        if not count:
+            return
+    elif job.kind == "paccache":
+        for label, output in zip(("Older versions", "Uninstalled packages"), outputs):
+            detail(label + ": " + output.strip())
+        if all("no candidate packages found" in output.lower() for output in outputs):
+            return
+    else:
+        for output in outputs:
+            detail(output.strip() or "No removable objects reported.")
+    if VERBOSE and job.kind in ("nix", "paccache"):
+        for output in outputs:
+            detail(output)
+    if not job.previews or VERBOSE or args.check:
+        for command in job.commands:
+            detail("Cleanup: " + shlex.join(command), "dim")
+    if args.check:
+        return
+    if not confirm(f"Clean {job.name}?", default=True):
+        detail("Skipped.", "dim")
+        return
+    for command in job.commands:
+        if run(command, privileged=job.privileged).returncode != 0:
+            raise RuntimeError("Cache cleanup failed; review the command's output.")
+    detail("Cleanup complete.", "green")
+
+
+def cleanup_caches(args, manager, available):
+    section("Cached packages")
+    failed = False
+    selected = list(available)
+    # An empty/missing user profile can still leave collectable store objects.
+    if not args.no_nix and shutil.which("nix-store") and not any(source.name.startswith("Nix") for source in selected):
+        selected.append(Source("Nix store", [], []))
+    jobs = cache_jobs(manager, selected)
+    if not jobs:
+        detail("No supported caches selected.", "dim")
+    for job in jobs:
+        try:
+            if job.kind == "flatpak-discover":
+                flatpak_jobs = flatpak_cache_jobs(args.timeout)
+                if not flatpak_jobs:
+                    detail("Flatpak: no cached installations found.", "dim")
+                for flatpak_job in flatpak_jobs:
+                    try:
+                        cleanup_job(flatpak_job, args)
+                    except RuntimeError as error:
+                        detail(f"{flatpak_job.name}: {error}", "red")
+                        failed = True
+            else:
+                cleanup_job(job, args)
+        except RuntimeError as error:
+            detail(f"{job.name}: {error}", "red")
+            failed = True
+    return failed
 
 
 def distro():
@@ -260,12 +425,175 @@ def process(source, args):
         return
     if VERBOSE:
         detail("Upgrade command: " + shlex.join(source.upgrade), "dim")
-    if not confirm(f"Install {source.name} updates?"):
+    if not confirm(f"Install {source.name} updates?", default=True):
         detail("Skipped.", "dim")
         return
     if run(source.upgrade, source.privileged).returncode != 0:
         raise RuntimeError("Upgrade failed; review the package manager's output.")
     detail("Update finished.", "green")
+
+
+def parsed_updates(source, output, exit_code):
+    """Return packages, or None when successful output cannot be counted."""
+    output = clean(output)
+    program = source.check[0]
+    rows = package_rows(output)
+    packages = [{"name": name, "installed": old, "available": new, "kind": "package"}
+                for name, old, new in rows]
+    if packages:
+        return packages
+    if program in ("checkupdates", "paru", "yay"):
+        return [] if not output.strip() else None
+    if program == "apt-get":
+        return [] if re.search(r"^0 upgraded,", output, re.M) else None
+    if program == "dnf":
+        if exit_code == 0:
+            return []
+        for line in output.splitlines():
+            match = re.fullmatch(r"(\S+\.\S+)\s+(\S+)\s+(\S+)", line.strip())
+            if match:
+                packages.append({"name": match[1], "installed": None, "available": match[2], "kind": "package"})
+    elif program == "zypper":
+        for line in output.splitlines():
+            fields = [field.strip() for field in line.split("|")]
+            if len(fields) >= 5 and fields[0] in ("v", "v?", "i", "i+"):
+                packages.append({"name": fields[2], "installed": fields[3] if len(fields) >= 6 else None,
+                                 "available": fields[4] if len(fields) >= 6 else fields[3], "kind": "package"})
+        if not packages and "No updates found" in output:
+            return []
+    elif program == "xbps-install":
+        for line in output.splitlines():
+            fields = line.split()
+            if len(fields) == 6 and fields[1] in ("update", "install"):
+                name, _, version = fields[0].rpartition("-")
+                packages.append({"name": name or fields[0], "installed": None, "available": version, "kind": "package"})
+        if not output.strip():
+            return []
+    elif program == "apk":
+        for line in output.splitlines():
+            match = re.fullmatch(r"(\S+)\s+<\s+(\S+)", line.strip())
+            if match:
+                installed = re.fullmatch(r"(.+)-([0-9][^-]*(?:-r\d+)?)", match[1])
+                if installed:
+                    packages.append({"name": installed[1], "installed": installed[2], "available": match[2], "kind": "package"})
+        if not output.strip() or "Installed" in output and "Available" in output and len(output.splitlines()) <= 1:
+            return []
+    elif program == "flatpak":
+        for line in output.splitlines():
+            fields = line.split("\t")
+            if len(fields) == 4 and fields[0].strip():
+                packages.append({"name": fields[0].strip(), "installed": None,
+                                 "available": fields[1].strip() or None, "kind": "package",
+                                 "branch": fields[2].strip(), "arch": fields[3].strip()})
+        if not output.strip():
+            return []
+    elif program == "nix":
+        for name in re.findall(r"upgrading '([^']+)' from flake '[^']+' to '[^']+'", output):
+            packages.append({"name": name.rsplit(".", 1)[-1], "installed": None,
+                             "available": None, "kind": "flake"})
+        if not packages and (not output.strip() or all(
+                line.startswith(("warning:", "unpacking ", "copying path ")) for line in output.splitlines() if line.strip())):
+            return []
+    elif program == "nix-env":
+        for old, new in re.findall(r"upgrading '([^']+)' to '([^']+)'", output):
+            name, _, version = old.rpartition("-")
+            packages.append({"name": name, "installed": version,
+                             "available": new.rpartition("-")[2], "kind": "package"})
+        if not output.strip():
+            return []
+    # Deduplicate duplicate remote/architecture rows without inflating counts.
+    unique = {}
+    for package in packages:
+        key = (package["name"], package.get("branch"), package.get("arch"))
+        unique[key] = package
+    return list(unique.values()) if unique else None
+
+
+def json_report(args, available):
+    result = {"version": 1, "checked_at": datetime.now(timezone.utc).isoformat(),
+              "status": "unknown", "total": 0, "sources": [], "notes": [], "busy": False,
+              "reboot": {"required": False, "reasons": []}}
+    for source in available:
+        cached = source.check[0] in ("apt-get", "zypper", "apk", "nix-env")
+        item = {"name": source.name, "status": "error", "count": None,
+                "packages": [], "cached": cached, "message": "", "warnings": []}
+        command = source.check
+        if command[0] == "flatpak":
+            command = ["flatpak", "remote-ls", "--updates", "--columns=application,version,branch,arch"]
+        try:
+            checked = run(command, capture=True, timeout=args.timeout)
+            output = clean(checked.stdout)
+            if checked.returncode not in source.codes:
+                raise RuntimeError(output.strip()[:2000] or f"Check failed (exit {checked.returncode}).")
+            item["warnings"] = [line.strip()[:500] for line in output.splitlines()
+                                if re.search(r"\b(warning|held back|kept back)\b", line, re.I)][:10]
+            packages = parsed_updates(source, output, checked.returncode)
+            if packages is None:
+                item["status"] = "unknown"
+                item["message"] = "Could not count this check's output. Open the updater for details."
+            else:
+                item["packages"] = packages
+                item["count"] = len(packages)
+                item["status"] = "updates" if packages else "up-to-date"
+                result["total"] += len(packages)
+                if any(package["kind"] == "flake" for package in packages):
+                    item["message"] = "Nix reports newer flake revisions; package versions may be unchanged."
+        except RuntimeError as error:
+            item["message"] = str(error)
+        result["sources"].append(item)
+    reasons = reboot_reasons()
+    result["reboot"] = {"required": bool(reasons), "reasons": reasons}
+    statuses = [source["status"] for source in result["sources"]]
+    result["status"] = "error" if "error" in statuses else "updates" if result["total"] else \
+        "unknown" if "unknown" in statuses or not statuses else "up-to-date"
+    result["checked_at"] = datetime.now(timezone.utc).isoformat()
+    return result
+
+
+def check_json(args):
+    """Background mode: no sudo, installs, refresh commands, cleanup or services."""
+    cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "mori-update"
+    with contextlib.redirect_stdout(io.StringIO()) as notes:
+        cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with (cache / "lock").open("w") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                result = {"version": 1, "busy": True, "status": "busy", "sources": [],
+                          "total": 0, "notes": ["An update or check is already running."]}
+            else:
+                available = sources(args, distro())
+                discovery_notes = notes.getvalue().strip().splitlines()
+                with tempfile.TemporaryDirectory(prefix="mori-update-") as database:
+                    previous = os.environ.get("CHECKUPDATES_DB")
+                    os.environ["CHECKUPDATES_DB"] = database
+                    try:
+                        result = json_report(args, available)
+                    finally:
+                        if previous is None:
+                            os.environ.pop("CHECKUPDATES_DB", None)
+                        else:
+                            os.environ["CHECKUPDATES_DB"] = previous
+                result["notes"] = discovery_notes
+                # Atomic replacement lets the widget restore the last check on reload.
+                with tempfile.NamedTemporaryFile(mode="w", dir=cache, delete=False) as state:
+                    json.dump(result, state)
+                    path = state.name
+                os.replace(path, cache / "status.json")
+    print(json.dumps(result))
+    return int(result["status"] == "error")
+
+
+def launch_updater():
+    terminal = shutil.which("foot")
+    if not terminal:
+        raise RuntimeError("Foot is not installed or is missing from PATH.")
+    # Detach the terminal so moving/disabling/reloading the widget cannot kill
+    # an in-progress package transaction.
+    subprocess.Popen([terminal, "--title", "Mori updates", str(Path(__file__).resolve()), "--refresh", "--wait"],
+                     start_new_session=True, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0
 
 
 SESSION_SERVICES = {name + ".service" for name in (
@@ -427,17 +755,17 @@ def select_services(units):
         print("  " + paint(f"{index:>2}", "yellow") + "  " + unit)
     while True:
         try:
-            answer = input(paint("  Restart services: numbers, 'all', or Enter to skip: ", "yellow")).strip()
+            answer = input(paint("  Restart services: numbers, 0/all for all, or Enter to skip: ", "yellow")).strip()
         except EOFError:
             return []
         if not answer:
             return []
-        if answer.lower() == "all":
+        if answer.lower() in ("0", "all"):
             return units
         parts = answer.split()
         if all(part.isdecimal() and 1 <= int(part) <= len(units) for part in parts):
             return list(dict.fromkeys(units[int(part) - 1] for part in parts))
-        detail("Choose the displayed numbers, 'all', or Enter.", "yellow")
+        detail("Choose the displayed numbers, 0/all, or Enter.", "yellow")
 
 
 def maintenance(args, scan_services=True):
@@ -491,7 +819,7 @@ def maintenance(args, scan_services=True):
 
 
 def main():
-    global VERBOSE
+    global VERBOSE, SESSION_CACHE, WAIT_ON_EXIT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", "--list", action="store_true", help="check only; never install packages")
     parser.add_argument("--refresh", action="store_true", help="refresh cached metadata/channels (may need sudo)")
@@ -504,12 +832,27 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="show commands and full check output")
     parser.add_argument("--maintenance", action="store_true", help="only check reboot/services; ask before restarting")
     parser.add_argument("--no-maintenance", action="store_true", help="skip reboot/service checks")
+    parser.add_argument("--clean", action="store_true", help="only offer cache cleanup; combine with --check to preview")
+    parser.add_argument("--no-cleanup", action="store_true", help="skip the cached-package cleanup step")
+    parser.add_argument("--json", action="store_true", help="read-only background check as JSON; no prompts or cleanup")
+    parser.add_argument("--launch", action="store_true", help="open the interactive updater in a detached Foot window")
+    parser.add_argument("--wait", action="store_true", help="wait for Enter before closing the terminal")
     args = parser.parse_args()
+    WAIT_ON_EXIT = args.wait and not args.json and not args.launch
     VERBOSE = args.verbose
     if args.maintenance and args.no_maintenance:
         parser.error("--maintenance and --no-maintenance cannot be combined")
+    if args.clean and (args.no_cleanup or args.maintenance):
+        parser.error("--clean cannot be combined with --no-cleanup or --maintenance")
+    if args.json and (args.refresh or args.clean or args.maintenance or args.launch):
+        parser.error("--json cannot be combined with refresh, cleanup, maintenance or launch")
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
+    if args.launch:
+        return launch_updater()
+    if args.json:
+        VERBOSE = False
+        return check_json(args)
     if not args.check and not sys.stdin.isatty():
         parser.error("interactive updates require a terminal; use --check")
     if os.geteuid() == 0:
@@ -523,11 +866,17 @@ def main():
         except BlockingIOError:
             print("mori-update is already running.", file=sys.stderr)
             return 1
+        if not args.check:
+            SESSION_CACHE = cache
         section("Mori · updates")
         detail("Check only" if args.check else "Review updates · choose what to install", "dim")
         if args.maintenance:
             return int(maintenance(args))
-        available = sources(args, distro())
+        info = distro()
+        manager = backend(info) if args.backend == "auto" else args.backend
+        available = sources(args, info)
+        if args.clean:
+            return int(cleanup_caches(args, manager, available))
         if not available:
             print("No supported package sources found.", file=sys.stderr)
             return 1
@@ -541,6 +890,8 @@ def main():
                 except RuntimeError as error:
                     detail(f"{source.name}: {error}", "red")
                     failed = True
+        if not args.no_cleanup:
+            failed = cleanup_caches(args, manager, available) or failed
         if not args.no_maintenance and any(source.privileged for source in available):
             try:
                 failed = maintenance(args, scan_services=not args.check) or failed
@@ -562,3 +913,14 @@ if __name__ == "__main__":
     except RuntimeError as error:
         print(f"mori-update: {error}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        if SESSION_CACHE is not None:
+            try:
+                (SESSION_CACHE / "last-session").write_text(str(time.time_ns()))
+            except OSError:
+                pass
+        if WAIT_ON_EXIT and sys.stdin.isatty():
+            try:
+                input(paint("\n  Press Enter to close… ", "yellow"))
+            except (EOFError, KeyboardInterrupt):
+                pass

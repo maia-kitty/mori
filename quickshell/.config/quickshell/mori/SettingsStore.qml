@@ -12,6 +12,8 @@ Item {
     property bool mediaEnabled: true
     property bool kdeConnectEnabled: true
     property bool systemTrayEnabled: true
+    property bool updatesEnabled: true
+    property int updateIntervalMinutes: 60
     property bool networkEnabled: true
     property bool volumeEnabled: true
     property bool brightnessEnabled: true
@@ -31,7 +33,7 @@ Item {
     property var leftModuleOrder: ["calendar", "media", "kdeConnect"]
     property var centerModuleOrder: ["workspaces"]
     property var rightModuleOrder: [
-        "systemTray", "network", "volume", "brightness", "wallpaper", "notifications", "battery",
+        "systemTray", "updates", "network", "volume", "brightness", "wallpaper", "notifications", "battery",
         "powerMenu"
     ]
     property var moduleColors: ({
@@ -39,6 +41,7 @@ Item {
         "media": "aqua",
         "kdeConnect": "orange",
         "systemTray": "fg",
+        "updates": "green",
         "network": "blue",
         "volume": "yellow",
         "brightness": "yellow",
@@ -83,6 +86,7 @@ Item {
         case "media": return mediaEnabled
         case "kdeConnect": return kdeConnectEnabled
         case "systemTray": return systemTrayEnabled
+        case "updates": return updatesEnabled
         case "network": return networkEnabled
         case "volume": return volumeEnabled
         case "brightness": return brightnessEnabled
@@ -101,6 +105,7 @@ Item {
         case "media": mediaEnabled = enabled; break
         case "kdeConnect": kdeConnectEnabled = enabled; break
         case "systemTray": systemTrayEnabled = enabled; break
+        case "updates": updatesEnabled = enabled; break
         case "network": networkEnabled = enabled; break
         case "volume": volumeEnabled = enabled; break
         case "brightness": brightnessEnabled = enabled; break
@@ -112,6 +117,13 @@ Item {
         default: return
         }
 
+        noteChange()
+    }
+
+    function setUpdateInterval(minutes) {
+        if ([0, 15, 60, 180].indexOf(minutes) < 0 || updateIntervalMinutes === minutes)
+            return
+        updateIntervalMinutes = minutes
         noteChange()
     }
 
@@ -225,7 +237,7 @@ Item {
         const defaultLeft = ["calendar", "media", "kdeConnect"]
         const defaultCenter = ["workspaces"]
         const defaultRight = [
-            "systemTray", "network", "volume", "brightness", "wallpaper",
+            "systemTray", "updates", "network", "volume", "brightness", "wallpaper",
             "notifications", "battery", "powerMenu"
         ]
         const allowed = defaultLeft.concat(defaultCenter, defaultRight)
@@ -299,6 +311,9 @@ Item {
                 }
 
                 const clock = parsed.clock || {}
+                const updates = parsed.updates || {}
+                if ([0, 15, 60, 180].indexOf(updates.intervalMinutes) >= 0)
+                    updateIntervalMinutes = updates.intervalMinutes
                 if (["24h", "12h"].indexOf(clock.timeFormat) >= 0)
                     clockTimeFormat = clock.timeFormat
                 if (["yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"].indexOf(clock.dateFormat) >= 0)
@@ -321,6 +336,7 @@ Item {
                 "media": mediaEnabled,
                 "kdeConnect": kdeConnectEnabled,
                 "systemTray": systemTrayEnabled,
+                "updates": updatesEnabled,
                 "network": networkEnabled,
                 "volume": volumeEnabled,
                 "brightness": brightnessEnabled,
@@ -336,6 +352,7 @@ Item {
                 "right": rightModuleOrder
             },
             "colors": moduleColors,
+            "updates": { "intervalMinutes": updateIntervalMinutes },
             "power": powerCommands,
             "compact": {
                 "media": mediaCompact,

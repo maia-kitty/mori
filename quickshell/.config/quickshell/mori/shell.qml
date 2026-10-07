@@ -14,6 +14,7 @@ ShellRoot {
     BatteryWarning {}
 
     NiriEvents { id: niriState }
+    UpdateService { id: updateService; settings: settings }
 
     NotificationServer {
         id: notificationServer
@@ -28,6 +29,7 @@ ShellRoot {
         overviewOpen: niriState.overviewOpen
         niriEvents: niriState
         settings: settings
+        updateService: updateService
         // Keep the bar on the primary output. Without an explicit screen,
         // Quickshell may remap the panel to the currently active monitor.
         screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null

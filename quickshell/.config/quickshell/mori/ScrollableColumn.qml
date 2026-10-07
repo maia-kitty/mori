@@ -12,6 +12,8 @@ Flickable {
     boundsBehavior: Flickable.StopAtBounds
     clip: true
 
+    function forceLayout() { contentColumn.forceLayout() }
+
     Column {
         id: contentColumn
         width: root.width

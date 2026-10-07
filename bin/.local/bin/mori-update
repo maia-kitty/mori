@@ -270,7 +270,8 @@ def process(source, args):
 
 SESSION_SERVICES = {name + ".service" for name in (
     "display-manager", "gdm", "plasmalogin", "sddm", "lightdm", "lxdm", "slim",
-    "xdm", "greetd", "nodm", "ly", "lemurs", "systemd-logind", "dbus", "dbus-broker",
+    "xdm", "greetd", "nodm", "ly", "lemurs", "systemd-logind", "elogind",
+    "dbus", "dbus-broker",
 )}
 
 
@@ -294,6 +295,67 @@ def reboot_reasons():
     return reasons
 
 
+def runit_service_for_pid(pid, executable, proc_root=Path("/proc"),
+                          service_root=Path("/var/service")):
+    """Only trust an enabled runsv ancestor of the process xcheckrestart found."""
+    try:
+        if os.readlink(proc_root / str(pid) / "exe") != executable:
+            return None  # The PID exited and may have been reused since the scan.
+    except OSError:
+        return None
+    seen = set()
+    while pid > 1 and pid not in seen:
+        seen.add(pid)
+        process = proc_root / str(pid)
+        try:
+            stat = (process / "stat").read_text()
+            # The comm field is parenthesized and may contain spaces or ')'.
+            end_of_comm = stat.rfind(") ")
+            if end_of_comm < 0:
+                return None
+            parent = int(stat[end_of_comm + 2:].split()[1])
+        except (OSError, ValueError, IndexError):
+            return None
+        if parent <= 1:
+            return None
+        supervisor = proc_root / str(parent)
+        try:
+            args = (supervisor / "cmdline").read_bytes().split(b"\0")
+            supervisor_exe = Path(os.readlink(supervisor / "exe")).name
+        except OSError:
+            return None
+        if supervisor_exe == "runsv" and len(args) > 1:
+            argument = os.fsdecode(args[1])
+            name = Path(argument).name
+            if (re.fullmatch(r"[A-Za-z0-9_@.:-]+", name)
+                    and not name.startswith("-")
+                    and (argument == name or Path(argument).resolve() ==
+                         (service_root / name).resolve())
+                    and (service_root / name).is_dir()):
+                return name
+            return None
+        pid = parent
+    return None
+
+
+def xcheckrestart_services(output):
+    units = set()
+    other = 0
+    for line in output.splitlines():
+        match = re.fullmatch(r"([1-9][0-9]*) (.+) \([^()]*\)", line)
+        if not match:
+            continue
+        unit = runit_service_for_pid(int(match[1]), match[2])
+        if unit:
+            units.add(unit)
+        else:
+            other += 1
+    if other:
+        detail(f"{other} outdated process(es) are not linked to enabled runit services; "
+               "restart those applications or log out as appropriate.", "yellow")
+    return sorted(units)
+
+
 def restart_scan(timeout):
     """Read-only probes. Never run a tool's default automatic restart mode."""
     if shutil.which("needrestart"):
@@ -305,6 +367,9 @@ def restart_scan(timeout):
     elif systemd_running() and shutil.which("needs-restarting"):
         command = ["needs-restarting", "-s"]
         kind = "dnf"
+    elif not systemd_running() and shutil.which("sv") and shutil.which("xcheckrestart"):
+        command = ["xcheckrestart"]
+        kind = "xcheckrestart"
     else:
         return None, []
     detail("Scanning services (may ask for your password)…", "dim")
@@ -327,13 +392,16 @@ def restart_scan(timeout):
             reasons.append("A CPU microcode upgrade is pending (needrestart).")
     elif kind == "checkservices":
         units = re.findall(r"^'([^']+\.service)'\s*$", output, re.M)
+    elif kind == "xcheckrestart":
+        units = xcheckrestart_services(output)
     else:
         units = re.findall(r"^([\w@.\\:-]+\.service)\s*$", output, re.M)
     # Validate names before giving them to an init tool. Do not include the
     # display/login/session infrastructure in the restart selection.
     units = sorted({unit for unit in units if re.fullmatch(r"[A-Za-z0-9_@.\\:-]+", unit)
                     and not unit.startswith("-")})
-    excluded = [unit for unit in units if unit in SESSION_SERVICES or unit.startswith("user@")]
+    excluded = [unit for unit in units if unit.removesuffix(".service") + ".service"
+                in SESSION_SERVICES or unit.startswith("user@")]
     if excluded:
         detail("Session services need a logout/reboot: " + ", ".join(excluded), "yellow")
     return [unit for unit in units if unit not in excluded], reasons
@@ -381,7 +449,8 @@ def maintenance(args, scan_services=True):
             units, extra = restart_scan(args.timeout)
             reasons.extend(extra)
             if units is None:
-                detail("Service check unavailable — install needrestart, or checkservices on Arch.", "dim")
+                detail("Service check unavailable — install needrestart, checkservices on Arch, "
+                       "or xtools-minimal on Void.", "dim")
             elif not units:
                 detail("No services needing a restart were reported.", "green")
             else:

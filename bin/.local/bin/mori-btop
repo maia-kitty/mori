@@ -8,4 +8,4 @@ if [ -n "$window_id" ]; then
     exec niri msg action focus-window --id "$window_id"
 fi
 
-exec kitty --class btop --title btop btop
+exec foot --app-id btop --title btop btop

@@ -229,18 +229,28 @@ Item {
                         readonly property bool available: root.actionAvailable(modelData)
                         opacity: available ? 1 : 0.4
                         width: menuItems.width
-                        implicitHeight: 20
+                        implicitHeight: Theme.controlHeight
 
+                        Rectangle {
+                            anchors.fill: parent
+                            color: Theme.controlBackground(false, index === root.selectedActionIndex,
+                                buttonArea.containsMouse && available)
+                            border.width: 1
+                            border.color: available && (buttonArea.containsMouse || index === root.selectedActionIndex)
+                                ? root.accent : Theme.bg4
+                        }
                         Rectangle {
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
-                            width: parent.width * parent.holdProgress
+                            anchors.margins: 1
+                            width: Math.max(0, parent.width - 2) * parent.holdProgress
                             color: modelData.label === "Power off" ? Theme.bgred : Theme.bg4
                         }
 
                         Text {
                             anchors.left: parent.left
+                            anchors.leftMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: (index === root.selectedActionIndex ? "› " : "  ")
                                 + modelData.label
@@ -252,20 +262,12 @@ Item {
 
                         Text {
                             anchors.right: parent.right
+                            anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.shortcut
                             color: modelData.label === "Power off" ? root.accent : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
-                        }
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: 1
-                            visible: index < powerActions.count - 1
-                            color: Theme.bg4
                         }
 
                         Timer {
@@ -297,8 +299,8 @@ Item {
                             id: buttonArea
                             enabled: parent.available
                             anchors.fill: parent
+                            hoverEnabled: true
                             onPressed: {
-                                root.selectedActionIndex = parent.index
                                 parent.holdProgress = 0
                             }
                             onReleased: parent.holdProgress = 0

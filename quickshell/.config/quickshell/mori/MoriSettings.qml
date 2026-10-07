@@ -166,11 +166,11 @@ Item {
     }
 
     function controlBackground(selected, focused, hovered) {
-        return selected ? Theme.bg3 : focused || hovered ? Theme.bg2 : Theme.bg1
+        return Theme.controlBackground(selected, focused, hovered)
     }
 
     function controlBorder(selected, focused, hovered) {
-        return selected || focused || hovered ? Theme.fg : Theme.bg4
+        return Theme.controlBorder(selected, focused, hovered)
     }
 
     function pageTitle() {
@@ -854,6 +854,9 @@ Item {
                     "modeIndex": Math.max(0, modeIndex)
                 })
             }
+            // Stable sort keeps the compositor's order within each group.
+            result.sort((left, right) => Number(/^DP(?:-|$)/i.test(right.connector))
+                - Number(/^DP(?:-|$)/i.test(left.connector)))
             displays = result
             displayDirty = false
             selectedDisplay = result.length > 0 ? result[0].connector : ""
@@ -1509,7 +1512,9 @@ Item {
             width: parent ? parent.width : 0
             height: 38
             opacity: root.draggingModule === moduleKey ? 0 : 1
-            color: hoverHandler.hovered ? Theme.bg2 : "transparent"
+            color: root.controlBackground(false, root.keyboardModule === moduleRow.moduleKey, hoverHandler.hovered)
+            border.width: 1
+            border.color: root.controlBorder(false, root.keyboardModule === moduleRow.moduleKey, hoverHandler.hovered)
 
             transform: Translate {
                 y: root.modulePreviewOffset(
@@ -1590,14 +1595,6 @@ Item {
                             color: moduleRow.moduleCompact ? Theme.fg : Theme.grey1
                             font.family: Theme.fontFamily
                             font.pixelSize: Math.max(10, Theme.fontSize - 1)
-                        }
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 10
-                            height: 10
-                            color: moduleRow.moduleCompact ? Theme.fg : "transparent"
-                            border.width: 1
-                            border.color: Theme.fg
                         }
                     }
 
@@ -1684,7 +1681,7 @@ Item {
             anchors.centerIn: parent
             width: Math.min(600, settingsWindow.width - 48)
             height: Math.min(650, settingsWindow.height - 48)
-            color: Theme.bg
+            color: Theme.bg1
             border.width: 2
             border.color: Theme.fg
 
@@ -1699,7 +1696,7 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 18
-                height: 30
+                height: Theme.controlHeight
 
                 Rectangle {
                     id: backButton
@@ -1708,10 +1705,10 @@ Item {
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
                     width: 28
-                    height: 28
-                    color: Theme.bg1
+                    height: Theme.controlHeight
+                    color: root.controlBackground(false, false, backHover.hovered)
                     border.width: 1
-                    border.color: Theme.fg
+                    border.color: root.controlBorder(false, false, backHover.hovered)
 
                     SettingsLabel {
                         anchors.centerIn: parent
@@ -1720,6 +1717,7 @@ Item {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize + 2
                     }
+                    HoverHandler { id: backHover }
                     TapHandler { onTapped: root.page = "home" }
                 }
                 SettingsLabel {
@@ -1737,10 +1735,10 @@ Item {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: 28
-                    height: 28
-                    color: Theme.bg1
+                    height: Theme.controlHeight
+                    color: root.controlBackground(false, false, closeHover.hovered)
                     border.width: 1
-                    border.color: Theme.fg
+                    border.color: root.controlBorder(false, false, closeHover.hovered)
 
                     SettingsLabel {
                         anchors.centerIn: parent
@@ -1749,6 +1747,7 @@ Item {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize + 2
                     }
+                    HoverHandler { id: closeHover }
                     TapHandler { onTapped: root.close() }
                 }
             }
@@ -1766,7 +1765,7 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 90
                 width: 84
-                height: 28
+                height: Theme.controlHeight
                 color: ready ? Theme.bg2 : Theme.bg1
                 border.width: 1
                 border.color: ready ? Theme.fg : Theme.bg4
@@ -1925,7 +1924,7 @@ Item {
                                                 text: (categoryRow.index === root.keyboardCategoryIndex
                                                     ? "› " : "  ") + categoryRow.modelData.label
                                                 color: categoryRow.index === root.keyboardCategoryIndex
-                                                    || categoryHover.hovered ? Theme.fg : Theme.grey1
+                                                    ? Theme.fg : Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                             }
@@ -2103,7 +2102,9 @@ Item {
                                         readonly property string moduleKey: modelData
                                         width: parent.width
                                         height: 48
-                                        color: colorHover.hovered ? Theme.bg2 : "transparent"
+                                        color: root.controlBackground(false, index === root.keyboardColorRow, colorHover.hovered)
+                                        border.width: 1
+                                        border.color: root.controlBorder(false, index === root.keyboardColorRow, colorHover.hovered)
                                         SettingsLabel {
                                             anchors.left: parent.left
                                             anchors.leftMargin: 8
@@ -2206,7 +2207,7 @@ Item {
                                                     clockRow.modelData.key) === modelData
                                                 readonly property bool focused: clockRow.index === root.keyboardClockIndex && selected
                                                 width: Math.max(92, choiceContent.implicitWidth + 20)
-                                                height: 30
+                                                height: Theme.controlHeight
                                                 color: root.controlBackground(selected, focused, choiceHover.hovered)
                                                 border.width: 1
                                                 border.color: root.controlBorder(selected, focused, choiceHover.hovered)
@@ -2217,17 +2218,9 @@ Item {
                                                     spacing: 6
                                                     SettingsLabel {
                                                         text: clockRow.modelData.labels[clockChoice.index]
-                                                        color: clockChoice.selected || choiceHover.hovered ? Theme.fg : Theme.grey1
+                                                        color: clockChoice.selected || clockChoice.focused ? Theme.fg : Theme.grey1
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: Theme.fontSize
-                                                    }
-                                                    Rectangle {
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        width: 10
-                                                        height: 10
-                                                        color: clockChoice.selected ? Theme.fg : "transparent"
-                                                        border.width: 1
-                                                        border.color: Theme.fg
                                                     }
                                                 }
                                                 HoverHandler { id: choiceHover }
@@ -2290,8 +2283,8 @@ Item {
                                         required property int index
                                         readonly property bool focused: index === root.keyboardUpdateIndex
                                         readonly property bool selected: root.settings.updateIntervalMinutes === modelData.minutes
-                                        width: 92
-                                        height: 30
+                                        width: 100
+                                        height: Theme.controlHeight
                                         color: root.controlBackground(selected, focused, updateHover.hovered)
                                         border.width: 1
                                         border.color: root.controlBorder(selected, focused, updateHover.hovered)
@@ -2299,18 +2292,10 @@ Item {
                                             anchors.centerIn: parent
                                             spacing: 6
                                             SettingsLabel {
-                                                text: updateChoice.modelData.label
-                                                color: updateChoice.selected || updateChoice.focused || updateHover.hovered ? Theme.fg : Theme.grey1
+                                                text: (updateChoice.focused ? "› " : "  ") + updateChoice.modelData.label
+                                                color: updateChoice.selected || updateChoice.focused ? Theme.fg : Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
-                                            }
-                                            Rectangle {
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                width: 10
-                                                height: 10
-                                                color: updateChoice.selected ? Theme.fg : "transparent"
-                                                border.width: 1
-                                                border.color: Theme.fg
                                             }
                                         }
                                         HoverHandler { id: updateHover }
@@ -2417,7 +2402,7 @@ Item {
                                             color: root.controlBackground(false, commandField.activeFocus, commandField.hovered)
                                             border.width: 1
                                             border.color: root.powerErrors[powerRow.modelData.key] ? Theme.red
-                                                : commandField.activeFocus ? Theme.fg : Theme.bg4
+                                                : root.controlBorder(false, commandField.activeFocus, commandField.hovered)
                                         }
                                         onTextEdited: root.setPowerDraft(powerRow.modelData.key, text)
                                         onActiveFocusChanged: {
@@ -2507,9 +2492,10 @@ Item {
                                     }
                                     width: parent.width
                                     height: 54
-                                    color: root.controlBackground(false, index === root.keyboardInputIndex, false)
+                                    color: root.controlBackground(false, index === root.keyboardInputIndex, inputHover.hovered)
                                     border.width: 1
-                                    border.color: root.controlBorder(false, index === root.keyboardInputIndex, false)
+                                    border.color: root.controlBorder(false, index === root.keyboardInputIndex, inputHover.hovered)
+                                    HoverHandler { id: inputHover }
 
                                     SettingsLabel {
                                         anchors.left: parent.left
@@ -2531,7 +2517,7 @@ Item {
                                         anchors.rightMargin: 112
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 150
-                                        height: 28
+                                        height: Theme.controlHeight
                                         placeholderText: "System default"
                                         verticalAlignment: TextInput.AlignVCenter
                                         leftPadding: 8
@@ -2547,7 +2533,7 @@ Item {
                                         background: Rectangle {
                                             color: Theme.bg2
                                             border.width: 1
-                                            border.color: layoutField.activeFocus ? Theme.fg : Theme.bg4
+                                            border.color: root.controlBorder(false, layoutField.activeFocus, layoutField.hovered)
                                         }
                                         onTextChanged: if (visible) root.keyboardLayoutDraft = text
                                         onActiveFocusChanged: {
@@ -2699,7 +2685,7 @@ Item {
 
                                     Rectangle {
                                         width: refreshLabel.implicitWidth + 20
-                                        height: 30
+                                        height: Theme.controlHeight
                                         color: refreshHover.hovered ? Theme.bg2 : Theme.bg1
                                         border.width: 1
                                         border.color: Theme.fg
@@ -2737,7 +2723,8 @@ Item {
                                     font.pixelSize: Theme.fontSize
                                 }
 
-                                Row {
+                                Flow {
+                                    width: parent.width
                                     spacing: 8
                                     Repeater {
                                         model: root.displays
@@ -2745,7 +2732,7 @@ Item {
                                             id: displaySelector
                                             required property var modelData
                                             width: selectorLabel.implicitWidth + 18
-                                            height: 30
+                                            height: Theme.controlHeight
                                             color: root.controlBackground(root.selectedDisplay === modelData.connector,
                                                 root.keyboardDisplaySection === "outputs" && root.selectedDisplay === modelData.connector, displaySelectorHover.hovered)
                                             border.width: 1
@@ -2755,12 +2742,12 @@ Item {
                                             SettingsLabel {
                                                 id: selectorLabel
                                                 anchors.centerIn: parent
-                                                text: displaySelector.modelData.connector
+                                                text: (root.keyboardDisplaySection === "outputs"
+                                                    && root.selectedDisplay === displaySelector.modelData.connector ? "› " : "  ")
+                                                    + displaySelector.modelData.connector
                                                     + (displaySelector.modelData.enabled ? "" : " · off")
                                                 color: root.selectedDisplay === displaySelector.modelData.connector
                                                     ? Theme.fg : Theme.grey1
-                                                font.underline: root.keyboardDisplaySection === "outputs"
-                                                    && root.selectedDisplay === displaySelector.modelData.connector
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                             }
@@ -2884,10 +2871,14 @@ Item {
                                         anchors.right: parent.right
                                         anchors.margins: 10
                                         width: displayEnabledLabel.implicitWidth + 18
-                                        height: 26
-                                        color: displayEnabledHover.hovered ? Theme.bg2 : Theme.bgdim
+                                        height: Theme.controlHeight
+                                        color: Theme.controlBackground(false,
+                                            root.keyboardDisplaySection === "editor" && root.keyboardDisplayField === 0,
+                                            displayEnabledHover.hovered)
                                         border.width: 1
-                                        border.color: Theme.fg
+                                        border.color: Theme.controlBorder(false,
+                                            root.keyboardDisplaySection === "editor" && root.keyboardDisplayField === 0,
+                                            displayEnabledHover.hovered)
                                         opacity: displayEditor.output
                                             && (displayEditor.output.enabled
                                                 ? root.enabledDisplayCount() > 1 : true) ? 1 : 0.45
@@ -2900,8 +2891,6 @@ Item {
                                             color: Theme.fg
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
-                                            font.underline: root.keyboardDisplaySection === "editor"
-                                                && root.keyboardDisplayField === 0
                                         }
                                         HoverHandler { id: displayEnabledHover }
                                         TapHandler {
@@ -3139,19 +3128,18 @@ Item {
 
                         Rectangle {
                             width: keepLabel.implicitWidth + 18
-                            height: 30
-                            color: keepHover.hovered ? Theme.bg3 : Theme.bg2
+                            height: Theme.controlHeight
+                            color: Theme.controlBackground(false, root.keyboardConfirmationIndex === 0, keepHover.hovered)
                             border.width: 1
                             border.color: Theme.fg
                             SettingsLabel {
                                 id: keepLabel
                                 anchors.centerIn: parent
-                                text: "Keep"
+                                text: (root.keyboardConfirmationIndex === 0 ? "› " : "  ") + "Keep"
                                 color: root.keyboardConfirmationIndex === 0
                                     ? Theme.fg : Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
-                                font.underline: root.keyboardConfirmationIndex === 0
                             }
                             HoverHandler { id: keepHover }
                             TapHandler { onTapped: root.keepDisplayConfiguration() }
@@ -3159,19 +3147,18 @@ Item {
 
                         Rectangle {
                             width: revertLabel.implicitWidth + 18
-                            height: 30
-                            color: revertHover.hovered ? Theme.bg3 : Theme.bg2
+                            height: Theme.controlHeight
+                            color: Theme.controlBackground(false, root.keyboardConfirmationIndex === 1, revertHover.hovered)
                             border.width: 1
                             border.color: Theme.fg
                             SettingsLabel {
                                 id: revertLabel
                                 anchors.centerIn: parent
-                                text: "Revert"
+                                text: (root.keyboardConfirmationIndex === 1 ? "› " : "  ") + "Revert"
                                 color: root.keyboardConfirmationIndex === 1
                                     ? Theme.fg : Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
-                                font.underline: root.keyboardConfirmationIndex === 1
                             }
                             HoverHandler { id: revertHover }
                             TapHandler {

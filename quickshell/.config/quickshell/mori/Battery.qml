@@ -250,9 +250,12 @@ Row {
                                 || root.performanceAvailable)
                         readonly property bool selected: root.currentProfile === modelData.profile
                         width: menuColumn.width
-                        height: 30
-                        color: profileHover.hovered && available
-                            ? Theme.bg2 : "transparent"
+                        height: Theme.controlHeight
+                        color: Theme.controlBackground(selected, index === root.keyboardProfileIndex,
+                            profileHover.hovered && available)
+                        border.width: 1
+                        border.color: available ? Theme.controlBorder(selected,
+                            index === root.keyboardProfileIndex, profileHover.hovered, root.accent) : Theme.bg4
 
                         Text {
                             anchors.left: parent.left
@@ -261,9 +264,8 @@ Row {
                             text: (profileRow.index === root.keyboardProfileIndex ? "› " : "  ")
                                 + profileRow.modelData.label
                             color: profileRow.available
-                                ? profileRow.selected || profileRow.index === root.keyboardProfileIndex
-                                    ? root.accent : Theme.fg
-                                : Theme.grey
+                                ? profileRow.selected ? root.accent : Theme.fg
+                                : Theme.disabledText
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
@@ -274,7 +276,7 @@ Row {
                             anchors.verticalCenter: parent.verticalCenter
                             text: profileRow.available
                                 ? profileRow.modelData.shortcut
-                                    + (profileRow.selected ? " · Active" : "")
+
                                 : profileRow.modelData.shortcut + " · Unavailable"
                             color: profileRow.available && profileRow.selected
                                 ? root.accent : Theme.grey1

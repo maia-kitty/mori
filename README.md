@@ -31,7 +31,7 @@ I personally use CachyOs so it was made with it in mind.
 | Python 3.9+ | Mori updater and Updates widget |
 | Zenity | Wallpaper folder picker and Wi-Fi password dialog |
 
-KDE Connect is optional. If its QML module is unavailable, the KDE Connect bar widget stays hidden while the rest of the shell loads. Sending the clipboard from that widget requires `kdeconnect-cli`.
+KDE Connect is optional. If its QML module is unavailable, the enabled KDE Connect bar widget shows “Unavailable” while the rest of the shell loads. Sending the clipboard from that widget requires `kdeconnect-cli`.
 
 On a standalone `wpa_supplicant` setup, the network popup can add open and WPA-Personal networks. Saving new connections across restarts also requires `wpa_supplicant` to allow `SAVE_CONFIG` (`update_config=1`).
 
@@ -61,7 +61,6 @@ These applications have configurations, themes, or shortcuts here. They are opti
 | Software | What it is (for) |
 | --- | --- |
 | Fish | Shell of choice |
-| Kitty | Alternative terminal with a bundled configuration |
 | Neovim / LazyVim | CLI Editor |
 | Zed | GUI Editor |
 | Yazi | CLI file manager |
@@ -89,7 +88,7 @@ stow -t ~ fonts bin niri quickshell systemd foot fuzzel swaylock
 fc-cache -f ~/.local/share/fonts
 ```
 
-Foot is the default terminal for Mod+T, Fuzzel, btop, and the Updates widget. The `foot` package includes the Everforest palette, IBM Plex Mono with Symbols Nerd Font fallback, and terminal key bindings. The `kitty` package remains available as an optional alternative configuration.
+Foot is the default terminal for Mod+T, Fuzzel, btop, and the Updates widget. The `foot` package includes the Everforest palette, IBM Plex Mono with Symbols Nerd Font fallback, and terminal key bindings.
 
 Choose only the packages you want. Other home-directory packages, such as `gtk`, `qt`, `fish`, or `nvim`, can be stowed individually. Back up conflicting files before replacing them. Keep the checkout in place: the installed symlinks point into it.
 
@@ -173,7 +172,7 @@ This helper does not enable a tray app or scheduled checks or remove installed p
 
 ### Updates widget
 
-The Mori bar's **Updates** module shows the number of pending updates and opens a popup with package lists, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Modules**. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
+The Mori bar's **Updates** module shows the number of pending updates and opens a popup with per-source update counts, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Modules**. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
 
 Checks run shortly after startup and hourly by default. Choose **15 min**, **1 hour**, **3 hours**, or **Manual** in **Settings → Updates**; the interval saves with the other Mori settings. Disabling the module stops future scheduled checks. **Check now** (`C`) starts a read-only check. **Update** (`U`) opens Foot with `mori-update --refresh`, where password prompts, update confirmations, cleanup, service restarts, and reboots are handled. Foot waits for Enter after completion so you can review the output, then closes. It runs independently of the widget. The bar rechecks after the updater session completes. Press Up/Down to scroll or Escape to close.
 

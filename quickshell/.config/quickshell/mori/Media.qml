@@ -10,6 +10,7 @@ Item {
     required property var panelWindow
     required property var popupCoordinator
     property var player: null
+    property int keyboardPlayerIndex: 0
     property bool playerManuallySelected: false
     property color accent: Theme.aqua
     property bool compactMode: false
@@ -57,6 +58,7 @@ Item {
             close()
         } else {
             selectPlayer()
+            keyboardPlayerIndex = Math.max(0, Mpris.players.values.indexOf(player))
             popupCoordinator.showPopup(root)
             popup.visible = true
         }
@@ -66,6 +68,28 @@ Item {
     function handleKeyPressed(event) {
         if (event.key === Qt.Key_Escape) {
             close()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            const players = Mpris.players.values
+            if (!players.length) return
+            keyboardPlayerIndex = Math.max(0, Math.min(players.length - 1,
+                keyboardPlayerIndex + (event.key === Qt.Key_Up ? -1 : 1)))
+            Qt.callLater(() => {
+                const row = playerRows.itemAt(keyboardPlayerIndex)
+                if (!row) return
+                const y = row.mapToItem(details.contentItem, 0, 0).y
+                if (y < details.contentY) details.contentY = y
+                else if (y + row.height > details.contentY + details.height)
+                    details.contentY = y + row.height - details.height
+            })
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            const candidate = Mpris.players.values[keyboardPlayerIndex]
+            if (candidate) choosePlayer(candidate)
             event.accepted = true
             return
         }
@@ -141,7 +165,7 @@ Item {
     PopupWindow {
         id: popup
         implicitWidth: 340
-        implicitHeight: details.implicitHeight + 24
+        implicitHeight: Math.min(details.implicitHeight + 24, root.panelWindow.screen ? Math.max(80, root.panelWindow.screen.height - root.panelWindow.height - 24) : 440)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -164,11 +188,9 @@ Item {
             border.width: 2
             border.color: root.hasPlayer && root.player.isPlaying ? root.accent : Theme.grey
 
-            Column {
+            ScrollableColumn {
                 id: details
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
+                anchors.fill: parent
                 anchors.margins: 12
                 spacing: 8
 
@@ -231,13 +253,18 @@ Item {
                     topPadding: 4
                 }
                 Repeater {
+                    id: playerRows
                     model: Mpris.players
 
-                    delegate: Item {
+                    delegate: Rectangle {
                         required property var modelData
                         required property int index
                         width: details.width
-                        height: 30
+                        height: Theme.controlHeight
+                        color: Theme.controlBackground(modelData === root.player, index === root.keyboardPlayerIndex, playerHover.hovered)
+                        border.width: 1
+                        border.color: Theme.controlBorder(modelData === root.player, index === root.keyboardPlayerIndex, playerHover.hovered, root.accent)
+                        HoverHandler { id: playerHover }
 
                         Text {
                             anchors.left: parent.left
@@ -245,7 +272,7 @@ Item {
                             anchors.leftMargin: 8
                             anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.identity || modelData.dbusName
+                            text: (index === root.keyboardPlayerIndex ? "› " : "  ") + (modelData.identity || modelData.dbusName)
                             color: modelData === root.player ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
@@ -273,39 +300,35 @@ Item {
                     }
                 }
                 Row {
-                    width: parent.width
-                    spacing: 20
-                    enabled: root.hasPlayer && root.player.canControl
-
-                    Text {
-                        text: String.fromCodePoint(0xf04ae)
-                        color: parent.enabled && root.player.canGoPrevious ? root.accent : Theme.grey
-                        font.family: Theme.nerdFontFamily
-                        font.pixelSize: 20
-                        TapHandler {
-                            enabled: root.hasPlayer && root.player.canGoPrevious
-                            onTapped: root.player.previous()
-                        }
-                    }
-                    Text {
-                        text: root.hasPlayer && root.player.isPlaying
-                            ? String.fromCodePoint(0xf03e4) : String.fromCodePoint(0xf040a)
-                        color: parent.enabled && root.player.canTogglePlaying ? root.accent : Theme.grey
-                        font.family: Theme.nerdFontFamily
-                        font.pixelSize: 20
-                        TapHandler {
-                            enabled: root.hasPlayer && root.player.canTogglePlaying
-                            onTapped: root.player.togglePlaying()
-                        }
-                    }
-                    Text {
-                        text: String.fromCodePoint(0xf04ad)
-                        color: parent.enabled && root.player.canGoNext ? root.accent : Theme.grey
-                        font.family: Theme.nerdFontFamily
-                        font.pixelSize: 20
-                        TapHandler {
-                            enabled: root.hasPlayer && root.player.canGoNext
-                            onTapped: root.player.next()
+                    spacing: 8
+                    Repeater {
+                        model: [
+                            { icon: 0xf04ae, action: "previous" },
+                            { icon: root.hasPlayer && root.player.isPlaying ? 0xf03e4 : 0xf040a, action: "togglePlaying" },
+                            { icon: 0xf04ad, action: "next" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool available: root.hasPlayer && root.player.canControl
+                                && (modelData.action === "previous" ? root.player.canGoPrevious
+                                    : modelData.action === "next" ? root.player.canGoNext : root.player.canTogglePlaying)
+                            width: 38
+                            height: Theme.controlHeight
+                            color: Theme.controlBackground(false, false, available && playbackHover.hovered)
+                            border.width: 1
+                            border.color: available ? root.accent : Theme.bg4
+                            Text {
+                                anchors.centerIn: parent
+                                text: String.fromCodePoint(modelData.icon)
+                                color: available ? root.accent : Theme.disabledText
+                                font.family: Theme.nerdFontFamily
+                                font.pixelSize: 20
+                            }
+                            HoverHandler { id: playbackHover }
+                            TapHandler {
+                                enabled: available
+                                onTapped: root.player[modelData.action]()
+                            }
                         }
                     }
                 }

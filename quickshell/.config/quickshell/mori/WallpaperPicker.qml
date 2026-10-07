@@ -286,31 +286,49 @@ Item {
                         id: folderActions
                         spacing: 12
 
-                        Text {
-                            text: "↑ Up"
-                            color: up.enabled ? root.accent : Theme.grey
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                        Rectangle {
+                            width: upText.implicitWidth + 20
+                            height: Theme.controlHeight
+                            readonly property bool available: files.folder.toString() !== root.wallpaperFolder.toString()
+                            color: Theme.controlBackground(false, false, available && upHover.hovered)
+                            border.width: 1
+                            border.color: available ? root.accent : Theme.bg4
+                            Text {
+                                id: upText
+                                anchors.centerIn: parent
+                                text: "↑ Up"
+                                color: parent.available ? root.accent : Theme.disabledText
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            HoverHandler { id: upHover }
                             TapHandler {
-                                id: up
-                                enabled: files.folder.toString() !== root.wallpaperFolder.toString()
+                                enabled: parent.available
                                 onTapped: root.goToParent()
                             }
                         }
-                        Text {
-                            text: "Choose folder  F"
-                            color: root.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-
+                        Rectangle {
+                            width: folderText.implicitWidth + 20
+                            height: Theme.controlHeight
+                            color: Theme.controlBackground(false, false, folderHover.hovered)
+                            border.width: 1
+                            border.color: root.accent
+                            Text {
+                                id: folderText
+                                anchors.centerIn: parent
+                                text: "Choose folder · F"
+                                color: root.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            HoverHandler { id: folderHover }
                             TapHandler { onTapped: root.openFolderPicker() }
                         }
                     }
                 }
 
-                Row {
+                Flow {
                     width: parent.width
-                    height: 24
                     spacing: 6
 
                     Repeater {
@@ -318,23 +336,24 @@ Item {
 
                         delegate: Rectangle {
                             required property var modelData
-                            height: 24
+                            height: Theme.controlHeight
                             width: screenName.implicitWidth + 16
-                            color: Theme.bg2
+                            color: Theme.controlBackground(root.selectedScreen === modelData,
+                                root.keyboardMode === "screens" && root.selectedScreen === modelData, screenHover.hovered)
                             border.width: 1
-                            border.color: Theme.bg4
+                            border.color: Theme.controlBorder(root.selectedScreen === modelData,
+                                root.keyboardMode === "screens" && root.selectedScreen === modelData, screenHover.hovered, root.accent)
 
                             Text {
                                 id: screenName
                                 anchors.centerIn: parent
-                                text: modelData.name
+                                text: (root.keyboardMode === "screens" && root.selectedScreen === modelData ? "› " : "  ") + modelData.name
                                 color: root.selectedScreen === modelData ? root.accent : Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
-                                font.underline: root.keyboardMode === "screens"
-                                    && root.selectedScreen === modelData
                             }
 
+                            HoverHandler { id: screenHover }
                             TapHandler { onTapped: root.selectedScreen = modelData }
                         }
                     }
@@ -357,9 +376,11 @@ Item {
                         required property bool fileIsDir
                         width: grid.cellWidth - 6
                         height: grid.cellHeight - 6
-                        color: Theme.bg2
+                        color: Theme.controlBackground(false,
+                            root.keyboardMode === "files" && root.keyboardIndex === tile.index, hover.hovered)
                         border.width: 1
-                        border.color: root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl)
+                        border.color: hover.hovered || root.keyboardMode === "files" && root.keyboardIndex === tile.index
+                            || root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl)
                             ? root.accent : Theme.bg4
 
                         Image {
@@ -383,10 +404,10 @@ Item {
                         }
                         Text {
                             anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 5 }
-                            text: tile.fileName
+                            text: (root.keyboardMode === "files" && root.keyboardIndex === tile.index ? "› " : "  ") + tile.fileName
                             elide: Text.ElideRight
                             color: root.keyboardMode === "files"
-                                && root.keyboardIndex === tile.index || hover.hovered
+                                && root.keyboardIndex === tile.index
                                 ? root.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize

@@ -421,18 +421,18 @@ Item {
 
                                     width: (parent.width - 12) / 7
                                     height: 28
-                                    color: "transparent"
-                                    border.width: current ? 1 : 0
-                                    border.color: root.accent
+                                    color: Theme.controlBackground(selected, keyboardFocused, dayHover.hovered)
+                                    border.width: 1
+                                    border.color: selected || keyboardFocused || current ? root.accent : Theme.bg4
+                                    HoverHandler { id: dayHover }
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: dayCell.value.getDate()
+                                        text: (dayCell.keyboardFocused ? "› " : "") + dayCell.value.getDate()
                                         color: dayCell.selected ? root.accent
                                              : dayCell.inMonth ? Theme.grey1 : Theme.grey
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
-                                        font.underline: dayCell.keyboardFocused
                                     }
 
                                     Rectangle {

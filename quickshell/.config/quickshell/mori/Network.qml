@@ -926,8 +926,22 @@ RowLayout {
                                             Layout.fillWidth: true
                                             text: (root.keyboardNetworkIndex === index ? "› " : "  ")
                                                 + networkName + "   " + Math.round(strength * 100) + "%"
-                                            color: isConnected || root.keyboardNetworkIndex === index
-                                                ? root.accent : Theme.fg
+                                            leftPadding: 8
+                                            rightPadding: 8
+                                            topPadding: 6
+                                            bottomPadding: 6
+                                            elide: Text.ElideRight
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                z: -1
+                                                color: Theme.controlBackground(isConnected,
+                                                    root.keyboardNetworkIndex === index, networkHover.hovered)
+                                                border.width: 1
+                                                border.color: Theme.controlBorder(isConnected,
+                                                    root.keyboardNetworkIndex === index, networkHover.hovered, root.accent)
+                                            }
+                                            HoverHandler { id: networkHover }
+                                            color: isConnected ? root.accent : Theme.fg
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
 

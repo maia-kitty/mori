@@ -210,10 +210,10 @@ RowLayout {
                 Row {
                     width: parent.width
                     Text {
-                        text: "› Brightness"
+                        text: "Brightness"
                         color: root.accent
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        font.pixelSize: Theme.headingFontSize
                     }
                     Text {
                         width: parent.width - x

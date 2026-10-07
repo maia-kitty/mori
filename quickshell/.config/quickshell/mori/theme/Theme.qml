@@ -32,6 +32,17 @@ Singleton {
     readonly property color bgorange: "#4a4037"
     readonly property color bgvisual: "#543a48"
 
+    readonly property int controlHeight: 30
+    readonly property color disabledText: grey1
+
+    function controlBackground(selected, focused, hovered) {
+        return focused || hovered ? bg2 : bg1
+    }
+
+    function controlBorder(selected, focused, hovered, accent) {
+        return selected || focused || hovered ? (accent === undefined ? fg : accent) : bg4
+    }
+
     // Text uses Old Standard TT; icon-only labels use Symbols Nerd Font.
     readonly property string fontFamily: "Old Standard TT"
     readonly property string nerdFontFamily: "Symbols Nerd Font"

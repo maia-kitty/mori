@@ -10,8 +10,7 @@ Row {
     required property var popupCoordinator
     required property var updateService
     property color accent: Theme.green
-    readonly property color statusColor: updateService.status === "error" ? Theme.red
-        : updateService.rebootRequired ? Theme.yellow : accent
+    readonly property color statusColor: accent
     readonly property string summary: updateService.checking ? "Checking for updates…"
         : updateService.updating ? "Updater open in terminal"
         : updateService.status === "error" ? "Some checks failed"
@@ -54,11 +53,17 @@ Row {
     BarLabel {
         anchors.verticalCenter: parent.verticalCenter
         text: root.updateService.checking ? "…" : root.updateService.updating ? "↗"
-            : root.updateService.status === "error" ? (root.updateService.count || "") + "!"
+            : root.updateService.status === "error" ? String(root.updateService.count)
             : !root.updateService.report ? "?"
             : root.updateService.status === "unknown" ? "?"
             : root.updateService.count + (root.updateService.incomplete ? "?" : "")
         color: root.statusColor
+    }
+    BarLabel {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.updateService.status === "error"
+        text: "!"
+        color: Theme.red
     }
     TapHandler { onTapped: root.toggle() }
 
@@ -180,7 +185,6 @@ Row {
                                     text: sourceRow.modelData.name + " · "
                                         + (sourceRow.modelData.status === "error" ? "Check failed"
                                             : sourceRow.modelData.count === null ? "Count unavailable"
-                                            : sourceRow.modelData.count === 0 ? "Up to date"
                                             : sourceRow.modelData.count + " available")
                                     wrapMode: Text.Wrap
                                     textFormat: Text.PlainText
@@ -188,60 +192,6 @@ Row {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
                                     font.weight: Font.DemiBold
-                                }
-                                Text {
-                                    visible: !!sourceRow.modelData.cached
-                                    text: "Cached index · refresh when updating"
-                                    color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                Repeater {
-                                    model: sourceRow.modelData.packages.slice(0, 40)
-                                    Text {
-                                        required property var modelData
-                                        width: sourceList.width
-                                        text: modelData.name + (modelData.kind === "flake" ? " · newer flake revision"
-                                            : modelData.installed && modelData.available ? "  " + modelData.installed + " → " + modelData.available
-                                            : modelData.available ? "  → " + modelData.available : "")
-                                        textFormat: Text.PlainText
-                                        wrapMode: Text.WrapAnywhere
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
-                                }
-                                Text {
-                                    visible: sourceRow.modelData.packages.length > 40
-                                    text: "+ " + (sourceRow.modelData.packages.length - 40) + " more · open updater for the full list"
-                                    width: parent.width
-                                    wrapMode: Text.Wrap
-                                    color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                Text {
-                                    visible: !!sourceRow.modelData.message
-                                    width: parent.width
-                                    text: sourceRow.modelData.message || ""
-                                    textFormat: Text.PlainText
-                                    wrapMode: Text.WrapAnywhere
-                                    color: sourceRow.modelData.status === "error" ? Theme.red : Theme.grey2
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                }
-                                Repeater {
-                                    model: sourceRow.modelData.warnings || []
-                                    Text {
-                                        required property string modelData
-                                        width: sourceList.width
-                                        text: modelData
-                                        textFormat: Text.PlainText
-                                        wrapMode: Text.WrapAnywhere
-                                        color: Theme.yellow
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                    }
                                 }
                             }
                         }
@@ -271,8 +221,8 @@ Row {
                                 readonly property bool available: !root.updateService.checking && !root.updateService.launching
                                     && (!modelData.update || !root.updateService.updating)
                                 width: 168
-                                height: 34
-                                color: actionHover.hovered && available ? Theme.bg3 : Theme.bg2
+                                height: Theme.controlHeight
+                                color: Theme.controlBackground(false, false, actionHover.hovered && available)
                                 border.width: 1
                                 border.color: available ? root.accent : Theme.bg4
                                 Text {

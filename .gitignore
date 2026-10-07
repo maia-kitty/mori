@@ -31,3 +31,6 @@ secrets*
 # Editor and OS files
 .DS_Store
 *~
+
+# Local legacy terminal configuration
+/kitty/

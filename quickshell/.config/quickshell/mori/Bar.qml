@@ -189,6 +189,18 @@ PanelWindow {
                     "accent": barWindow.settings.moduleColor("kdeConnect")
                 })
             }
+            Row {
+                visible: !parent.available
+                spacing: barWindow.bracketSpacing
+                BarLabel { text: "["; color: Theme.grey1 }
+                BarLabel {
+                    text: String.fromCodePoint(0xf011c)
+                    color: Theme.grey1
+                    font.family: Theme.nerdFontFamily
+                }
+                BarLabel { text: "Unavailable"; color: Theme.grey1 }
+                BarLabel { text: "]"; color: Theme.grey1 }
+            }
             Binding {
                 target: kdeConnectLoader.item
                 property: "accent"
@@ -395,8 +407,7 @@ PanelWindow {
                     height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active && (moduleKey !== "kdeConnect"
-                        || (item && item.available))
+                    visible: active
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }
@@ -417,8 +428,7 @@ PanelWindow {
                     height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active && (moduleKey !== "kdeConnect"
-                        || (item && item.available))
+                    visible: active
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }
@@ -440,8 +450,7 @@ PanelWindow {
                     height: Theme.barContentHeight
                     readonly property string moduleKey: modelData
                     active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active && (moduleKey !== "kdeConnect"
-                        || (item && item.available))
+                    visible: active
                     sourceComponent: barWindow.componentForModule(moduleKey)
                 }
             }
@@ -451,6 +460,7 @@ PanelWindow {
         Loader {
             active: barWindow.settings.notificationsEnabled
             sourceComponent: NotificationPopup {
+                accent: barWindow.settings.moduleColor("notifications")
                 panelWindow: barWindow
                 notificationServer: barWindow.notificationServer
                 popupCoordinator: barWindow

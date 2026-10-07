@@ -9,6 +9,7 @@ Item {
     required property var notificationServer
     required property var popupCoordinator
     required property bool doNotDisturb
+    property color accent: Theme.purple
     property var pendingNotifications: []
     property int nextToastId: 0
     property bool suppressed: false
@@ -143,7 +144,7 @@ Item {
     PopupWindow {
         id: popup
         implicitWidth: 360
-        implicitHeight: popupList.implicitHeight + 24
+        implicitHeight: Math.min(popupList.implicitHeight + 24, root.panelWindow.screen ? Math.max(80, root.panelWindow.screen.height - root.panelWindow.height - 24) : 440)
         visible: popupNotifications.count > 0 && !root.suppressed
         color: "transparent"
         grabFocus: false
@@ -164,13 +165,11 @@ Item {
             shown: popup.visible
             color: Theme.bg1
             border.width: 2
-            border.color: Theme.purple
+            border.color: root.accent
 
-            Column {
+            ScrollableColumn {
                 id: popupList
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
+                anchors.fill: parent
                 anchors.margins: 12
                 spacing: 8
 
@@ -229,7 +228,7 @@ Item {
                             Text {
                                 width: parent.width
                                 text: toast.appName
-                                color: Theme.purple
+                                color: root.accent
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
@@ -264,7 +263,7 @@ Item {
                             anchors.right: parent.right
                             anchors.margins: 6
                             text: "×"
-                            color: Theme.purple
+                            color: root.accent
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize + 5
 

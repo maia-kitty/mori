@@ -63,8 +63,16 @@ def package_rows(output):
     return rows
 
 
+NIX_REVISION_PATTERN = r"upgrading '([^']+)' from flake '([^']+)' to '([^']+)'"
+
+
+def nix_revision_changes(output):
+    return [(name, old, new) for name, old, new in re.findall(NIX_REVISION_PATTERN, clean(output))
+            if old != new]
+
+
 def show_check(output):
-    upgrades = re.findall(r"upgrading '([^']+)' from flake '[^']+' to '[^']+'", clean(output))
+    upgrades = [name for name, old, new in nix_revision_changes(output)]
     if upgrades and not VERBOSE:
         detail(f"{len(upgrades)} Nix package source(s) have newer flake revisions.", "green")
         for name in upgrades:
@@ -73,6 +81,12 @@ def show_check(output):
             if re.search(r"\b(warning|error)\b", line, re.I):
                 detail(line, "yellow")
         detail("Use --verbose for flake URLs and revision details.", "dim")
+        return
+    if not upgrades and re.search(NIX_REVISION_PATTERN, clean(output)) and not VERBOSE:
+        detail("No newer Nix flake revisions.", "green")
+        for line in clean(output).splitlines():
+            if re.search(r"\b(warning|error)\b", line, re.I):
+                detail(line, "yellow")
         return
     rows = package_rows(output)
     if rows and not VERBOSE:
@@ -341,7 +355,7 @@ def nix_source(profile):
     if (profile / "manifest.json").exists():
         command = ["nix", "--extra-experimental-features", "nix-command flakes",
                    "profile", "upgrade", "--profile", str(profile), "--all"]
-        return Source("Nix profile", command + ["--dry-run", "--refresh"], command,
+        return Source("Nix profile", command + ["--dry-run", "--refresh"], command + ["--refresh"],
                       note="Checks unlocked flake packages in this user profile (Nix 2.22+).")
     if (profile / "manifest.nix").exists():
         command = ["nix-env", "--profile", str(profile), "--upgrade"]
@@ -403,6 +417,15 @@ def run(command, privileged=False, capture=False, timeout=None):
         raise RuntimeError(str(error)) from error
 
 
+def check_succeeded(source, checked):
+    if checked.returncode in source.codes:
+        return True
+    # AUR query helpers use exit 1 for an empty update list. Diagnostic
+    # output still means failure, including network and state-file errors.
+    return (source.check[0] in ("paru", "yay") and checked.returncode == 1
+            and not clean(checked.stdout).strip())
+
+
 def process(source, args):
     section(source.name)
     if source.note and (VERBOSE or source.refresh):
@@ -413,11 +436,13 @@ def process(source, args):
             raise RuntimeError("Metadata refresh failed; skipping this source.")
     print(paint("  Checking for updates…", "dim"), flush=True)
     checked = run(source.check, capture=True, timeout=args.timeout)
-    if checked.returncode not in source.codes:
+    if not check_succeeded(source, checked):
         detail(checked.stdout, "red")
         raise RuntimeError(f"Check failed (exit {checked.returncode}); skipping this source.")
     show_check(checked.stdout)
     if args.check:
+        return
+    if source.check[0] == "nix" and parsed_updates(source, checked.stdout, checked.returncode) == []:
         return
     # Native dry runs contain status text as well as packages. Let the package
     # manager resolve the final transaction rather than guessing from that text.
@@ -488,11 +513,13 @@ def parsed_updates(source, output, exit_code):
         if not output.strip():
             return []
     elif program == "nix":
-        for name in re.findall(r"upgrading '([^']+)' from flake '[^']+' to '[^']+'", output):
+        for name, old, new in nix_revision_changes(output):
             packages.append({"name": name.rsplit(".", 1)[-1], "installed": None,
                              "available": None, "kind": "flake"})
-        if not packages and (not output.strip() or all(
-                line.startswith(("warning:", "unpacking ", "copying path ")) for line in output.splitlines() if line.strip())):
+        remaining = re.sub(NIX_REVISION_PATTERN, "", output)
+        if not packages and (not remaining.strip() or all(
+                line.strip().startswith(("warning:", "unpacking ", "copying path "))
+                for line in remaining.splitlines() if line.strip())):
             return []
     elif program == "nix-env":
         for old, new in re.findall(r"upgrading '([^']+)' to '([^']+)'", output):
@@ -523,7 +550,7 @@ def json_report(args, available):
         try:
             checked = run(command, capture=True, timeout=args.timeout)
             output = clean(checked.stdout)
-            if checked.returncode not in source.codes:
+            if not check_succeeded(source, checked):
                 raise RuntimeError(output.strip()[:2000] or f"Check failed (exit {checked.returncode}).")
             item["warnings"] = [line.strip()[:500] for line in output.splitlines()
                                 if re.search(r"\b(warning|held back|kept back)\b", line, re.I)][:10]

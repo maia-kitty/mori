@@ -234,15 +234,15 @@ Item {
                 }
                 Rectangle {
                     width: parent.width
-                    height: 32
+                    height: Theme.controlHeight
                     readonly property bool canSend: root.connected && clipboardPlugin.available && !clipboardSend.running
-                    color: canSend ? (sendMouse.containsMouse ? Theme.bg3 : Theme.bgorange) : Theme.bg2
+                    color: Theme.controlBackground(false, false, canSend && sendMouse.containsMouse)
                     border.width: 1
-                    border.color: canSend ? root.accent : Theme.grey
+                    border.color: canSend ? root.accent : Theme.bg4
                     Text {
                         anchors.centerIn: parent
                         text: clipboardSend.running ? "Sending…" : "Send clipboard  S"
-                        color: parent.canSend ? root.accent : Theme.grey
+                        color: parent.canSend ? root.accent : Theme.disabledText
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }

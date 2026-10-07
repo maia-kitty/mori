@@ -249,8 +249,21 @@ RowLayout {
                                                 Layout.fillWidth: true
                                                 text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
                                                     + (modelData.description || modelData.nickname || modelData.name) : ""
-                                                color: modelData === root.sink || modelData === root.keyboardNode
-                                                    ? root.accent : Theme.fg
+                                                leftPadding: 6
+                                                rightPadding: 6
+                                                topPadding: 4
+                                                bottomPadding: 4
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    z: -1
+                                                    color: Theme.controlBackground(modelData === root.sink,
+                                                        modelData === root.keyboardNode, sinkHover.hovered)
+                                                    border.width: 1
+                                                    border.color: Theme.controlBorder(modelData === root.sink,
+                                                        modelData === root.keyboardNode, sinkHover.hovered, root.accent)
+                                                }
+                                                HoverHandler { id: sinkHover }
+                                                color: modelData === root.sink ? root.accent : Theme.fg
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                                 elide: Text.ElideRight
@@ -324,7 +337,7 @@ RowLayout {
                             text: "Applications"
                             color: root.accent
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                            font.pixelSize: Theme.headingFontSize
                             topPadding: 4
                         }
 

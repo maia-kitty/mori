@@ -247,7 +247,7 @@ Item {
                                 spacing: 12
 
                                 Text {
-                                    text: root.doNotDisturb ? "DND on  D" : "DND off  D"
+                                    text: "DND · D"
                                     color: root.doNotDisturb ? root.accent : Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize

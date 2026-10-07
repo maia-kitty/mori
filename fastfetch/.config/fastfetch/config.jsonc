@@ -11,8 +11,8 @@
   "display": {
     "key": { "width": 9 },
     "color": {
-      "keys": "8",
-      "output": "6"
+      "keys": "38;2;211;198;170",
+      "output": "38;2;133;146;137"
     }
   },
   "modules": [

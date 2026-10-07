@@ -6,7 +6,6 @@ source /usr/share/cachyos-fish-config/cachyos-config.fish
 #    # smth smth
 #end
 
-#alias ssh="kitty +kitten ssh"
 set -gx DMS_PRIVESC sudo
 
 abbr -a S 'paru -S'

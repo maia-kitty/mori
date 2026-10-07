@@ -22,7 +22,7 @@ I personally use CachyOs so it was made with it in mind.
 | PipeWire and WirePlumber | Audio and the bar's volume controls |
 | brightnessctl | Laptop backlight control |
 | power-profiles-daemon | Battery popup power profiles |
-| Kitty | Terminal and terminal-based launch shortcuts |
+| Foot | Default terminal, terminal-based launch shortcuts, and the Updates widget |
 | Fuzzel | Application launcher and clipboard picker |
 | wl-clipboard and cliphist | Clipboard history and copying selections |
 | awww | Wallpaper daemon and per-output wallpaper selection |
@@ -61,7 +61,7 @@ These applications have configurations, themes, or shortcuts here. They are opti
 | Software | What it is (for) |
 | --- | --- |
 | Fish | Shell of choice |
-| Foot | Terminal used by the Updates widget |
+| Kitty | Alternative terminal with a bundled configuration |
 | Neovim / LazyVim | CLI Editor |
 | Zed | GUI Editor |
 | Yazi | CLI file manager |
@@ -84,10 +84,12 @@ Install GNU Stow and the dependencies for the components you want using your pac
 ```bash
 git clone https://github.com/maia-kitty/mori.git
 cd mori
-stow --simulate -v -t ~ fonts bin niri quickshell systemd kitty fuzzel swaylock
-stow -t ~ fonts bin niri quickshell systemd kitty fuzzel swaylock
+stow --simulate -v -t ~ fonts bin niri quickshell systemd foot fuzzel swaylock
+stow -t ~ fonts bin niri quickshell systemd foot fuzzel swaylock
 fc-cache -f ~/.local/share/fonts
 ```
+
+Foot is the default terminal for Mod+T, Fuzzel, btop, and the Updates widget. The `foot` package includes the Everforest palette, IBM Plex Mono with Symbols Nerd Font fallback, and terminal key bindings. The `kitty` package remains available as an optional alternative configuration.
 
 Choose only the packages you want. Other home-directory packages, such as `gtk`, `qt`, `fish`, or `nvim`, can be stowed individually. Back up conflicting files before replacing them. Keep the checkout in place: the installed symlinks point into it.
 

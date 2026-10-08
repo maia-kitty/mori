@@ -12,6 +12,13 @@ RowLayout {
     readonly property var wiredRepeater: popupContent.item ? popupContent.item.wiredRepeaterRef : null
     readonly property var vpnRepeater: popupContent.item ? popupContent.item.vpnRepeaterRef : null
     readonly property var networkRepeater: popupContent.item ? popupContent.item.networkRepeaterRef : null
+    property bool bluetoothView: false
+    readonly property var bluetoothPanel: popupContent.item ? popupContent.item.bluetoothPanelRef : null
+    function setView(bluetooth) {
+        bluetoothView = bluetooth
+        keyboardNetworkIndex = 0
+        if (listCol) listCol.contentY = 0
+    }
     spacing: 4
     property color accent: Theme.blue
     property bool compactMode: false
@@ -168,7 +175,12 @@ RowLayout {
     function handleKeyPressed(event) {
         if (event.key === Qt.Key_Escape) close()
         else if (event.modifiers !== Qt.NoModifier) return
-        else if (event.key === Qt.Key_Up) moveNetworkSelection(-1)
+        else if (event.key === Qt.Key_Tab) {
+            if (!event.isAutoRepeat) setView(!bluetoothView)
+        } else if (bluetoothView && bluetoothPanel) {
+            bluetoothPanel.handleKeyPressed(event)
+            return
+        } else if (event.key === Qt.Key_Up) moveNetworkSelection(-1)
         else if (event.key === Qt.Key_Down) moveNetworkSelection(1)
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (!event.isAutoRepeat) actOnSelection(false)
@@ -744,8 +756,8 @@ RowLayout {
     PopupWindow {
         id: popup
 
-        implicitWidth: 320
-        implicitHeight: Math.min(popupContent.item ? popupContent.item.implicitHeight : 80, 400)
+        implicitWidth: 400
+        implicitHeight: Math.min(popupContent.item ? popupContent.item.implicitHeight : 80, 440)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -788,6 +800,7 @@ RowLayout {
 
             sourceComponent: Component {
                 PopupSurface {
+                    readonly property alias bluetoothPanelRef: bluetoothControls
                     readonly property alias listColRef: listCol
                     readonly property alias wiredRepeaterRef: wiredRepeater
                     readonly property alias vpnRepeaterRef: vpnRepeater
@@ -807,12 +820,49 @@ RowLayout {
                         anchors.right: parent.right
                         anchors.margins: 12
                         anchors.bottomMargin: 10
-                        spacing: 10
+                        spacing: 12
+
+                        WidgetHeader { text: "Network"; color: root.accent }
+
+                        RowLayout {
+                            width: parent.width
+                            spacing: 6
+                            Repeater {
+                                model: ["Network", "Bluetooth"]
+                                delegate: Rectangle {
+                                    required property int index
+                                    required property string modelData
+                                    readonly property bool selected: root.bluetoothView === (index === 1)
+                                    Layout.fillWidth: true
+                                    implicitHeight: Theme.controlHeight
+                                    color: Theme.controlBackground(selected, false, tabHover.hovered)
+                                    border.width: 1
+                                    border.color: Theme.controlBorder(selected, false, tabHover.hovered, root.accent)
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        color: parent.selected ? root.accent : Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                    }
+                                    HoverHandler { id: tabHover }
+                                    TapHandler { onTapped: root.setView(index === 1) }
+                                }
+                            }
+                        }
+
+                        BluetoothPanel {
+                            id: bluetoothControls
+                            width: parent.width
+                            accent: root.accent
+                            visible: root.bluetoothView
+                            active: popup.visible && root.bluetoothView
+                        }
 
                         Column {
                             width: parent.width
                             spacing: 4
-                            visible: wiredDevices.count > 0
+                            visible: !root.bluetoothView && wiredDevices.count > 0
 
                             WidgetHeader {
                                 text: "Ethernet"
@@ -893,7 +943,7 @@ RowLayout {
                             Rectangle {
                                 width: parent.width
                                 height: 1
-                                visible: wiredDevices.count > 0
+                                visible: !root.bluetoothView && wiredDevices.count > 0
                                 color: Theme.bg4
                             }
                         }
@@ -901,6 +951,8 @@ RowLayout {
                         Column {
                             width: parent.width
                             spacing: 4
+
+                            visible: !root.bluetoothView
 
                             WidgetHeader {
                                 text: "VPN"
@@ -996,6 +1048,8 @@ RowLayout {
                         Column {
                             width: parent.width
                             spacing: 4
+
+                            visible: !root.bluetoothView
 
                             WidgetHeader {
                                 text: "Wi-Fi"
@@ -1112,7 +1166,9 @@ RowLayout {
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
                         anchors.margins: 12
-                        text: "↑↓: select · Enter: connect · D: disconnect · Esc: close"
+                        text: root.bluetoothView
+                            ? "Tab: Network / Bluetooth · ↑↓: select\nEnter: pair / connect · D: disconnect · Esc: close"
+                            : "Tab: Network / Bluetooth · ↑↓: select\nEnter: connect · D: disconnect · Esc: close"
                     }
 
                 }
@@ -1123,6 +1179,7 @@ RowLayout {
     // Dismiss clicks below the bar without blocking the network pill itself.
     PanelWindow {
         id: dismissLayer
+        screen: root.panelWindow.screen
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
@@ -102,7 +103,7 @@ Item {
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
         "notifications", "powerMenu", "systemTray", "updates", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "appearance", "clock", "updates", "power", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "clock", "updates", "power", "displays", "input", "about"]
     readonly property var updateIntervals: [
         { label: "15 min", minutes: 15 }, { label: "1 hour", minutes: 60 },
         { label: "3 hours", minutes: 180 }, { label: "Manual", minutes: 0 }
@@ -175,8 +176,8 @@ Item {
 
     function pageTitle() {
         switch (page) {
-        case "modules": return "Modules"
-        case "appearance": return "Appearance"
+        case "modules":
+        case "appearance": return "Bar & widgets"
         case "clock": return "Time & date"
         case "updates": return "Updates"
         case "power": return "Power menu"
@@ -656,6 +657,12 @@ Item {
                 && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
             if (page !== "input" && page !== "displays" && page !== "power") return
             applyCurrentPage()
+            event.accepted = true
+            return
+        }
+        if ((page === "modules" || page === "appearance")
+                && (key === Qt.Key_Tab || key === Qt.Key_Backtab)) {
+            openPage(page === "modules" ? "appearance" : "modules")
             event.accepted = true
             return
         }
@@ -1850,9 +1857,41 @@ Item {
                 }
             }
 
+            RowLayout {
+                id: barTabs
+                visible: root.page === "modules" || root.page === "appearance"
+                anchors.top: saveErrorBanner.visible ? saveErrorBanner.bottom : headerDivider.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 18
+                anchors.topMargin: 12
+                spacing: 8
+                Repeater {
+                    model: [{ page: "modules", label: "Widgets" }, { page: "appearance", label: "Colors" }]
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool selected: root.page === modelData.page
+                        Layout.fillWidth: true
+                        implicitHeight: Theme.controlHeight
+                        color: Theme.controlBackground(selected, false, tabHover.hovered)
+                        border.width: 1
+                        border.color: Theme.controlBorder(selected, false, tabHover.hovered, Theme.fg)
+                        Text {
+                            anchors.centerIn: parent
+                            text: parent.modelData.label
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+                        HoverHandler { id: tabHover }
+                        TapHandler { onTapped: root.openPage(modelData.page) }
+                    }
+                }
+            }
+
             Item {
                 id: pageArea
-                anchors.top: saveErrorBanner.visible
+                anchors.top: barTabs.visible ? barTabs.bottom : saveErrorBanner.visible
                     ? saveErrorBanner.bottom : headerDivider.bottom
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
@@ -1895,8 +1934,7 @@ Item {
                                 Repeater {
                                     id: categoryRepeater
                                     model: [
-                                        { "key": "modules", "label": "Modules", "description": "Visibility and bar order" },
-                                        { "key": "appearance", "label": "Appearance", "description": "Module accent colors" },
+                                        { "key": "modules", "label": "Bar & widgets", "description": "Widget layout, visibility, and colors" },
                                         { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
                                         { "key": "updates", "label": "Updates", "description": "Package update check interval" },
                                         { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
@@ -1976,7 +2014,7 @@ Item {
                                 width: modulesFlick.width
                                 spacing: 8
                                 SettingsLabel {
-                                    text: "↑↓ select · Shift+↑↓ reorder and cross sections"
+                                    text: "↑↓ select · Shift+↑↓ reorder · Tab colors"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
@@ -2084,7 +2122,7 @@ Item {
                                 width: appearanceFlick.width
                                 spacing: 6
                                 SettingsLabel {
-                                    text: "↑↓ module · ←→ color · Enter apply"
+                                    text: "↑↓ widget · ←→ color · Enter apply · Tab widgets"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize

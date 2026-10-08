@@ -280,6 +280,7 @@ RowLayout {
 
     PanelWindow {
         id: dismissLayer
+        screen: root.panelWindow.screen
         visible: brightnessPopup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height

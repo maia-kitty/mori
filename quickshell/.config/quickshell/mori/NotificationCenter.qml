@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -11,6 +12,7 @@ Item {
     required property var panelWindow
     required property var notificationServer
     required property var popupCoordinator
+    property var settings: null
     property color accent: Theme.purple
     property bool doNotDisturb: false
 
@@ -84,6 +86,7 @@ Item {
             pendingNotifications.shift()
         pendingNotifications.push({
             "notificationId": nextNotificationId++,
+            "receivedAt": Date.now(),
             "appName": String(notification.appName || "Notification"),
             "desktopEntry": String(notification.desktopEntry || ""),
             "summary": String(notification.summary || ""),
@@ -304,6 +307,7 @@ Item {
                                 required property string desktopEntry
                                 required property string summary
                                 required property string body
+                                required property double receivedAt
                                 width: historyView.width
                                 implicitHeight: notificationText.implicitHeight + 12
                                 radius: 0
@@ -322,13 +326,31 @@ Item {
                                     anchors.margins: 6
                                     spacing: 2
 
-                                    Text {
+                                    RowLayout {
                                         width: parent.width
-                                        text: appName
-                                        color: root.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        elide: Text.ElideRight
+                                        spacing: 8
+                                        Text {
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            text: appName
+                                            color: root.accent
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            Layout.maximumWidth: parent.width * 0.65
+                                            Layout.alignment: Qt.AlignVCenter
+                                            text: Qt.formatDateTime(new Date(receivedAt),
+                                                (root.settings ? root.settings.clockDateFormat : "yyyy/MM/dd")
+                                                + " · " + (root.settings && root.settings.clockTimeFormat === "12h"
+                                                    ? "h:mm AP" : "HH:mm"))
+                                            color: Theme.grey
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize - 2
+                                            elide: Text.ElideRight
+                                        }
                                     }
 
                                     Text {
@@ -394,6 +416,7 @@ Item {
 
     PanelWindow {
         id: dismissLayer
+        screen: root.panelWindow.screen
         visible: popup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height

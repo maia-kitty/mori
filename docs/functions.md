@@ -28,14 +28,15 @@
 
 Open **Settings** from the bar or with **Mod+Period**:
 
-- **Modules:** choose, arrange, and recolor bar widgets.
-- **Appearance:** customize the shell’s appearance.
+- **Bar & widgets:** **Widgets** controls visibility, left/center/right order, and compact modes; **Colors** controls widget accent colors. Click the tabs or press **Tab** to switch views.
 - **Time & date:** clock format, seconds, and date order; time format also applies to calendar events.
 - **Input:** keyboard layout, mouse/touchpad acceleration, tapping, natural scrolling, and disable-while-typing. An empty keyboard layout follows the system.
 - **Displays:** monitor layout and output settings, with timed confirmation and rollback.
 - **Power menu** and **Updates:** see below.
 
-Module, appearance, clock, and update interval settings save immediately. Input, display, and power changes use **Apply**; closing settings discards pending edits. Shell settings live in `~/.config/quickshell/mori-settings.json` (under `$XDG_CONFIG_HOME` when set); input and display settings update Niri’s configuration.
+Bar, widget, clock, and update interval settings save immediately. Input, display, and power changes use **Apply**; closing settings discards pending edits. Shell settings live in `~/.config/quickshell/mori-settings.json` (under `$XDG_CONFIG_HOME` when set); input and display settings update Niri’s configuration.
+
+The bar uses the main monitor only, with one widget layout.
 
 ## Desktop widgets
 
@@ -53,9 +54,13 @@ Module, appearance, clock, and update interval settings save immediately. Input,
 
 Incoming notification popups leave open menus in place. The count beside the bell shows stored history entries, hides when empty, and decreases when entries are removed or cleared.
 
+Notification history shows each arrival's date and time using the configured clock formats.
+
 The volume popup has **Playback** and **Microphone** tabs (**Tab** switches between them). The device picker expands only when switching devices; **Enter** opens it or selects a device, and **Escape** collapses it before closing the popup. **Up/Down** moves through device choices or playback apps, **Left/Right** adjusts volume, and **M** toggles mute for the focused device or app. Playback apps appear as compact name-and-slider rows.
 
 In the network popup, use **Up/Down** to select Ethernet, an active VPN, or Wi-Fi; **Enter** connects and **D** disconnects the selected connection.
+
+Press **Tab** or click the **Network / Bluetooth** tabs to switch views. Bluetooth provides adapter power, scanning, pairing, connection controls, and device battery levels when available. Use **Up/Down** to select a device, **Enter** to pair or connect, and **D** to disconnect. Scanning stops when the Bluetooth view closes.
 
 ## Power menu
 
@@ -126,9 +131,8 @@ This helper does not enable a tray app or scheduled checks or remove installed p
 
 ## Updates widget
 
-The Mori bar's **Updates** module shows the number of pending updates and opens a popup with per-source update counts, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Modules**. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
+The Mori bar's **Updates** module shows the number of pending updates and opens a popup with per-source update counts, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Bar & widgets**, in the **Widgets** or **Colors** tab. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
 
 Checks run shortly after startup and hourly by default. Choose **15 min**, **1 hour**, **3 hours**, or **Manual** in **Settings → Updates**; the interval saves with the other Mori settings. Disabling the module stops future scheduled checks. **Check now** (`C`) starts a read-only check. **Update** (`U`) opens Foot with `mori-update --refresh`, where password prompts, update confirmations, cleanup, service restarts, and reboots are handled. Foot waits for Enter after completion so you can review the output, then closes. It runs independently of the widget. The bar rechecks after the updater session completes. Press Up/Down to scroll or Escape to close.
 
 Stow both `bin` and `quickshell`, and keep `~/.local/bin` on your graphical session's PATH. Foot is needed for the Update button; checks still work without it. The widget calls `mori-update --json`, which only checks packages and reboot hints: it never invokes sudo/doas, refreshes system indexes or legacy Nix channels, cleans caches, restarts services, or installs packages. Checks may contact repositories and populate download/metadata caches. Cached indexes are labeled, and Nix counts newer flake revisions rather than guaranteed package-version changes. Failed or unrecognized checks show an error/unknown count instead of reporting zero updates. Results save in `$XDG_CACHE_HOME/mori-update/status.json` (normally `~/.cache/mori-update/status.json`) and survive shell reloads.
-

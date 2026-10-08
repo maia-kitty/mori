@@ -320,6 +320,7 @@ PanelWindow {
             BarBracket { text: "["; color: notificationCenter.accent; action: () => notificationCenter.toggle() }
             NotificationCenter {
                 id: notificationCenter
+                settings: barWindow.settings
                 panelWindow: barWindow
                 notificationServer: barWindow.notificationServer
                 popupCoordinator: barWindow

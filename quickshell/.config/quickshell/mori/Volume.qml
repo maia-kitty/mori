@@ -488,6 +488,7 @@ RowLayout {
     // without blocking the volume controls.
     PanelWindow {
         id: dismissLayer
+        screen: root.panelWindow.screen
         visible: devicePopup.visible
         anchors { top: true; bottom: true; left: true; right: true }
         margins.top: root.panelWindow.height

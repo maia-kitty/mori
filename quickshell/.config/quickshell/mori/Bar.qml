@@ -463,7 +463,7 @@ PanelWindow {
                 accent: barWindow.settings.moduleColor("notifications")
                 panelWindow: barWindow
                 notificationServer: barWindow.notificationServer
-                popupCoordinator: barWindow
+                suppressed: barWindow.overviewOpen || barWindow.fullscreen
                 doNotDisturb: {
                     const currentRevision = barWindow.settings.revision
                     const center = barWindow.loadedModule("notifications")

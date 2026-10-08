@@ -854,7 +854,6 @@ Item {
                     "modeIndex": Math.max(0, modeIndex)
                 })
             }
-            // Stable sort keeps the compositor's order within each group.
             result.sort((left, right) => Number(/^DP(?:-|$)/i.test(right.connector))
                 - Number(/^DP(?:-|$)/i.test(left.connector)))
             displays = result
@@ -1922,7 +1921,7 @@ Item {
                                             SettingsLabel {
                                                 text: (categoryRow.index === root.keyboardCategoryIndex
                                                     ? "› " : "  ") + categoryRow.modelData.label
-                                                color: Theme.grey1
+                                                color: Theme.fg
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                             }

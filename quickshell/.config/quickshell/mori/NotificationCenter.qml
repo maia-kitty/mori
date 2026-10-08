@@ -6,8 +6,8 @@ import "./theme"
 
 Item {
     id: root
-    implicitWidth: 18
-    implicitHeight: bell.implicitHeight
+    implicitWidth: Math.max(18, indicator.implicitWidth)
+    implicitHeight: indicator.implicitHeight
     required property var panelWindow
     required property var notificationServer
     required property var popupCoordinator
@@ -173,18 +173,27 @@ Item {
         }
     }
 
-    BarLabel {
-        id: bell
+    Row {
+        id: indicator
         anchors.centerIn: parent
-        text: String.fromCodePoint(root.doNotDisturb ? 0xf009b : 0xf009a)
-        color: root.accent
-        font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
+        spacing: 6
 
-        TapHandler {
-            onTapped: root.toggle()
+        BarLabel {
+            text: String.fromCodePoint(root.doNotDisturb ? 0xf009b : 0xf009a)
+            color: root.accent
+            font.family: Theme.nerdFontFamily
+            font.pixelSize: Theme.fontSize
+        }
+
+        BarLabel {
+            id: countLabel
+            text: String(root.notificationCount)
+            visible: root.notificationCount > 0
+            color: root.accent
         }
     }
+
+    TapHandler { onTapped: root.toggle() }
 
     PopupWindow {
         id: popup
@@ -282,7 +291,7 @@ Item {
                         ListView {
                             id: historyView
                             width: parent.width
-                            height: Math.min(contentHeight, Math.max(0, 440 - 24 - notificationHeader.height - 8))
+                            height: Math.min(contentHeight, Math.max(0, 440 - 24 - notificationHeader.height - notificationHint.implicitHeight - 16))
                             clip: true
                             spacing: 8
                             cacheBuffer: 0
@@ -371,6 +380,11 @@ Item {
                                     onClicked: parent.activate()
                                 }
                             }
+                        }
+
+                        KeyboardHint {
+                            id: notificationHint
+                            text: "Esc: close"
                         }
                     }
                 }

@@ -7,7 +7,6 @@ Item {
     id: root
     required property var panelWindow
     required property var notificationServer
-    required property var popupCoordinator
     required property bool doNotDisturb
     property color accent: Theme.purple
     property var pendingNotifications: []
@@ -34,9 +33,6 @@ Item {
         }
         while (popupNotifications.count > 3)
             popupNotifications.remove(popupNotifications.count - 1)
-
-        popupCoordinator.showPopup(root)
-        suppressed = false
     }
 
     function removeNotification(toastId) {
@@ -46,10 +42,6 @@ Item {
                 return
             }
         }
-    }
-
-    function close() {
-        suppressed = true
     }
 
     function desktopId(value) {
@@ -148,7 +140,6 @@ Item {
         visible: popupNotifications.count > 0 && !root.suppressed
         color: "transparent"
         grabFocus: false
-        onVisibleChanged: if (!visible) root.popupCoordinator.hidePopup(root)
 
         anchor.window: root.panelWindow
         anchor.rect {

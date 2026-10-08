@@ -175,7 +175,7 @@ RowLayout {
     PopupWindow {
         id: brightnessPopup
         implicitWidth: 230
-        implicitHeight: root.errorMessage.length > 0 ? 110 : 80
+        implicitHeight: brightnessContent.implicitHeight + 24
         visible: false
         color: "transparent"
         grabFocus: false
@@ -203,7 +203,10 @@ RowLayout {
             border.color: root.accent
 
             Column {
-                anchors.fill: parent
+                id: brightnessContent
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.margins: 12
                 spacing: 8
 
@@ -266,6 +269,10 @@ RowLayout {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                     wrapMode: Text.WordWrap
+                }
+
+                KeyboardHint {
+                    text: "←→: brightness · Esc: close"
                 }
             }
         }

@@ -165,7 +165,7 @@ Item {
     PopupWindow {
         id: popup
         implicitWidth: 340
-        implicitHeight: Math.min(details.implicitHeight + 24, root.panelWindow.screen ? Math.max(80, root.panelWindow.screen.height - root.panelWindow.height - 24) : 440)
+        implicitHeight: Math.min(details.implicitHeight + mediaHint.implicitHeight + 36, root.panelWindow.screen ? Math.max(80, root.panelWindow.screen.height - root.panelWindow.height - 24) : 440)
         visible: false
         color: "transparent"
         grabFocus: false
@@ -190,8 +190,12 @@ Item {
 
             ScrollableColumn {
                 id: details
-                anchors.fill: parent
+                anchors.top: parent.top
+                anchors.bottom: mediaHint.top
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.margins: 12
+                anchors.bottomMargin: 10
                 spacing: 8
 
                 Item {
@@ -330,6 +334,15 @@ Item {
                         }
                     }
                 }
+            }
+
+            KeyboardHint {
+                id: mediaHint
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 12
+                text: "↑↓: player · Enter: select · Space: play/pause · ←→: track · Esc: close"
             }
         }
     }

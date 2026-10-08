@@ -1,5 +1,3 @@
-# Mori Everforest lock screen
-
 daemonize
 ignore-empty-password
 show-failed-attempts
@@ -12,7 +10,6 @@ font-size=20
 indicator-radius=105
 indicator-thickness=8
 
-# Everforest dark background and neutral text.
 color=232a2e
 inside-color=2d353be6
 line-color=00000000
@@ -20,11 +17,9 @@ ring-color=d3c6aa
 text-color=d3c6aa
 separator-color=00000000
 
-# Input feedback.
 key-hl-color=a7c080
 bs-hl-color=e67e80
 
-# Cleared, verifying, invalid, and Caps Lock states.
 inside-clear-color=2d353be6
 line-clear-color=00000000
 ring-clear-color=83c092

@@ -9,14 +9,26 @@ import "./theme"
 RowLayout {
     id: root
     readonly property var deviceList: popupContent.item ? popupContent.item.deviceListRef : null
-    readonly property var outputRepeater: popupContent.item ? popupContent.item.outputRepeaterRef : null
+    readonly property var deviceRepeater: popupContent.item ? popupContent.item.deviceRepeaterRef : null
     readonly property var appRepeater: popupContent.item ? popupContent.item.appRepeaterRef : null
+    readonly property var masterControl: popupContent.item ? popupContent.item.masterControlRef : null
     property color accent: Theme.yellow
     property bool compactMode: false
     spacing: 6
 
     readonly property var sink: Pipewire.defaultAudioSink
+    readonly property var source: Pipewire.defaultAudioSource
     property var keyboardNode: null
+    property bool microphoneView: false
+    property bool devicePickerOpen: false
+    readonly property var currentDevice: {
+        const device = microphoneView ? source : sink
+        return device && device.ready && device.audio ? device : null
+    }
+    onCurrentDeviceChanged: {
+        if (devicePopup.visible && !devicePickerOpen && (!keyboardNode || !keyboardNode.isStream))
+            keyboardNode = currentDevice
+    }
     required property var panelWindow
     required property var popupCoordinator
 
@@ -26,50 +38,109 @@ RowLayout {
         else {
             popupCoordinator.showPopup(root)
             devicePopup.visible = true
-            keyboardNode = sink || selectableNodes()[0] || null
+            keyboardNode = currentDevice
         }
     }
 
-    function close() { devicePopup.visible = false; keyboardNode = null }
+    function close() {
+        devicePopup.visible = false
+        devicePickerOpen = false
+        keyboardNode = null
+    }
 
+    function setView(microphone) {
+        microphoneView = microphone
+        devicePickerOpen = false
+        keyboardNode = currentDevice
+        if (deviceList) deviceList.contentY = 0
+    }
+
+    function audioNodes() {
+        return Pipewire.nodes.values.filter(node => node && node.ready && node.audio)
+    }
+    function deviceNodes() {
+        return audioNodes().filter(node => !node.isStream && node.isSink !== microphoneView)
+    }
+    function appNodes() {
+        return microphoneView ? [] : audioNodes().filter(node => node.isSink && node.isStream)
+    }
     function selectableNodes() {
-        const nodes = Pipewire.nodes.values.filter(node => node && node.ready
-            && node.isSink && node.audio)
-        return nodes.filter(node => !node.isStream)
-            .concat(nodes.filter(node => node.isStream))
+        if (devicePickerOpen) return deviceNodes()
+        return (currentDevice && currentDevice.ready && currentDevice.audio ? [currentDevice] : [])
+            .concat(appNodes())
+    }
+    function toggleDevicePicker() {
+        if (!devicePickerOpen && deviceNodes().length === 0) return
+        if (devicePickerOpen) {
+            devicePickerOpen = false
+            keyboardNode = currentDevice
+        } else {
+            devicePickerOpen = true
+            keyboardNode = currentDevice || deviceNodes()[0] || null
+        }
     }
     function moveKeyboardSelection(offset) {
         const nodes = selectableNodes()
-        if (nodes.length === 0) return
+        if (nodes.length === 0) { keyboardNode = null; return }
         const current = nodes.indexOf(keyboardNode)
         keyboardNode = nodes[Math.max(0, Math.min(nodes.length - 1,
-            (current < 0 ? 0 : current) + offset))]
+            current < 0 ? 0 : current + offset))]
         Qt.callLater(() => {
             if (!deviceList) return
-            for (const repeater of [outputRepeater, appRepeater]) {
-                if (!repeater) continue
-                for (let i = 0; i < repeater.count; i++) {
-                    const item = repeater.itemAt(i)
-                    if (!item || item.modelData !== keyboardNode) continue
-                    const y = item.mapToItem(deviceList.contentItem, 0, 0).y
-                    if (y < deviceList.contentY) deviceList.contentY = y
-                    else if (y + item.height > deviceList.contentY + deviceList.height)
-                        deviceList.contentY = y + item.height - deviceList.height
-                    return
-                }
+            if (!devicePickerOpen && keyboardNode === currentDevice) {
+                deviceList.contentY = 0
+                return
+            }
+            const repeater = devicePickerOpen ? deviceRepeater : appRepeater
+            if (!repeater) return
+            for (let i = 0; i < repeater.count; i++) {
+                const item = repeater.itemAt(i)
+                if (!item || item.modelData !== keyboardNode) continue
+                const y = item.mapToItem(deviceList.contentItem, 0, 0).y
+                if (y < deviceList.contentY) deviceList.contentY = y
+                else if (y + item.height > deviceList.contentY + deviceList.height)
+                    deviceList.contentY = y + item.height - deviceList.height
+                return
             }
         })
     }
     function handleKeyPressed(event) {
-        if (event.key === Qt.Key_Escape) close()
-        else if (event.key === Qt.Key_Up) moveKeyboardSelection(-1)
+        if (event.key === Qt.Key_Escape) {
+            if (devicePickerOpen) toggleDevicePicker()
+            else close()
+        } else if (event.modifiers !== Qt.NoModifier) return
+        else if (event.key === Qt.Key_Tab) {
+            if (!event.isAutoRepeat) setView(!microphoneView)
+        } else if (event.key === Qt.Key_Up) moveKeyboardSelection(-1)
         else if (event.key === Qt.Key_Down) moveKeyboardSelection(1)
         else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
             if (keyboardNode && keyboardNode.audio)
                 setVolume(keyboardNode, keyboardNode.audio.volume
                     + (event.key === Qt.Key_Left ? -0.05 : 0.05))
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (!event.isAutoRepeat) {
+                if (devicePickerOpen) selectDevice(keyboardNode)
+                else if (!keyboardNode || !keyboardNode.isStream) toggleDevicePicker()
+            }
+        } else if (event.key === Qt.Key_M) {
+            if (!event.isAutoRepeat) toggleNodeMute(keyboardNode)
         } else return
         event.accepted = true
+    }
+
+    function selectDevice(node) {
+        if (!node || !node.ready || !node.audio || node.isStream) return
+        if (node.isSink) Pipewire.preferredDefaultAudioSink = node
+        else Pipewire.preferredDefaultAudioSource = node
+        devicePickerOpen = false
+        keyboardNode = node
+    }
+
+    function toggleNodeMute(node) {
+        if (node && node.ready && node.audio) {
+            keyboardNode = node
+            node.audio.muted = !node.audio.muted
+        }
     }
 
     function setVolume(node, value) {
@@ -170,7 +241,7 @@ RowLayout {
 
     PopupWindow {
         id: devicePopup
-        implicitWidth: 320
+        implicitWidth: 400
         implicitHeight: Math.min(popupContent.item ? popupContent.item.implicitHeight : 80, 440)
         visible: false
         color: "transparent"
@@ -196,9 +267,10 @@ RowLayout {
             sourceComponent: Component {
                 PopupSurface {
                     readonly property alias deviceListRef: deviceList
-                    readonly property alias outputRepeaterRef: outputRepeater
+                    readonly property alias deviceRepeaterRef: deviceRepeater
                     readonly property alias appRepeaterRef: appRepeater
-                    implicitHeight: deviceList.implicitHeight + 24
+                    readonly property alias masterControlRef: masterControl
+                    implicitHeight: deviceList.implicitHeight + volumeHint.implicitHeight + 36
                     anchors.fill: parent
                     shown: devicePopup.visible
                     color: Theme.bg1
@@ -208,241 +280,204 @@ RowLayout {
                     ScrollableColumn {
                         id: deviceList
                         anchors.top: parent.top
-                        anchors.bottom: parent.bottom
+                        anchors.bottom: volumeHint.top
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.margins: 12
-                        spacing: 10
+                        anchors.bottomMargin: 10
+                        spacing: 12
 
-                        WidgetHeader {
-                            text: "Output Devices"
-                            color: root.accent
+                        WidgetHeader { text: "Volume"; color: root.accent }
+
+                        RowLayout {
+                            width: parent.width
+                            spacing: 6
+                            Repeater {
+                                model: ["Playback", "Microphone"]
+                                delegate: Rectangle {
+                                    required property int index
+                                    required property string modelData
+                                    readonly property bool selected: root.microphoneView === (index === 1)
+                                    Layout.fillWidth: true
+                                    implicitHeight: Theme.controlHeight
+                                    color: Theme.controlBackground(selected, false, tabHover.hovered)
+                                    border.width: 1
+                                    border.color: Theme.controlBorder(selected, false, tabHover.hovered, root.accent)
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        color: parent.selected ? root.accent : Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                    }
+                                    HoverHandler { id: tabHover }
+                                    TapHandler { onTapped: root.setView(index === 1) }
+                                }
+                            }
                         }
 
-                        Repeater {
-                            id: outputRepeater
-                            // Keep the native object model: insert/remove individual
-                            // delegates instead of rebuilding a filtered JS array.
-                            model: Pipewire.nodes
+                        Rectangle {
+                            id: devicePicker
+                            width: parent.width
+                            height: Theme.controlHeight
+                            readonly property bool available: root.deviceNodes().length > 0
+                            color: Theme.controlBackground(false, root.devicePickerOpen
+                                || !!root.currentDevice && root.keyboardNode === root.currentDevice, pickerHover.hovered && available)
+                            border.width: 1
+                            border.color: Theme.controlBorder(false, root.devicePickerOpen
+                                || !!root.currentDevice && root.keyboardNode === root.currentDevice, pickerHover.hovered && available, root.accent)
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                Text {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    text: root.currentDevice
+                                        ? root.currentDevice.description || root.currentDevice.nickname || root.currentDevice.name
+                                        : devicePicker.available ? "Choose a device" : root.microphoneView ? "No microphone available" : "No output available"
+                                    color: root.currentDevice ? root.accent : Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    text: root.devicePickerOpen ? "▴" : "▾"
+                                    color: devicePicker.available ? Theme.fg : Theme.disabledText
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                            }
+                            HoverHandler { id: pickerHover }
+                            TapHandler { enabled: parent.available; onTapped: root.toggleDevicePicker() }
+                        }
 
-                            delegate: Loader {
-                                id: nodeLoader
-                                required property var modelData
-                                required property int index
-                                active: !!modelData && modelData.ready && modelData.isSink
-                                         && !modelData.isStream && !!modelData.audio
-                                visible: active
-                                width: deviceList.width
-                                sourceComponent: Component {
-                                    Column {
-                                        property var modelData: nodeLoader.modelData
-                                        width: deviceList.width
-                                        spacing: 5
-
-                                        RowLayout {
-                                            width: parent.width
-                                            spacing: 8
-
+                        Column {
+                            width: parent.width
+                            visible: root.devicePickerOpen
+                            spacing: 4
+                            Repeater {
+                                id: deviceRepeater
+                                model: Pipewire.nodes
+                                delegate: Loader {
+                                    id: nodeLoader
+                                    required property var modelData
+                                    required property int index
+                                    active: root.devicePickerOpen && !!modelData && modelData.ready
+                                        && !!modelData.audio && !modelData.isStream
+                                        && modelData.isSink !== root.microphoneView
+                                    visible: active
+                                    width: deviceList.width
+                                    sourceComponent: Component {
+                                        Rectangle {
+                                            width: nodeLoader.width
+                                            implicitHeight: Theme.controlHeight
+                                            readonly property bool selected: nodeLoader.modelData === root.currentDevice
+                                            readonly property bool focused: nodeLoader.modelData === root.keyboardNode
+                                            color: Theme.controlBackground(selected, focused, deviceHover.hovered)
+                                            border.width: 1
+                                            border.color: Theme.controlBorder(selected, focused, deviceHover.hovered, root.accent)
                                             Text {
-                                                Layout.fillWidth: true
-                                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
-                                                    + (modelData.description || modelData.nickname || modelData.name) : ""
-                                                leftPadding: 6
-                                                rightPadding: 6
-                                                Layout.preferredHeight: Theme.controlHeight
+                                                anchors.fill: parent
+                                                leftPadding: 8
+                                                rightPadding: 8
                                                 verticalAlignment: Text.AlignVCenter
-                                                topPadding: 0
-                                                bottomPadding: 0
-                                                Rectangle {
-                                                    anchors.fill: parent
-                                                    z: -1
-                                                    color: Theme.controlBackground(modelData === root.sink,
-                                                        modelData === root.keyboardNode, sinkHover.hovered)
-                                                    border.width: 1
-                                                    border.color: Theme.controlBorder(modelData === root.sink,
-                                                        modelData === root.keyboardNode, sinkHover.hovered, root.accent)
-                                                }
-                                                HoverHandler { id: sinkHover }
-                                                color: modelData === root.sink ? root.accent : Theme.fg
+                                                text: (parent.selected ? "✓  " : "   ")
+                                                    + (nodeLoader.modelData.description || nodeLoader.modelData.nickname || nodeLoader.modelData.name)
+                                                color: parent.selected ? root.accent : Theme.fg
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
                                                 elide: Text.ElideRight
-
-                                                TapHandler {
-                                                    onTapped: {
-                                                        root.keyboardNode = modelData
-                                                        if (modelData && modelData.ready && modelData.audio)
-                                                            Pipewire.preferredDefaultAudioSink = modelData
-                                                    }
-                                                }
                                             }
-
-                                            Text {
-                                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
-                                                color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
-                                            }
-                                        }
-
-                                        Slider {
-                                            id: deviceSlider
-                                            width: parent.width
-                                            implicitHeight: 20
-                                            from: 0
-                                            to: 1
-                                            stepSize: 0.01
-                                            enabled: !!modelData && modelData.ready && !!modelData.audio
-                                            value: enabled ? modelData.audio.volume : 0
-                                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
-
-                                            background: Rectangle {
-                                                x: deviceSlider.leftPadding
-                                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
-                                                width: deviceSlider.availableWidth
-                                                height: 4
-                                                radius: 0
-                                                color: Theme.bg4
-
-                                                Rectangle {
-                                                    width: deviceSlider.visualPosition * parent.width
-                                                    height: parent.height
-                                                    radius: 0
-                                                    color: root.accent
-                                                }
-                                            }
-
-                                            handle: Rectangle {
-                                                x: deviceSlider.leftPadding + deviceSlider.visualPosition
-                                                   * (deviceSlider.availableWidth - width)
-                                                y: deviceSlider.topPadding + deviceSlider.availableHeight / 2 - height / 2
-                                                width: 10
-                                                height: 10
-                                                radius: 0
-                                                color: root.accent
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: parent.width
-                                            height: 1
-                                            color: Theme.bg4
+                                            HoverHandler { id: deviceHover }
+                                            TapHandler { onTapped: root.selectDevice(nodeLoader.modelData) }
                                         }
                                     }
                                 }
                             }
                         }
 
+                        AudioDeviceControl {
+                            id: masterControl
+                            width: parent.width
+                            modelData: root.currentDevice
+                            microphone: root.microphoneView
+                            focused: root.keyboardNode === root.currentDevice
+                            accent: root.accent
+                            onVolumeRequested: value => {
+                                root.keyboardNode = root.currentDevice
+                                root.setVolume(root.currentDevice, value)
+                            }
+                            onMuteRequested: root.toggleNodeMute(root.currentDevice)
+                        }
+
                         WidgetHeader {
+                            id: appsHeader
+                            visible: root.appNodes().length > 0
                             text: "Applications"
                             color: root.accent
-                            topPadding: 4
                         }
 
                         Repeater {
                             id: appRepeater
                             model: Pipewire.nodes
-
                             delegate: Loader {
-                                id: nodeLoader
+                                id: appLoader
                                 required property var modelData
                                 required property int index
-                                active: !!modelData && modelData.ready && modelData.isSink
-                                         && modelData.isStream && !!modelData.audio
+                                active: !root.microphoneView && !!modelData && modelData.ready
+                                    && modelData.isSink && modelData.isStream && !!modelData.audio
                                 visible: active
                                 width: deviceList.width
                                 sourceComponent: Component {
-                                    Column {
-                                        property var modelData: nodeLoader.modelData
-                                        // Playback streams are sinks; source streams record audio.
-                                        width: deviceList.width
-                                        spacing: 5
-
-                                        RowLayout {
-                                            width: parent.width
-                                            spacing: 8
-
-                                            Text {
-                                                Layout.fillWidth: true
-                                                text: modelData ? (modelData === root.keyboardNode ? "› " : "  ")
-                                                    + (modelData.properties["application.name"]
-                                                      || modelData.description
-                                                      || modelData.name) : ""
-                                                color: Theme.fg
-                                                leftPadding: 6
-                                                rightPadding: 6
-                                                Layout.preferredHeight: Theme.controlHeight
-                                                verticalAlignment: Text.AlignVCenter
-                                                Rectangle {
-                                                    anchors.fill: parent
-                                                    z: -1
-                                                    color: Theme.controlBackground(false,
-                                                        modelData === root.keyboardNode, appHover.hovered)
-                                                    border.width: 1
-                                                    border.color: Theme.controlBorder(false,
-                                                        modelData === root.keyboardNode, appHover.hovered, root.accent)
-                                                }
-                                                HoverHandler { id: appHover }
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
-                                                elide: Text.ElideRight
-                                            }
-
-                                            Text {
-                                                text: modelData && modelData.audio ? Math.round(modelData.audio.volume * 100) + "%" : "—"
-                                                color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
+                                    RowLayout {
+                                        width: appLoader.width
+                                        height: Theme.controlHeight
+                                        spacing: 10
+                                        Text {
+                                            Layout.preferredWidth: 125
+                                            Layout.minimumWidth: 0
+                                            text: (appLoader.modelData === root.keyboardNode ? "› " : "  ")
+                                                + (appLoader.modelData.properties["application.name"]
+                                                    || appLoader.modelData.description || appLoader.modelData.name)
+                                            color: appLoader.modelData.audio.muted ? Theme.grey1 : Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                            elide: Text.ElideRight
+                                        }
+                                        AudioSlider {
+                                            Layout.fillWidth: true
+                                            accent: root.accent
+                                            highlighted: appLoader.modelData === root.keyboardNode
+                                            value: appLoader.modelData.audio.volume
+                                            onMoved: {
+                                                root.keyboardNode = appLoader.modelData
+                                                root.setVolume(appLoader.modelData, value)
                                             }
                                         }
-
-                                        Slider {
-                                            id: appSlider
-                                            width: parent.width
-                                            implicitHeight: 20
-                                            from: 0
-                                            to: 1
-                                            stepSize: 0.01
-                                            enabled: !!modelData && modelData.ready && !!modelData.audio
-                                            value: enabled ? modelData.audio.volume : 0
-                                            onMoved: { root.keyboardNode = modelData; root.setVolume(modelData, value) }
-
-                                            background: Rectangle {
-                                                x: appSlider.leftPadding
-                                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
-                                                width: appSlider.availableWidth
-                                                height: 4
-                                                radius: 0
-                                                color: Theme.bg4
-
-                                                Rectangle {
-                                                    width: appSlider.visualPosition * parent.width
-                                                    height: parent.height
-                                                    radius: 0
-                                                    color: root.accent
-                                                }
-                                            }
-
-                                            handle: Rectangle {
-                                                x: appSlider.leftPadding + appSlider.visualPosition
-                                                   * (appSlider.availableWidth - width)
-                                                y: appSlider.topPadding + appSlider.availableHeight / 2 - height / 2
-                                                width: 10
-                                                height: 10
-                                                radius: 0
-                                                color: root.accent
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: parent.width
-                                            height: 1
-                                            color: Theme.bg4
+                                        Text {
+                                            Layout.preferredWidth: 38
+                                            horizontalAlignment: Text.AlignRight
+                                            text: Math.round(appLoader.modelData.audio.volume * 100) + "%"
+                                            color: Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    KeyboardHint {
+                        id: volumeHint
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 12
+                        text: root.devicePickerOpen
+                            ? "Tab: Playback / Microphone\n↑↓: device · Enter: select · Esc: back"
+                            : "Tab: Playback / Microphone · ↑↓: focus\n←→: volume · Enter: device · M: mute · Esc: close"
                     }
                 }
             }

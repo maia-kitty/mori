@@ -19,7 +19,7 @@ Install GNU Stow and the dependencies for the components you want.
 | wl-clipboard + cliphist | Clipboard history |
 | Bash, jq, Python 3.9+, Zenity | Helpers, updater, and dialogs |
 
-**Appearance:** Old Standard TT and IBM Plex Mono are bundled; install Symbols Nerd Font, adw-gtk3, and Adwaita icons/cursor separately. Qt styling uses qt5ct/qt6ct.
+**Appearance:** Old Standard TT and IBM Plex Mono are bundled; install Symbols Nerd Font, adw-gtk3, and Adwaita icons/cursor separately. Qt styling uses qt5ct and qt6ct-kde, with colors matching GTK.
 
 ## Software I use
 

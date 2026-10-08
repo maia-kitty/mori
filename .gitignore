@@ -3,6 +3,7 @@
 .local/
 !/bin/.local/
 !/fonts/.local/
+!/qt/.local/
 *.log
 *.lock
 

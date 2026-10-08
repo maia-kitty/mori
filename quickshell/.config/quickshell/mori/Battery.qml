@@ -291,6 +291,10 @@ Row {
                         }
                     }
                 }
+
+                KeyboardHint {
+                    text: root.profilesAvailable ? "↑↓: profile · Enter: select · Esc: close" : "Esc: close"
+                }
             }
         }
     }

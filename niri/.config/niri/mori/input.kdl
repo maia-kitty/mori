@@ -12,6 +12,5 @@ input {
         tap
         accel-speed 0.0
         natural-scroll
-        dwt
     }
 }

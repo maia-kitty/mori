@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 rezky_nightky <with.rezky@gmail.com>
 
-// Rotate Orion
-
 #version 330
 
 in vec2 fragCoord;

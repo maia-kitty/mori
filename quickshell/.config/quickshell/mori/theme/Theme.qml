@@ -44,7 +44,6 @@ Singleton {
         return focused || hovered ? bg5 : bg4
     }
 
-    // Text uses Old Standard TT; icon-only labels use Symbols Nerd Font.
     readonly property string fontFamily: "Old Standard TT"
     readonly property string nerdFontFamily: "Symbols Nerd Font"
     readonly property int fontSize: 14

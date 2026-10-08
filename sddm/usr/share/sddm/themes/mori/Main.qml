@@ -45,7 +45,6 @@ Rectangle {
         color: root.bg
     }
 
-    // Quiet geometry to give the otherwise flat screen some depth.
     Rectangle {
         width: parent.width * 0.62
         height: 1

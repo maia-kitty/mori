@@ -22,6 +22,8 @@ Item {
     property bool dayNavigation: false
     readonly property bool busy: syncProcess.running || eventQuery.running || monthQuery.running
     readonly property var weekdayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    readonly property int monthCellCount: Math.ceil(((shownMonth.getDay() + 6) % 7
+        + new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 0).getDate()) / 7) * 7
     readonly property date today: clock.date
 
     implicitWidth: clockLabel.implicitWidth
@@ -338,8 +340,12 @@ Item {
                     border.color: root.accent
 
                     Column {
-                        anchors.fill: parent
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: calendarHint.top
                         anchors.margins: 12
+                        anchors.bottomMargin: 10
                         spacing: 8
 
                         Item {
@@ -374,15 +380,6 @@ Item {
                             }
                         }
 
-                        Text {
-                            text: root.dayNavigation
-                                ? "Days: arrows move date · Tab: months"
-                                : "Months: ← / → · Tab: days"
-                            color: Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                        }
-
                         Grid {
                             width: parent.width
                             columns: 7
@@ -406,7 +403,7 @@ Item {
                             }
 
                             Repeater {
-                                model: 42
+                                model: root.monthCellCount
 
                                 delegate: Rectangle {
                                     id: dayCell
@@ -417,6 +414,8 @@ Item {
                                     readonly property bool current: root.sameDay(value, root.today)
                                     readonly property bool inMonth: value.getMonth() === root.shownMonth.getMonth()
 
+                                    opacity: inMonth ? 1 : 0
+                                    enabled: inMonth
                                     width: (parent.width - 12) / 7
                                     height: Theme.controlHeight
                                     color: Theme.controlBackground(selected, keyboardFocused, dayHover.hovered)
@@ -502,7 +501,7 @@ Item {
 
                         Flickable {
                             width: parent.width
-                            height: Math.max(0, popup.implicitHeight - y - 24)
+                            height: Math.max(0, parent.height - y)
                             contentHeight: eventList.height
                             clip: true
 
@@ -563,6 +562,17 @@ Item {
                                 }
                             }
                         }
+                    }
+
+                    KeyboardHint {
+                        id: calendarHint
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 12
+                        text: root.dayNavigation
+                            ? "Days: arrows move date · Tab: months"
+                            : "Months: ← / → · Tab: days"
                     }
                 }
             }

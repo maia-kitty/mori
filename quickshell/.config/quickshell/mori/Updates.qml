@@ -236,6 +236,10 @@ Row {
                             }
                         }
                     }
+
+                    KeyboardHint {
+                        text: "↑↓: scroll · Esc: close"
+                    }
                 }
             }
         }

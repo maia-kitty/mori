@@ -42,14 +42,18 @@ Module, appearance, clock, and update interval settings save immediately. Input,
 | Widget | Function |
 | --- | --- |
 | Network | Wi-Fi connections and active NetworkManager VPN controls |
-| Volume / brightness | Audio and laptop backlight controls |
+| Volume / brightness | Audio output/input devices, application volume, and laptop backlight controls |
 | Battery | Battery status and power profiles |
 | Media | Media player controls |
 | Calendar | Calendar view, with optional khal events and vdirsyncer sync |
 | Wallpapers | Folder picker and per-output wallpaper selection through awww |
-| Notifications | Notification popups and the newest 500 history entries for the current shell session |
+| Notifications | Notification popups, a stored-notification count, and the newest 500 history entries for the current shell session |
 | KDE Connect | Paired phone status and clipboard sending; shows “Unavailable” when its QML module is missing |
 | Updates | Per-source update counts, errors, last check time, and reboot hints |
+
+Incoming notification popups leave open menus in place. The count beside the bell shows stored history entries, hides when empty, and decreases when entries are removed or cleared.
+
+The volume popup has **Playback** and **Microphone** tabs (**Tab** switches between them). The device picker expands only when switching devices; **Enter** opens it or selects a device, and **Escape** collapses it before closing the popup. **Up/Down** moves through device choices or playback apps, **Left/Right** adjusts volume, and **M** toggles mute for the focused device or app. Playback apps appear as compact name-and-slider rows.
 
 In the network popup, use **Up/Down** to select Ethernet, an active VPN, or Wi-Fi; **Enter** connects and **D** disconnects the selected connection.
 

@@ -360,7 +360,7 @@ Item {
                 GridView {
                     id: grid
                     width: parent.width
-                    height: 264
+                    height: Math.max(0, parent.height - y - wallpaperHint.implicitHeight - parent.spacing)
                     clip: true
                     cellWidth: width / 3
                     cellHeight: 100
@@ -430,13 +430,11 @@ Item {
                     }
                 }
 
-                Text {
+                KeyboardHint {
+                    id: wallpaperHint
                     text: root.keyboardMode === "screens"
                         ? "←/→: monitor  ·  ↑: parent  ·  ↓: folder  ·  Tab: wallpapers"
-                        : "Arrows: navigate  ·  Enter: select  ·  Tab: monitors  ·  F: folder"
-                    color: Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                        : "Arrows: navigate  ·  Enter: select  ·  Tab: monitors"
                 }
             }
         }

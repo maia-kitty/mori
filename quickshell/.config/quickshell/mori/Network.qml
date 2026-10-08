@@ -136,7 +136,6 @@ RowLayout {
         }
         index -= wiredDevices.count
         if (index < vpnConnections.length) {
-            // The VPN section lists active connections only.
             if (disconnect) disconnectVpn(vpnConnections[index].uuid)
             return
         }
@@ -634,7 +633,6 @@ RowLayout {
             return
 
         passwordNetworkName = typeof network === "string" ? network : network.name
-        // Unmap the layer-shell dismiss surface before Zenity appears.
         close()
         passwordDialog.exec([
             "zenity",
@@ -794,7 +792,7 @@ RowLayout {
                     readonly property alias wiredRepeaterRef: wiredRepeater
                     readonly property alias vpnRepeaterRef: vpnRepeater
                     readonly property alias networkRepeaterRef: networkRepeater
-                    implicitHeight: listCol.implicitHeight + 24
+                    implicitHeight: listCol.implicitHeight + networkHint.implicitHeight + 34
                     anchors.fill: parent
                     shown: popup.visible
                     color: Theme.bg1
@@ -804,10 +802,11 @@ RowLayout {
                     ScrollableColumn {
                         id: listCol
                         anchors.top: parent.top
-                        anchors.bottom: parent.bottom
+                        anchors.bottom: networkHint.top
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.margins: 12
+                        anchors.bottomMargin: 10
                         spacing: 10
 
                         Column {
@@ -953,7 +952,6 @@ RowLayout {
                                             TapHandler {
                                                 onTapped: {
                                                     root.keyboardNetworkIndex = wiredDevices.count + index
-                                                    // Already connected.
                                                 }
                                             }
                                         }
@@ -1106,6 +1104,15 @@ RowLayout {
                                 }
                             }
                         }
+                    }
+
+                    KeyboardHint {
+                        id: networkHint
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 12
+                        text: "↑↓: select · Enter: connect · D: disconnect · Esc: close"
                     }
 
                 }

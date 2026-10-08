@@ -101,7 +101,6 @@ def show_check(output):
                 cells = [parts[index] if index < len(parts) else "" for parts in columns]
                 print("  " + "  ".join(paint(cell.ljust(size), tone) for cell, size, tone in zip(
                     cells, sizes, ("green", "dim", "yellow"))))
-        # Retain warnings alongside the formatted package list.
         warnings = [line for line in clean(output).splitlines()
                     if re.search(r"\b(warning|error|held back)\b", line, re.I)]
         for line in warnings:
@@ -214,7 +213,6 @@ def flatpak_cache_jobs(timeout):
 def cleanup_job(job, args):
     detail(job.name, "blue")
     detail(job.note, "dim")
-    # Check executable availability before asking permission to run it.
     for command in job.commands + job.previews:
         if not shutil.which(command[0]):
             raise RuntimeError(f"Missing {command[0]}; skipping this cleanup.")
@@ -528,7 +526,6 @@ def parsed_updates(source, output, exit_code):
                              "available": new.rpartition("-")[2], "kind": "package"})
         if not output.strip():
             return []
-    # Deduplicate duplicate remote/architecture rows without inflating counts.
     unique = {}
     for package in packages:
         key = (package["name"], package.get("branch"), package.get("arch"))

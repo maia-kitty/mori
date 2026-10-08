@@ -1,16 +1,13 @@
-// === Notifications ===
 config-notification {
     disable-failed
 }
 
-// === Gestures & Input ===
 gestures {
     hot-corners {
         off
    }
 }
 
-// === Layout ===
 layout {
     background-color "transparent"
     center-focused-column "never"
@@ -26,7 +23,6 @@ layout {
     }
 }
 
-// === Layer Rules & Overview ===
 layer-rule {
     match namespace="^awww-daemon$"
     place-within-backdrop true
@@ -38,12 +34,10 @@ overview {
     }
 }
 
-// === Startup spawns ===
 spawn-at-startup "awww-daemon" "--quiet"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 
-// === Environment ===
 environment {
   XDG_CURRENT_DESKTOP "niri"
   XCURSOR_THEME "Adwaita"
@@ -53,7 +47,6 @@ environment {
   QT_QPA_PLATFORMTHEME_QT6 "qt6ct"
 }
 
-// === Misc Settings ===
 hotkey-overlay {
     skip-at-startup
 }
@@ -62,7 +55,6 @@ prefer-no-csd
 
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 
-// === Animations ===
 animations {
     workspace-switch {
         spring damping-ratio=1.0 stiffness=700 epsilon=0.0001
@@ -110,12 +102,10 @@ animations {
     }
 }
 
-// === Debug ===
 debug {
    honor-xdg-activation-with-invalid-serial
 }
 
-// === Includes ===
 include optional=true "mori/colors.kdl"
 include optional=true "mori/input.kdl"
 include optional=true "mori/layout.kdl"

@@ -262,6 +262,10 @@ Item {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                 }
+
+                KeyboardHint {
+                    text: "Esc: close"
+                }
             }
         }
     }

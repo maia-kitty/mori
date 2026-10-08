@@ -173,7 +173,7 @@ Item {
 
     PopupWindow {
         id: menu
-        implicitWidth: root.errorMessage.length > 0 ? 300 : 150
+        implicitWidth: root.errorMessage.length > 0 ? 300 : 200
         implicitHeight: menuItems.implicitHeight + 24
         visible: false
         color: "transparent"
@@ -322,6 +322,10 @@ Item {
                     color: Theme.grey1
                     font.family: Theme.fontFamily
                     font.pixelSize: Math.max(10, Theme.fontSize - 1)
+                }
+
+                KeyboardHint {
+                    text: "↑↓: select\nHold Enter or shortcut: run\nEsc: close"
                 }
             }
         }

@@ -6,7 +6,7 @@
 
 Use your distribution’s package manager to install GNU Stow and the [desktop dependencies](../README.md#desktop-dependencies). Package names vary by distribution. Install only the optional applications you want.
 
-Install Symbols Nerd Font, adw-gtk3, and the Adwaita icons/cursor separately. Old Standard TT, IBM Plex Mono, and their font licenses are bundled. For Qt styling, install qt5ct and qt6ct; Niri sets their platform-theme variables.
+Install Symbols Nerd Font, adw-gtk3, and the Adwaita icons/cursor separately. Old Standard TT, IBM Plex Mono, and their font licenses are bundled. For Qt styling, install qt5ct and qt6ct-kde; Niri sets their platform-theme variables. Qt 5 uses its native palette, while Qt 6 and KDE apps use the bundled `Mori.colors` scheme. Rebuild qt6ct-kde after a Qt minor-version update if its theme plugin stops loading.
 
 For standalone Wi-Fi, install `iw` and `wpa_supplicant` with `wpa_cli`, give your user access to its control socket, and enable `update_config=1` if new networks should survive restarts. The popup supports open and WPA-Personal networks.
 
@@ -23,7 +23,6 @@ Back up conflicting dotfiles. Before linking:
 
 - Edit `niri/.config/niri/mori/outputs.kdl` for your monitors; the bundled layout uses DP-1 and a rotated HDMI-A-1.
 - Review `niri/.config/niri/mori/binds.kdl` for application shortcuts.
-- Replace `/home/martin/` in `qt/.config/qt5ct/qt5ct.conf` and `qt/.config/qt6ct/qt6ct.conf` with your home path if using Qt styling.
 - If using Fish, review its CachyOS config source and Arch-specific `paru` abbreviations in `fish/.config/fish/config.fish`.
 
 ## 3. Link the packages

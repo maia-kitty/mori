@@ -41,6 +41,7 @@ overview {
 // === Startup spawns ===
 spawn-at-startup "awww-daemon" "--quiet"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
+spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 
 // === Environment ===
 environment {

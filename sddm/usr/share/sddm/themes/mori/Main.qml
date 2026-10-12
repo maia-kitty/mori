@@ -15,6 +15,7 @@ Rectangle {
     readonly property color accent: "#a7c080"
     readonly property color red: "#e67e80"
     readonly property string uiFont: "Old Standard TT"
+    readonly property string monoFont: "IBM Plex Mono"
     property int sessionIndex: session.index
 
     TextConstants { id: textConstants }
@@ -94,7 +95,7 @@ Rectangle {
         anchors.topMargin: Math.max(80, parent.height * 0.21)
         text: Qt.formatTime(new Date(), "HH:mm")
         color: root.fg
-        font.family: root.uiFont
+        font.family: root.monoFont
         font.pixelSize: Math.max(42, Math.min(78, parent.height * 0.09))
         font.weight: Font.Light
     }
@@ -211,7 +212,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "SK · QWERTZ"
                         color: root.accent
-                        font.family: root.uiFont
+                        font.family: root.monoFont
                         font.pixelSize: 10
                         font.bold: true
                     }
@@ -224,7 +225,7 @@ Rectangle {
                 height: 16
                 text: textConstants.prompt
                 color: root.muted
-                font.family: root.uiFont
+                font.family: root.monoFont
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
@@ -272,7 +273,7 @@ Rectangle {
                 Text {
                     text: "POWER OFF"
                     color: powerMouse.containsMouse ? root.fg : root.muted
-                    font.family: root.uiFont
+                    font.family: root.monoFont
                     font.pixelSize: 11
 
                     MouseArea {
@@ -286,7 +287,7 @@ Rectangle {
                 Text {
                     text: "REBOOT"
                     color: rebootMouse.containsMouse ? root.fg : root.muted
-                    font.family: root.uiFont
+                    font.family: root.monoFont
                     font.pixelSize: 11
 
                     MouseArea {

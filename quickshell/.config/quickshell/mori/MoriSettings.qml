@@ -41,6 +41,15 @@ Item {
     property int keyboardColorRow: 0
     property int keyboardColorIndex: 0
     property int keyboardUpdateIndex: 0
+    property int keyboardAboutIndex: 0
+    readonly property var aboutLinks: [
+        { "label": "Niri", "detail": "Scrollable-tiling Wayland compositor", "url": "https://github.com/YaLTeR/niri" },
+        { "label": "Quickshell", "detail": "QML toolkit this shell is built on", "url": "https://quickshell.org" },
+        { "label": "Everforest", "detail": "Color palette", "url": "https://github.com/sainnhe/everforest" },
+        { "label": "Old Standard TT", "detail": "Interface typeface", "url": "https://fonts.google.com/specimen/Old+Standard+TT" },
+        { "label": "IBM Plex Mono", "detail": "Monospace typeface", "url": "https://github.com/IBM/plex" },
+        { "label": "Mori", "detail": "Source for these dotfiles", "url": "https://github.com/maia-kitty/mori" }
+    ]
     property int keyboardClockIndex: 0
     property int keyboardPowerIndex: 0
     property bool editingPowerCommand: false
@@ -326,7 +335,16 @@ Item {
         } else if (name === "input") {
             keyboardInputIndex = 0
             loadInputSettings()
+        } else if (name === "about") {
+            keyboardAboutIndex = 0
         }
+    }
+
+    function openAboutLink(index) {
+        keyboardAboutIndex = index
+        Qt.openUrlExternally(aboutLinks[index].url)
+        // The browser opens behind this overlay otherwise.
+        close()
     }
 
     function loadPowerDrafts() {
@@ -708,6 +726,13 @@ Item {
             else if (key === Qt.Key_Left || key === Qt.Key_Right
                     || key === Qt.Key_Return || key === Qt.Key_Enter)
                 cycleClockOption(key === Qt.Key_Left ? -1 : 1)
+            else return
+        } else if (page === "about") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardAboutIndex = Math.max(0, Math.min(aboutLinks.length - 1,
+                    keyboardAboutIndex + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                openAboutLink(keyboardAboutIndex)
             else return
         } else if (page === "updates") {
             if (key === Qt.Key_Left || key === Qt.Key_Right)
@@ -3224,6 +3249,50 @@ Item {
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
+                            }
+                            SettingsLabel {
+                                text: "Built with · ↑↓ / Enter opens in your browser"
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            Column {
+                                width: parent.width
+                                spacing: 6
+                                Repeater {
+                                    model: root.aboutLinks
+                                    delegate: Rectangle {
+                                        id: aboutLink
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool focused: index === root.keyboardAboutIndex
+                                        width: parent.width
+                                        height: Theme.controlHeight
+                                        color: root.controlBackground(false, focused, aboutHover.hovered)
+                                        border.width: 1
+                                        border.color: root.controlBorder(false, focused, aboutHover.hovered)
+                                        SettingsLabel {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 10
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: (aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
+                                            color: Theme.fg
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                        SettingsLabel {
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 10
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: aboutLink.modelData.detail
+                                            color: Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                                        }
+                                        HoverHandler { id: aboutHover; cursorShape: Qt.PointingHandCursor }
+                                        TapHandler { onTapped: root.openAboutLink(aboutLink.index) }
+                                    }
+                                }
                             }
                         }
                     }

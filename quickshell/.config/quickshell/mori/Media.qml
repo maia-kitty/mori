@@ -108,14 +108,22 @@ Item {
         }
     }
 
-    // ObjectModel does not expose a convenient preferred-player property.
-    // Refreshing lightly also makes a newly-playing player take precedence.
-    Timer {
-        interval: 1500
-        repeat: true
-        running: true
-        triggeredOnStart: true
-        onTriggered: root.selectPlayer()
+    // ObjectModel does not expose a preferred player. Reselect when players
+    // come and go, or when any of them starts or stops playing.
+    Component.onCompleted: selectPlayer()
+
+    Connections {
+        target: Mpris.players
+        function onValuesChanged() { root.selectPlayer() }
+    }
+
+    Instantiator {
+        model: Mpris.players
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            function onIsPlayingChanged() { root.selectPlayer() }
+        }
     }
 
     Row {

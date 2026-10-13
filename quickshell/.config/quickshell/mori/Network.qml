@@ -35,6 +35,9 @@ RowLayout {
     property bool fallbackWifiConnected: false
     property string fallbackWifiName: ""
     property real fallbackWifiSignal: 0
+    // False once wpa_cli cannot reach the control socket, e.g. when
+    // NetworkManager owns wpa_supplicant. Opening the popup retries once.
+    property bool wpaReachable: true
     property var wpaKnownNetworks: ({})
     property string wpaError: ""
     property string pendingWpaName: ""
@@ -56,10 +59,11 @@ RowLayout {
     required property var panelWindow
     required property var popupCoordinator
     readonly property bool popupVisible: popup.visible
-    readonly property bool useWpaFallback: fallbackWifiInterface.length > 0
+    readonly property bool useWpaFallback: fallbackWifiInterface.length > 0 && wpaReachable
         && (!wifiDevice || (!wifiConnected && nativeWifiNetworkCount === 0))
     readonly property bool hasWifiConnection: wifiConnected || fallbackWifiConnected
-    readonly property bool wifiRadioEnabled: Networking.wifiEnabled || fallbackWifiInterface.length > 0
+    readonly property bool wifiRadioEnabled: Networking.wifiEnabled
+        || (fallbackWifiInterface.length > 0 && wpaReachable)
     readonly property string currentWifiName: wifiConnected ? wifiName : fallbackWifiName
     readonly property string icon: {
         if (wiredConnected) return String.fromCodePoint(0xf0200)
@@ -73,6 +77,10 @@ RowLayout {
         else {
             popupCoordinator.showPopup(root)
             popup.visible = true
+            if (!wpaReachable) {
+                wpaReachable = true
+                refreshWpaSupplicantState()
+            }
         }
     }
 
@@ -428,6 +436,8 @@ RowLayout {
     // SSID. These processes only affect the compact bar indicator; the popup
     // continues to use Quickshell's native model for network actions.
     function refreshWpaSupplicantState() {
+        if (!wpaReachable)
+            return
         if (fallbackWifiInterface) {
             if (!wpaStatus.running)
                 wpaStatus.exec(["wpa_cli", "-i", fallbackWifiInterface, "status"])
@@ -439,7 +449,7 @@ RowLayout {
     Timer {
         interval: root.fallbackWifiInterface ? 5000 : 10000
         repeat: true
-        running: true
+        running: root.wpaReachable
         triggeredOnStart: true
         onTriggered: root.refreshWpaSupplicantState()
     }
@@ -447,7 +457,7 @@ RowLayout {
     Timer {
         interval: 30000
         repeat: true
-        running: root.fallbackWifiInterface.length > 0
+        running: root.fallbackWifiInterface.length > 0 && root.wpaReachable
         onTriggered: if (!wifiProbe.running) wifiProbe.exec(["iw", "dev"])
     }
 
@@ -578,6 +588,15 @@ RowLayout {
                     root.fallbackWifiSignal = 0
             }
         }
+        onExited: exitCode => {
+            if (exitCode === 0)
+                return
+            root.wpaReachable = false
+            root.fallbackWifiConnected = false
+            root.fallbackWifiName = ""
+            root.fallbackWifiSignal = 0
+            wpaNetworks.clear()
+        }
     }
 
     Process {
@@ -609,8 +628,9 @@ RowLayout {
         vpnDisconnect.exec(["nmcli", "connection", "down", "uuid", uuid])
     }
 
+    // `nmcli monitor` below drives updates; this only covers missed events.
     Timer {
-        interval: 10000
+        interval: 60000
         repeat: true
         running: true
         triggeredOnStart: true

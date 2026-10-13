@@ -7,6 +7,10 @@ Requisite=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/qs --no-duplicate -c mori
+# THP=always backs each thread's 8 MB stack with huge pages; the shell gains nothing from them.
+MemoryTHP=disable
+# One arena per thread mostly holds idle free space in a mostly-idle shell.
+Environment=MALLOC_ARENA_MAX=2
 Restart=on-failure
 RestartSec=1
 

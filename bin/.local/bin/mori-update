@@ -3,21 +3,21 @@
 
 import argparse
 import contextlib
-from dataclasses import dataclass, field
 import fcntl
 import io
 import json
 import os
 import re
-from pathlib import Path
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import textwrap
-from datetime import datetime, timezone
 import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 
 
 VERBOSE = False
@@ -71,42 +71,40 @@ def nix_revision_changes(output):
             if old != new]
 
 
-def show_check(output):
-    upgrades = [name for name, old, new in nix_revision_changes(output)]
-    if upgrades and not VERBOSE:
-        detail(f"{len(upgrades)} Nix package source(s) have newer flake revisions.", "green")
-        for name in upgrades:
-            detail(name.rsplit(".", 1)[-1] + "  →  newer flake revision", "yellow")
-        for line in clean(output).splitlines():
-            if re.search(r"\b(warning|error)\b", line, re.I):
-                detail(line, "yellow")
+def warnings(output, words=("warning", "error")):
+    pattern = r"\b(" + "|".join(words) + r")\b"
+    return [line for line in clean(output).splitlines() if re.search(pattern, line, re.I)]
+
+
+def show_check(output, packages):
+    """Render parsed_updates() results; raw output when uncountable or verbose."""
+    if VERBOSE or packages is None:
+        detail(output.strip() or "Up to date — no changes reported.")
+        return
+    if not packages:
+        detail("Up to date.", "green")
+    elif all(package["kind"] == "flake" for package in packages):
+        detail(f"{len(packages)} Nix package source(s) have newer flake revisions.", "green")
+        for package in packages:
+            detail(package["name"] + "  →  newer flake revision", "yellow")
         detail("Use --verbose for flake URLs and revision details.", "dim")
-        return
-    if not upgrades and re.search(NIX_REVISION_PATTERN, clean(output)) and not VERBOSE:
-        detail("No newer Nix flake revisions.", "green")
-        for line in clean(output).splitlines():
-            if re.search(r"\b(warning|error)\b", line, re.I):
-                detail(line, "yellow")
-        return
-    rows = package_rows(output)
-    if rows and not VERBOSE:
-        print(paint(f"  {len(rows)} package{'s' if len(rows) != 1 else ''} available", "green"))
+    else:
+        print(paint(f"  {len(packages)} package{'s' if len(packages) != 1 else ''} available", "green"))
         width = max(30, min(shutil.get_terminal_size((88, 24)).columns - 6, 94))
         sizes = [width // 3, width // 3, width - 2 * (width // 3)]
         print(paint("  " + "  ".join(value.ljust(size) for value, size in zip(
             ("PACKAGE", "INSTALLED", "AVAILABLE"), sizes)), "dim"))
-        for row in rows:
+        for package in packages:
+            # Flatpak refs can differ only by branch, e.g. GL.default//25.08 and //25.08-extra.
+            name = package["name"] + ("//" + package["branch"] if package.get("branch") else "")
+            row = (name, package["installed"] or "—", package["available"] or "—")
             columns = [textwrap.wrap(value, width=size) for value, size in zip(row, sizes)]
             for index in range(max(map(len, columns))):
                 cells = [parts[index] if index < len(parts) else "" for parts in columns]
                 print("  " + "  ".join(paint(cell.ljust(size), tone) for cell, size, tone in zip(
                     cells, sizes, ("green", "dim", "yellow"))))
-        warnings = [line for line in clean(output).splitlines()
-                    if re.search(r"\b(warning|error|held back)\b", line, re.I)]
-        for line in warnings:
-            detail(line, "yellow")
-    else:
-        detail(output.strip() or "Up to date — no changes reported.")
+    for line in warnings(output, ("warning", "error", "held back")):
+        detail(line, "yellow")
 
 
 def confirm(prompt, default=False):
@@ -152,6 +150,8 @@ def cache_jobs(manager, available):
         else:
             jobs.append(CacheCleanup("Arch package archives", [["pacman", "-Sc"]],
                 "Remove uninstalled package archives and unused sync databases. Install pacman-contrib to keep 3 cached versions instead.", True))
+        jobs.append(CacheCleanup("Orphaned packages", [], "Dependencies no installed package requires.",
+                                 True, kind="orphans"))
     elif manager == "apt":
         jobs.append(CacheCleanup("APT package archives", [["apt-get", "autoclean"]],
             "Remove obsolete downloaded packages that are no longer available from repositories.", True,
@@ -182,7 +182,7 @@ def cache_jobs(manager, available):
         elif source.name == "Flatpak":
             # Expand installed scopes later, isolating discovery failures from
             # the native/AUR/Nix cleanup jobs.
-            jobs.append(CacheCleanup("Flatpak object store", [], "", kind="flatpak-discover"))
+            jobs.append(CacheCleanup("Flatpak unused runtimes", [], "", kind="flatpak-discover"))
     return jobs
 
 
@@ -192,27 +192,49 @@ def flatpak_cache_jobs(timeout):
         detail(result.stdout, "red")
         raise RuntimeError("Cannot discover Flatpak installations; skipping Flatpak cleanup.")
     scopes = {line.strip() for line in clean(result.stdout).splitlines() if line.strip()}
-    # Empty installations can still contain an object cache.
-    data = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
-    if (data / "flatpak/repo").is_dir():
-        scopes.add("user")
-    if (Path(os.environ.get("FLATPAK_SYSTEM_DIR", "/var/lib/flatpak")) / "repo").is_dir():
-        scopes.add("system")
     jobs = []
     for scope in sorted(scopes):
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", scope):
             raise RuntimeError("Unrecognized Flatpak installation name; skipping Flatpak cleanup.")
         option = f"--{scope}" if scope in ("user", "system") else f"--installation={scope}"
-        command = ["flatpak", "repair", option]
-        jobs.append(CacheCleanup(f"Flatpak ({scope}) object store", [command],
-            "Prune unused objects and verify this installation; damaged objects may be downloaded again. Installed apps and runtimes are retained.",
-            scope != "user", [command + ["--dry-run"]]))
+        # Flatpak has no dry run here; it lists the refs and asks before removing them.
+        jobs.append(CacheCleanup(f"Flatpak ({scope}) unused runtimes",
+            [["flatpak", "uninstall", "--unused", option]],
+            "Remove runtimes and extensions no installed app uses; Flatpak lists them and asks again.",
+            scope != "user"))
     return jobs
+
+
+def orphans_job(job, args):
+    # pacman exits 1 when nothing matches -Qdtq, so this cannot be a generic preview.
+    result = run(["pacman", "-Qdtq"], capture=True, timeout=args.timeout)
+    names = [line.strip() for line in clean(result.stdout).splitlines() if line.strip()]
+    if result.returncode not in (0, 1) or (result.returncode == 1 and names):
+        detail(result.stdout, "red")
+        raise RuntimeError("Could not list orphaned packages.")
+    if not names:
+        detail("No orphaned packages.", "dim")
+        return
+    detail(f"{len(names)} orphaned package(s).", "yellow")
+    if args.check:
+        for name in names:
+            detail(name)
+        return
+    selected = select_items(names, "Remove packages")
+    if not selected:
+        detail("Skipped.", "dim")
+        return
+    # pacman shows the full removal, including unneeded dependencies, and confirms.
+    if run(["pacman", "-Rns"] + selected, privileged=True).returncode != 0:
+        raise RuntimeError("Orphan removal failed or was declined.")
+    detail("Cleanup complete.", "green")
 
 
 def cleanup_job(job, args):
     detail(job.name, "blue")
     detail(job.note, "dim")
+    if job.kind == "orphans":
+        return orphans_job(job, args)
     for command in job.commands + job.previews:
         if not shutil.which(command[0]):
             raise RuntimeError(f"Missing {command[0]}; skipping this cleanup.")
@@ -376,7 +398,8 @@ def sources(args, info):
         if helper:
             result.append(Source("AUR", [helper, "-Qua"], [helper, "-Sua"]))
     if not args.no_flatpak and shutil.which("flatpak"):
-        result.append(Source("Flatpak", ["flatpak", "remote-ls", "--updates"],
+        result.append(Source("Flatpak", ["flatpak", "remote-ls", "--updates",
+                                         "--columns=application,version,branch,arch"],
                              ["flatpak", "update"]))
     if not args.no_nix and (shutil.which("nix") or shutil.which("nix-env")):
         state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
@@ -403,14 +426,15 @@ def run(command, privileged=False, capture=False, timeout=None):
         command = [wrapper] + command
     if VERBOSE:
         detail("$ " + shlex.join(command), "dim")
-    env = dict(os.environ, LC_ALL="C")
+    # Parsers need untranslated output; interactive transactions keep the user's locale.
+    env = dict(os.environ, LC_ALL="C.UTF-8") if capture else None
     try:
         return subprocess.run(command, env=env, text=True, timeout=timeout,
                               stdin=subprocess.DEVNULL if capture and not privileged else None,
                               stdout=subprocess.PIPE if capture else None,
                               stderr=subprocess.STDOUT if capture else None)
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"Check timed out after {timeout}s.") from error
+        raise RuntimeError(f"{command[0]} timed out after {timeout}s.") from error
     except OSError as error:
         raise RuntimeError(str(error)) from error
 
@@ -425,6 +449,7 @@ def check_succeeded(source, checked):
 
 
 def process(source, args):
+    """Return False only when the user declined pending updates."""
     section(source.name)
     if source.note and (VERBOSE or source.refresh):
         detail(source.note, "dim")
@@ -437,23 +462,25 @@ def process(source, args):
     if not check_succeeded(source, checked):
         detail(checked.stdout, "red")
         raise RuntimeError(f"Check failed (exit {checked.returncode}); skipping this source.")
-    show_check(checked.stdout)
+    packages = parsed_updates(source, checked.stdout, checked.returncode)
+    show_check(checked.stdout, packages)
     if args.check:
-        return
-    if source.check[0] == "nix" and parsed_updates(source, checked.stdout, checked.returncode) == []:
-        return
-    # Native dry runs contain status text as well as packages. Let the package
-    # manager resolve the final transaction rather than guessing from that text.
+        return True
+    # Native dry runs contain status text as well as packages. When the output
+    # cannot be counted, let the package manager resolve the final transaction.
+    if packages == []:
+        return True
     if not checked.stdout.strip() and checked.returncode != 100:
-        return
+        return True
     if VERBOSE:
         detail("Upgrade command: " + shlex.join(source.upgrade), "dim")
     if not confirm(f"Install {source.name} updates?", default=True):
         detail("Skipped.", "dim")
-        return
+        return False
     if run(source.upgrade, source.privileged).returncode != 0:
         raise RuntimeError("Upgrade failed; review the package manager's output.")
     detail("Update finished.", "green")
+    return True
 
 
 def parsed_updates(source, output, exit_code):
@@ -541,16 +568,13 @@ def json_report(args, available):
         cached = source.check[0] in ("apt-get", "zypper", "apk", "nix-env")
         item = {"name": source.name, "status": "error", "count": None,
                 "packages": [], "cached": cached, "message": "", "warnings": []}
-        command = source.check
-        if command[0] == "flatpak":
-            command = ["flatpak", "remote-ls", "--updates", "--columns=application,version,branch,arch"]
         try:
-            checked = run(command, capture=True, timeout=args.timeout)
+            checked = run(source.check, capture=True, timeout=args.timeout)
             output = clean(checked.stdout)
             if not check_succeeded(source, checked):
                 raise RuntimeError(output.strip()[:2000] or f"Check failed (exit {checked.returncode}).")
-            item["warnings"] = [line.strip()[:500] for line in output.splitlines()
-                                if re.search(r"\b(warning|held back|kept back)\b", line, re.I)][:10]
+            item["warnings"] = [line.strip()[:500] for line in
+                                warnings(output, ("warning", "held back", "kept back"))][:10]
             packages = parsed_updates(source, output, checked.returncode)
             if packages is None:
                 item["status"] = "unknown"
@@ -574,6 +598,23 @@ def json_report(args, available):
     return result
 
 
+@contextlib.contextmanager
+def checkupdates_database(cache):
+    """Keep checkupdates' sync copy between runs so it downloads only changed databases.
+
+    The caller holds the cache lock, so no other check can share the copy concurrently.
+    """
+    previous = os.environ.get("CHECKUPDATES_DB")
+    os.environ["CHECKUPDATES_DB"] = str(cache / "checkup-db")
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("CHECKUPDATES_DB", None)
+        else:
+            os.environ["CHECKUPDATES_DB"] = previous
+
+
 def check_json(args):
     """Background mode: no sudo, installs, refresh commands, cleanup or services."""
     cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "mori-update"
@@ -588,16 +629,8 @@ def check_json(args):
             else:
                 available = sources(args, distro())
                 discovery_notes = notes.getvalue().strip().splitlines()
-                with tempfile.TemporaryDirectory(prefix="mori-update-") as database:
-                    previous = os.environ.get("CHECKUPDATES_DB")
-                    os.environ["CHECKUPDATES_DB"] = database
-                    try:
-                        result = json_report(args, available)
-                    finally:
-                        if previous is None:
-                            os.environ.pop("CHECKUPDATES_DB", None)
-                        else:
-                            os.environ["CHECKUPDATES_DB"] = previous
+                with checkupdates_database(cache):
+                    result = json_report(args, available)
                 result["notes"] = discovery_notes
                 # Atomic replacement lets the widget restore the last check on reload.
                 with tempfile.NamedTemporaryFile(mode="w", dir=cache, delete=False) as state:
@@ -774,26 +807,46 @@ def service_command(unit):
     return None
 
 
-def select_services(units):
-    for index, unit in enumerate(units, 1):
-        print("  " + paint(f"{index:>2}", "yellow") + "  " + unit)
+def select_items(items, action):
+    for index, item in enumerate(items, 1):
+        print("  " + paint(f"{index:>2}", "yellow") + "  " + item)
     while True:
         try:
-            answer = input(paint("  Restart services: numbers, 0/all for all, or Enter to skip: ", "yellow")).strip()
+            answer = input(paint(f"  {action}: numbers, 0/all for all, or Enter to skip: ", "yellow")).strip()
         except EOFError:
             return []
         if not answer:
             return []
         if answer.lower() in ("0", "all"):
-            return units
+            return items
         parts = answer.split()
-        if all(part.isdecimal() and 1 <= int(part) <= len(units) for part in parts):
-            return list(dict.fromkeys(units[int(part) - 1] for part in parts))
+        if all(part.isdecimal() and 1 <= int(part) <= len(items) for part in parts):
+            return list(dict.fromkeys(items[int(part) - 1] for part in parts))
         detail("Choose the displayed numbers, 0/all, or Enter.", "yellow")
 
 
-def maintenance(args, scan_services=True):
+def pending_config_merges(timeout):
+    """List .pacnew/.pacsave files from the pacman database; read-only."""
+    if not shutil.which("pacdiff"):
+        return
+    try:
+        result = run(["pacdiff", "--output", "--nocolor"], capture=True, timeout=timeout)
+    except RuntimeError as error:
+        detail(f"Config file check failed: {error}", "yellow")
+        return
+    files = [line.strip() for line in clean(result.stdout).splitlines() if line.startswith("/")]
+    if result.returncode != 0:
+        detail("Config file check failed; run pacdiff to review .pacnew files.", "yellow")
+    elif files:
+        detail(f"{len(files)} config file(s) need merging — run `pacdiff --sudo`:", "yellow")
+        for path in files:
+            detail(path)
+
+
+def maintenance(args, scan_services=True, manager=None):
     section("After updates")
+    if manager == "pacman":
+        pending_config_merges(args.timeout)
     reasons = reboot_reasons()
     failed = False
     if scan_services:
@@ -807,7 +860,7 @@ def maintenance(args, scan_services=True):
                 detail("No services needing a restart were reported.", "green")
             else:
                 detail(f"{len(units)} service(s) need restarting.", "yellow")
-                selected = [] if args.check else select_services(units)
+                selected = [] if args.check else select_items(units, "Restart services")
                 if args.check:
                     for unit in units:
                         detail(unit)
@@ -894,10 +947,10 @@ def main():
             SESSION_CACHE = cache
         section("Mori · updates")
         detail("Check only" if args.check else "Review updates · choose what to install", "dim")
-        if args.maintenance:
-            return int(maintenance(args))
         info = distro()
         manager = backend(info) if args.backend == "auto" else args.backend
+        if args.maintenance:
+            return int(maintenance(args, manager=manager))
         available = sources(args, info)
         if args.clean:
             return int(cleanup_caches(args, manager, available))
@@ -905,20 +958,28 @@ def main():
             print("No supported package sources found.", file=sys.stderr)
             return 1
         failed = False
-        # checkupdates uses a private temporary database, removed even on failure.
-        with tempfile.TemporaryDirectory(prefix="mori-update-") as database:
-            os.environ["CHECKUPDATES_DB"] = database
+        system_current = True
+        with checkupdates_database(cache):
             for source in available:
+                if source.name == "AUR" and not system_current and not args.check:
+                    # Arch does not support partial upgrades; AUR builds would link
+                    # against the outdated system libraries.
+                    section(source.name)
+                    detail("Skipped: the system upgrade did not complete. Update the system first.", "yellow")
+                    continue
                 try:
-                    process(source, args)
+                    current = process(source, args)
                 except RuntimeError as error:
                     detail(f"{source.name}: {error}", "red")
                     failed = True
+                    current = False
+                if source.privileged:
+                    system_current = current
         if not args.no_cleanup:
             failed = cleanup_caches(args, manager, available) or failed
         if not args.no_maintenance and any(source.privileged for source in available):
             try:
-                failed = maintenance(args, scan_services=not args.check) or failed
+                failed = maintenance(args, scan_services=not args.check, manager=manager) or failed
             except RuntimeError as error:
                 detail(str(error), "red")
                 failed = True

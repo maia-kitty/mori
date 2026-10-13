@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import Quickshell.Services.UPower
 
 ShellRoot {
     id: root
@@ -11,7 +12,11 @@ ShellRoot {
         id: settings
     }
 
-    BatteryWarning {}
+    // Desktops have no battery; skip the warning window and its timer.
+    Loader {
+        active: UPower.displayDevice.isLaptopBattery
+        sourceComponent: BatteryWarning {}
+    }
 
     NiriEvents { id: niriState }
     UpdateService { id: updateService; settings: settings }

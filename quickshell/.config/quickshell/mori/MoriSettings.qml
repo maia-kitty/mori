@@ -1706,8 +1706,9 @@ Item {
             Keys.onPressed: event => root.handleSettingsKey(event)
         }
 
-        Rectangle {
+        PopupSurface {
             id: settingsCard
+            shown: settingsWindow.visible
             anchors.centerIn: parent
             width: Math.min(600, settingsWindow.width - 48)
             height: Math.min(650, settingsWindow.height - 48)

@@ -26,7 +26,7 @@ Item {
                 anchors.centerIn: parent
                 text: String.fromCodePoint(root.microphone
                     ? (root.muted ? 0xf036d : 0xf036c)
-                    : (root.muted ? 0xf0583 : 0xf057e))
+                    : (root.muted ? 0xf0581 : 0xf057e))
                 color: !root.available ? Theme.disabledText : root.muted ? Theme.red : root.accent
                 font.family: Theme.nerdFontFamily
                 font.pixelSize: Theme.fontSize + 2

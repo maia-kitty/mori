@@ -18,6 +18,9 @@ RowLayout {
 
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property var source: Pipewire.defaultAudioSource
+    readonly property bool muted: !!(sink && sink.audio && sink.audio.muted)
+    // Bar-side color: grey while the output is muted, the accent otherwise.
+    readonly property color barColor: !sink ? Theme.grey : muted ? Theme.grey1 : accent
     property var keyboardNode: null
     property bool microphoneView: false
     property bool devicePickerOpen: false
@@ -167,10 +170,8 @@ RowLayout {
     }
 
     BarLabel {
-        text: root.sink && root.sink.audio && root.sink.audio.muted
-              ? String.fromCodePoint(0xf0583)
-              : String.fromCodePoint(0xf057e)
-        color: root.sink ? root.accent : Theme.grey
+        text: root.muted ? String.fromCodePoint(0xf0581) : String.fromCodePoint(0xf057e)
+        color: root.barColor
         font.family: Theme.nerdFontFamily
         font.pixelSize: Theme.fontSize
 
@@ -212,7 +213,7 @@ RowLayout {
                 width: slider.visualPosition * parent.width
                 height: parent.height
                 radius: 0
-                color: root.accent
+                color: root.barColor
             }
         }
 
@@ -222,7 +223,7 @@ RowLayout {
             width: 10
             height: 10
             radius: 0
-            color: root.accent
+            color: root.barColor
         }
     }
 
@@ -230,7 +231,7 @@ RowLayout {
         id: deviceArrow
         visible: !root.compactMode
         text: devicePopup.visible ? "▴" : "▾"
-        color: root.accent
+        color: root.barColor
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
 

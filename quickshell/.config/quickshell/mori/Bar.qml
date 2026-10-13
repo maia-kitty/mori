@@ -270,7 +270,7 @@ PanelWindow {
             height: Theme.barContentHeight
             readonly property alias module: volume
             spacing: barWindow.bracketSpacing
-            BarBracket { text: "["; color: volume.accent; action: () => volume.togglePopup() }
+            BarBracket { text: "["; color: volume.barColor; action: () => volume.togglePopup() }
             Volume {
                 id: volume
                 panelWindow: barWindow
@@ -278,7 +278,7 @@ PanelWindow {
                 accent: barWindow.settings.moduleColor("volume")
                 compactMode: barWindow.settings.volumeCompact
             }
-            BarBracket { text: "]"; color: volume.accent; action: () => volume.togglePopup() }
+            BarBracket { text: "]"; color: volume.barColor; action: () => volume.togglePopup() }
         }
     }
 

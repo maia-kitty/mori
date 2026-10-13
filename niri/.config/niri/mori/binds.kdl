@@ -27,14 +27,29 @@ binds {
     }
     Mod+Shift+E { quit; }
 
-    Mod+F4 allow-when-locked=true {
+    Mod+F2 allow-when-locked=true {
         spawn "qs" "-c" "mori" "ipc" "call" "bar" "volumeUp";
     }
-    Mod+F2 allow-when-locked=true {
+    Mod+F1 allow-when-locked=true {
         spawn "qs" "-c" "mori" "ipc" "call" "bar" "volumeDown";
     }
     Mod+F3 allow-when-locked=true {
         spawn "qs" "-c" "mori" "ipc" "call" "bar" "toggleMute";
+    }
+    XF86AudioRaiseVolume allow-when-locked=true {
+        spawn "qs" "-c" "mori" "ipc" "call" "bar" "volumeUp";
+    }
+    XF86AudioLowerVolume allow-when-locked=true {
+        spawn "qs" "-c" "mori" "ipc" "call" "bar" "volumeDown";
+    }
+    XF86AudioMute allow-when-locked=true {
+        spawn "qs" "-c" "mori" "ipc" "call" "bar" "toggleMute";
+    }
+    XF86MonBrightnessUp allow-when-locked=true {
+        spawn "qs" "-c" "mori" "ipc" "call" "bar" "brightnessUp";
+    }
+    XF86MonBrightnessDown allow-when-locked=true {
+        spawn "qs" "-c" "mori" "ipc" "call" "bar" "brightnessDown";
     }
     
     Mod+Q repeat=false { close-window; }

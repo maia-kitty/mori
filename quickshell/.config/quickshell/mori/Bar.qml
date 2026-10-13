@@ -107,6 +107,12 @@ PanelWindow {
         const module = loadedModule("volume")
         if (module) module.toggleMute()
     }
+    function adjustBrightness(delta) {
+        const module = loadedModule("brightness")
+        if (module && module.available)
+            module.requestBrightness(module.brightness + delta)
+        return module
+    }
 
     onOverviewOpenChanged: {
         if (overviewOpen && activePopup)

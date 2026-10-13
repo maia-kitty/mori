@@ -22,7 +22,10 @@
 | Mod+Shift+T | Toggle floating |
 | Mod+R / Mod+Shift+R | Cycle column width / window height |
 | Print / Ctrl+Print / Alt+Print | Screenshot selection / screen / window |
-| Mod+F2 / Mod+F3 / Mod+F4 | Volume down / mute / volume up |
+| Mod+F1 / Mod+F2 / Mod+F3 | Volume down / volume up / mute |
+| Volume and brightness keys | Volume down / mute / up, brightness down / up |
+
+Volume and brightness shortcuts show a short level indicator at the bottom of the main monitor.
 
 ## Shell settings
 

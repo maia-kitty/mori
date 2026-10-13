@@ -40,6 +40,12 @@ ShellRoot {
         screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
     }
 
+    Osd {
+        id: osd
+        settings: settings
+        screen: bar.screen
+    }
+
     // Niri invokes these through: qs -c mori ipc call bar <function>.
     IpcHandler {
         target: "bar"
@@ -48,8 +54,10 @@ ShellRoot {
         function toggleWallpaperPicker(): void { bar.toggleWallpaperPicker() }
         function toggleNotifications(): void { bar.toggleNotifications() }
         function toggleSettings(): void { bar.toggleSettings() }
-        function volumeUp(): void { bar.volumeUp() }
-        function volumeDown(): void { bar.volumeDown() }
-        function toggleMute(): void { bar.toggleMute() }
+        function volumeUp(): void { bar.volumeUp(); osd.showVolume() }
+        function volumeDown(): void { bar.volumeDown(); osd.showVolume() }
+        function toggleMute(): void { bar.toggleMute(); osd.showVolume() }
+        function brightnessUp(): void { osd.showBrightness(bar.adjustBrightness(0.05)) }
+        function brightnessDown(): void { osd.showBrightness(bar.adjustBrightness(-0.05)) }
     }
 }

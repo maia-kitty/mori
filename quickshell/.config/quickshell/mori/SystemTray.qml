@@ -9,6 +9,13 @@ Item {
     implicitHeight: trayRow.implicitHeight
     required property var panelWindow
 
+    function showMenu(item, icon) {
+        // display() takes coordinates relative to the bar window, so map from
+        // the scene (window) rather than this module's row; open below the bar.
+        const position = icon.mapToItem(null, 0, 0)
+        item.display(panelWindow, Math.round(position.x), panelWindow.height)
+    }
+
     Row {
         id: trayRow
         spacing: 4
@@ -31,17 +38,14 @@ Item {
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                     onClicked: mouse => {
                         if (mouse.button === Qt.LeftButton) {
-                            if (modelData.onlyMenu && modelData.hasMenu) {
-                                const anchorPosition = parent.mapToItem(root.parent, 0, parent.height)
-                                modelData.display(root.panelWindow, anchorPosition.x, anchorPosition.y)
-                            }
+                            if (modelData.onlyMenu && modelData.hasMenu)
+                                root.showMenu(modelData, parent)
                             else
                                 modelData.activate()
                         } else if (mouse.button === Qt.MiddleButton) {
                             modelData.secondaryActivate()
                         } else if (modelData.hasMenu) {
-                            const anchorPosition = parent.mapToItem(root.parent, 0, parent.height)
-                            modelData.display(root.panelWindow, anchorPosition.x, anchorPosition.y)
+                            root.showMenu(modelData, parent)
                         }
                     }
                 }

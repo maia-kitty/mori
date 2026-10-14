@@ -253,7 +253,7 @@ RowLayout {
         anchor.rect {
             x: root.panelWindow.popupAnchorX(
                 root, devicePopup.implicitWidth, devicePopup.visible)
-            y: parentWindow.height + 6
+            y: parentWindow.height + 2
             width: 1
             height: 1
         }

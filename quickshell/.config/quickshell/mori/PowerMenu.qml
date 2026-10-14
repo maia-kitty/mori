@@ -189,7 +189,7 @@ Item {
         anchor.window: root.panelWindow
         anchor.rect {
             x: root.panelWindow.popupAnchorX(root, menu.implicitWidth, menu.visible)
-            y: parentWindow.height + 6
+            y: parentWindow.height + 2
             width: 1
             height: 1
         }

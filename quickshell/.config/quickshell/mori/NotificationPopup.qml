@@ -144,7 +144,7 @@ Item {
         anchor.window: root.panelWindow
         anchor.rect {
             x: parentWindow.width
-            y: parentWindow.height + 6
+            y: parentWindow.height + 2
             width: 1
             height: 1
         }

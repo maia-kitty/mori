@@ -8,11 +8,17 @@
   --toolbar-field-color: #d3c6aa !important;
   --tab-selected-textcolor: #a7c080 !important;
   --toolbar-color: #d3c6aa !important;
-  --arrowpanel-color: #d3c6aa !important;
   --arrowpanel-background: #343f44 !important;
   --sidebar-text-color: #d3c6aa !important;
   --zen-main-browser-background: #2d353b !important;
   --zen-main-browser-background-toolbar: #2d353b !important;
+}
+
+/* Menus default to the GTK MenuText system color, which is dark here. */
+menupopup,
+panel {
+  --panel-text-color: #d3c6aa !important;
+  --panel-background-color: #343f44 !important;
 }
 
 #zen-browser-background {

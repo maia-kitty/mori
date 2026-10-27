@@ -20,7 +20,7 @@ binds {
         spawn "qs" "-c" "mori" "ipc" "call" "bar" "toggleWallpaperPicker";
     }
     Mod+N hotkey-overlay-title="Notification Center" { spawn "qs" "-c" "mori" "ipc" "call" "bar" "toggleNotifications"; }
-    Mod+Shift+N hotkey-overlay-title="Notepad" { spawn "obsidian"; }
+    Mod+O hotkey-overlay-title="Notepad" { spawn "obsidian"; }
 
     Mod+Alt+L hotkey-overlay-title="Lock Screen" {
         spawn "swaylock";

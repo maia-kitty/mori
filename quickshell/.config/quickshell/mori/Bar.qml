@@ -28,6 +28,7 @@ PanelWindow {
     property real contentOpacity: (overviewOpen || fullscreen) ? 0 : 1
     readonly property int componentSpacing: 20
     readonly property int bracketSpacing: 6
+    readonly property int slideDuration: 200
     readonly property int edgeMargin: 2
 
     // The panel window already starts 2px in from each screen edge. Clamp a
@@ -404,6 +405,9 @@ PanelWindow {
             anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: barWindow.componentSpacing
+            move: Transition {
+                NumberAnimation { properties: "x"; duration: barWindow.slideDuration; easing.type: Easing.OutCubic }
+            }
 
             Repeater {
                 id: leftModuleRepeater
@@ -422,9 +426,14 @@ PanelWindow {
 
         Row {
             id: centerModules
-            anchors.horizontalCenter: parent.horizontalCenter
+            x: Math.round((parent.width - width) / 2)
             anchors.verticalCenter: parent.verticalCenter
             spacing: barWindow.componentSpacing
+            // x binding instead of an anchor so the whole group slides when its width changes
+            Behavior on x { NumberAnimation { duration: barWindow.slideDuration; easing.type: Easing.OutCubic } }
+            move: Transition {
+                NumberAnimation { properties: "x"; duration: barWindow.slideDuration; easing.type: Easing.OutCubic }
+            }
 
             Repeater {
                 id: centerModuleRepeater
@@ -443,10 +452,14 @@ PanelWindow {
 
         Row {
             id: rightModules
-            anchors.right: parent.right
-            anchors.rightMargin: 12
+            x: parent.width - width - 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: barWindow.componentSpacing
+            // x binding instead of an anchor so the whole group slides when its width changes
+            Behavior on x { NumberAnimation { duration: barWindow.slideDuration; easing.type: Easing.OutCubic } }
+            move: Transition {
+                NumberAnimation { properties: "x"; duration: barWindow.slideDuration; easing.type: Easing.OutCubic }
+            }
 
             Repeater {
                 id: rightModuleRepeater

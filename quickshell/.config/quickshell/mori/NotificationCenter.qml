@@ -308,12 +308,19 @@ Item {
                                 required property string summary
                                 required property string body
                                 required property double receivedAt
+                                property bool expanded: false
                                 width: historyView.width
+                                ListView.onReused: expanded = false
                                 implicitHeight: notificationText.implicitHeight + 12
                                 radius: 0
                                 color: Theme.bg2
 
                                 function activate() {
+                                    // First click on a cut-off notification reveals the rest.
+                                    if (!expanded && (summaryText.truncated || bodyText.truncated)) {
+                                        expanded = true
+                                        return
+                                    }
                                     root.focusApplication(desktopEntry)
                                     root.removeNotification(notificationId)
                                 }
@@ -354,15 +361,18 @@ Item {
                                     }
 
                                     Text {
+                                        id: summaryText
                                         width: parent.width
                                         text: summary
                                         color: Theme.fg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
+                                        wrapMode: expanded ? Text.Wrap : Text.NoWrap
                                         elide: Text.ElideRight
                                     }
 
                                     Text {
+                                        id: bodyText
                                         width: parent.width
                                         visible: body.length > 0
                                         text: body
@@ -371,7 +381,7 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                         wrapMode: Text.Wrap
-                                        maximumLineCount: 3
+                                        maximumLineCount: expanded ? 1000 : 3
                                         elide: Text.ElideRight
                                     }
                                 }

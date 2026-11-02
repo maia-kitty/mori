@@ -6,7 +6,7 @@
 
 Use your distribution’s package manager to install GNU Stow and the [desktop dependencies](../README.md#desktop-dependencies). Package names vary by distribution. Install only the optional applications you want.
 
-Install Symbols Nerd Font, adw-gtk3, and the Adwaita icons/cursor separately. Old Standard TT, IBM Plex Mono, and their font licenses are bundled. For Qt styling, install qt5ct and qt6ct-kde; Niri sets their platform-theme variables. Qt 5 uses its native palette, while Qt 6 and KDE apps use the bundled `Mori.colors` scheme. Rebuild qt6ct-kde after a Qt minor-version update if its theme plugin stops loading.
+Install Symbols Nerd Font, adw-gtk3, and the Adwaita icons/cursor separately. Literata, IBM Plex Mono, and their font licenses are bundled. For Qt styling, install qt5ct and qt6ct-kde; Niri sets their platform-theme variables. Qt 5 uses its native palette, while Qt 6 and KDE apps use the bundled `Mori.colors` scheme. Rebuild qt6ct-kde after a Qt minor-version update if its theme plugin stops loading.
 
 For standalone Wi-Fi, install `iw` and `wpa_supplicant` with `wpa_cli`, give your user access to its control socket, and enable `update_config=1` if new networks should survive restarts. The popup supports open and WPA-Personal networks.
 
@@ -100,8 +100,8 @@ With SDDM installed, deploy its theme to the system root rather than your home d
 ```bash
 sudo stow --simulate -v -t / sddm
 sudo stow -t / sddm
-sudo cp -r fonts/.local/share/fonts/old-standard-tt /usr/local/share/fonts/
-sudo fc-cache -f /usr/local/share/fonts/old-standard-tt
+sudo cp -r fonts/.local/share/fonts/literata /usr/local/share/fonts/
+sudo fc-cache -f /usr/local/share/fonts/literata
 ```
 
 Resolve existing conflicts and check other SDDM theme overrides before deploying. This selects the Mori theme; enabling SDDM as your login manager is a separate step.

@@ -46,7 +46,7 @@ Item {
         { "label": "Niri", "detail": "Scrollable-tiling Wayland compositor", "url": "https://github.com/YaLTeR/niri" },
         { "label": "Quickshell", "detail": "QML toolkit this shell is built on", "url": "https://quickshell.org" },
         { "label": "Everforest", "detail": "Color palette", "url": "https://github.com/sainnhe/everforest" },
-        { "label": "Old Standard TT", "detail": "Interface typeface", "url": "https://fonts.google.com/specimen/Old+Standard+TT" },
+        { "label": "Literata", "detail": "Interface typeface", "url": "https://fonts.google.com/specimen/Literata" },
         { "label": "IBM Plex Mono", "detail": "Monospace typeface", "url": "https://github.com/IBM/plex" },
         { "label": "Mori", "detail": "Source for these dotfiles", "url": "https://github.com/maia-kitty/mori" }
     ]

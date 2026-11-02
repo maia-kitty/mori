@@ -5,7 +5,7 @@ show-keyboard-layout
 indicator-caps-lock
 indicator-idle-visible
 
-font=Old Standard TT
+font=Literata
 font-size=20
 indicator-radius=105
 indicator-thickness=8

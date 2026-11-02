@@ -1,6 +1,6 @@
 /* Mori typography: retain Discord's icon faces while standardizing UI text. */
 :root {
-  --font-primary: "Old Standard TT", serif;
-  --font-display: "Old Standard TT", serif;
+  --font-primary: "Literata", serif;
+  --font-display: "Literata", serif;
   --font-code: "IBM Plex Mono", monospace;
 }

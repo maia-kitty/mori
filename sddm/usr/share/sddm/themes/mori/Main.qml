@@ -14,7 +14,7 @@ Rectangle {
     readonly property color muted: "#9da9a0"
     readonly property color accent: "#a7c080"
     readonly property color red: "#e67e80"
-    readonly property string uiFont: "Old Standard TT"
+    readonly property string uiFont: "Literata"
     readonly property string monoFont: "IBM Plex Mono"
     property int sessionIndex: session.index
 

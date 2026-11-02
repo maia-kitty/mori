@@ -44,7 +44,7 @@ Singleton {
         return focused || hovered ? bg5 : bg4
     }
 
-    readonly property string fontFamily: "Old Standard TT"
+    readonly property string fontFamily: "Literata"
     readonly property string nerdFontFamily: "Symbols Nerd Font"
     readonly property int fontSize: 14
     readonly property int barContentHeight: 22

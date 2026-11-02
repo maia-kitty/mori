@@ -17,7 +17,8 @@ Install GNU Stow and the dependencies for the components you want.
 | NetworkManager, or iw + wpa_supplicant | Wi-Fi |
 | brightnessctl / power-profiles-daemon | Backlight / power profiles |
 | wl-clipboard + cliphist | Clipboard history |
-| Bash, jq, Python 3.9+, Zenity | Helpers, updater, and dialogs |
+| Bash, jq, Python 3.9+, Zenity | Helpers and dialogs |
+| [upkeep](https://github.com/maia-kitty/upkeep) | Updater behind the Updates widget |
 
 **Appearance:** Literata and IBM Plex Mono are bundled; install Symbols Nerd Font, adw-gtk3, and Adwaita icons/cursor separately. Qt styling uses qt5ct and qt6ct-kde, with colors matching GTK.
 

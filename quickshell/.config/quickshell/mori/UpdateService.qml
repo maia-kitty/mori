@@ -16,7 +16,7 @@ Item {
     readonly property bool incomplete: report && report.sources.some(source => source.count === null)
     readonly property bool rebootRequired: !!(report && report.reboot && report.reboot.required)
     readonly property string cacheRoot: (Quickshell.env("XDG_CACHE_HOME")
-        || Quickshell.env("HOME") + "/.cache") + "/mori-update"
+        || Quickshell.env("HOME") + "/.cache") + "/upkeep"
     readonly property string status: checking ? "checking" : updating ? "updating"
         : errorMessage.length > 0 ? "error" : report ? report.status : "unknown"
 
@@ -46,7 +46,7 @@ Item {
             return
         checking = true
         errorMessage = ""
-        checker.exec(["mori-update", "--json", "--timeout", "120"])
+        checker.exec(["upkeep", "--json", "--timeout", "120"])
     }
 
     function launch() {
@@ -55,7 +55,7 @@ Item {
         launching = true
         updating = true
         errorMessage = ""
-        launcher.exec(["mori-update", "--launch"])
+        launcher.exec(["upkeep", "--launch"])
     }
 
     onActiveChanged: {
@@ -83,13 +83,13 @@ Item {
                 root.acceptReport(JSON.parse(checkOutput.text))
             } catch (error) {
                 root.errorMessage = checkError.text.trim().slice(0, 1000)
-                    || "Could not read update status. Check that mori-update is installed."
+                    || "Could not read update status. Check that upkeep is installed."
             }
         }
         onRunningChanged: if (!running) Qt.callLater(() => {
             if (root.checking && !checker.running) {
                 root.checking = false
-                root.errorMessage = "Could not start mori-update. Stow the bin package and check your PATH."
+                root.errorMessage = "Could not start upkeep. Install it and check your PATH."
             }
         })
     }
@@ -113,7 +113,7 @@ Item {
             if (root.launching && !launcher.running) {
                 root.launching = false
                 root.updating = false
-                root.errorMessage = "Could not launch mori-update. Stow the bin package and check your PATH."
+                root.errorMessage = "Could not launch upkeep. Install it and check your PATH."
             }
         })
     }

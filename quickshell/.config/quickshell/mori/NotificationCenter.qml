@@ -14,7 +14,8 @@ Item {
     required property var popupCoordinator
     property var settings: null
     property color accent: Theme.purple
-    property bool doNotDisturb: false
+    readonly property bool doNotDisturb: !!settings && settings.doNotDisturb
+    function toggleDoNotDisturb() { if (settings) settings.setDoNotDisturb(!doNotDisturb) }
 
     property var pendingNotifications: []
     property int nextNotificationId: 0
@@ -48,7 +49,7 @@ Item {
             notificationHistory.clear()
             event.accepted = true
         } else if (event.key === Qt.Key_D) {
-            doNotDisturb = !doNotDisturb
+            toggleDoNotDisturb()
             event.accepted = true
         }
     }
@@ -263,7 +264,7 @@ Item {
                                     font.pixelSize: Theme.fontSize
 
                                     TapHandler {
-                                        onTapped: root.doNotDisturb = !root.doNotDisturb
+                                        onTapped: root.toggleDoNotDisturb()
                                     }
                                 }
 

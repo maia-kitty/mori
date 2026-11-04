@@ -11,11 +11,13 @@ Row {
 
     required property var panelWindow
     required property var popupCoordinator
+    required property var profiles
     property color accent: Theme.green
     property int keyboardProfileIndex: 0
-    property bool profilesAvailable: false
-    property bool performanceAvailable: false
-    property string currentProfile: ""
+    readonly property bool profilesAvailable: root.profiles.available
+    readonly property bool performanceAvailable: root.profiles.performanceAvailable
+    readonly property string currentProfile: root.profiles.current
+    onCurrentProfileChanged: keyboardProfileIndex = profileIndex(currentProfile)
     readonly property var device: UPower.displayDevice
     readonly property int charge: Math.round(Math.max(0, Math.min(1,
         device ? device.percentage : 0)) * 100)
@@ -36,19 +38,8 @@ Row {
 
     function close() { popup.visible = false }
 
-    function probeProfiles() {
-        if (!profileProbe.running)
-            profileProbe.exec(["sh", "-c", "command -v powerprofilesctl >/dev/null 2>&1 && exec powerprofilesctl get"])
-        if (!profileList.running)
-            profileList.exec(["sh", "-c", "command -v powerprofilesctl >/dev/null 2>&1 && exec powerprofilesctl list"])
-    }
-
-    function selectProfile(profile) {
-        if (!profilesAvailable || profileSet.running
-                || (profile === "performance" && !performanceAvailable))
-            return
-        profileSet.exec(["powerprofilesctl", "set", profile])
-    }
+    function probeProfiles() { root.profiles.probe() }
+    function selectProfile(profile) { root.profiles.select(profile) }
 
     function profileAt(index) {
         return ["power-saver", "balanced", "performance"][index]
@@ -121,37 +112,6 @@ Row {
         if (charge >= 13)
             return String.fromCodePoint(0xf243)
         return String.fromCodePoint(0xf244)
-    }
-
-    Process {
-        id: profileProbe
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.currentProfile = this.text.trim()
-                root.keyboardProfileIndex = root.profileIndex(root.currentProfile)
-            }
-        }
-        onExited: exitCode => {
-            root.profilesAvailable = exitCode === 0
-            if (exitCode !== 0)
-                root.currentProfile = ""
-        }
-    }
-
-    Process {
-        id: profileList
-        stdout: StdioCollector {
-            onStreamFinished: root.performanceAvailable = /^\s*\*?\s*performance:/m.test(this.text)
-        }
-        onExited: exitCode => {
-            if (exitCode !== 0)
-                root.performanceAvailable = false
-        }
-    }
-
-    Process {
-        id: profileSet
-        onExited: exitCode => root.probeProfiles()
     }
 
     Timer {

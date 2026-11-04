@@ -11,6 +11,8 @@ PanelWindow {
     required property bool overviewOpen
     required property var settings
     required property var updateService
+    required property var networkService
+    required property var powerProfiles
     readonly property bool fullscreen: {
         const active = ToplevelManager.activeToplevel
         if (!active || !active.fullscreen || !barWindow.screen)
@@ -258,6 +260,7 @@ PanelWindow {
             BarBracket { text: "["; color: network.accent; action: () => network.toggle() }
             Network {
                 id: network
+                service: barWindow.networkService
                 panelWindow: barWindow
                 popupCoordinator: barWindow
                 accent: barWindow.settings.moduleColor("network")
@@ -364,6 +367,7 @@ PanelWindow {
             BarBracket { text: "["; color: battery.accent; action: () => battery.toggle() }
             Battery {
                 id: battery
+                profiles: barWindow.powerProfiles
                 panelWindow: barWindow
                 popupCoordinator: barWindow
                 accent: barWindow.settings.moduleColor("battery")
@@ -502,11 +506,7 @@ PanelWindow {
                 panelWindow: barWindow
                 notificationServer: barWindow.notificationServer
                 suppressed: barWindow.overviewOpen || barWindow.fullscreen
-                doNotDisturb: {
-                    const currentRevision = barWindow.settings.revision
-                    const center = barWindow.loadedModule("notifications")
-                    return center ? center.doNotDisturb : false
-                }
+                doNotDisturb: barWindow.settings.doNotDisturb
             }
         }
     }
@@ -516,5 +516,7 @@ PanelWindow {
         panelWindow: barWindow
         popupCoordinator: barWindow
         settings: barWindow.settings
+        networkService: barWindow.networkService
+        powerProfiles: barWindow.powerProfiles
     }
 }

@@ -15,9 +15,6 @@ Item {
     property color accent: Theme.green
     // False while a host gives the keyboard to something else (hides the › markers).
     property bool keyboardActive: true
-    // Hosts hide while zenity's folder dialog is open, then reopen.
-    signal folderPickerRequested()
-    signal folderPicked()
 
     readonly property string currentMode: Theme.dark ? "dark" : "light"
     property string mode: currentMode
@@ -44,9 +41,34 @@ Item {
             wallpaperQuery.exec(["awww", "query"])
     }
 
+    // Settings shows an editable wallpaper folder path; the bar popup doesn't.
+    property bool folderEditable: false
+    readonly property bool editingFolder: folderField.activeFocus
+    // Emitted when the path field gives the keyboard back to the host.
+    signal keyboardReleased()
+    readonly property bool inRootFolder: files.folder.toString() === rootFolder.toString()
     function goToParent() {
-        if (files.folder.toString() !== rootFolder.toString())
+        if (!inRootFolder)
             files.folder = files.parentFolder
+    }
+    function editFolder() {
+        if (!folderEditable) return
+        folderField.text = settings.wallpaperFolder
+        folderField.forceActiveFocus()
+        folderField.selectAll()
+    }
+    // "~/Pictures/x/" → "/home/<user>/Pictures/x"; setWallpaperFolder rejects non-absolute paths.
+    function folderFromText(text) {
+        let path = text.trim()
+        if (path === "~" || path.startsWith("~/"))
+            path = Quickshell.env("HOME") + path.slice(1)
+        return path.length > 1 ? path.replace(/\/+$/, "") : path
+    }
+    function finishFolderEdit(save) {
+        if (save)
+            settings.setWallpaperFolder(folderFromText(folderField.text))
+        folderField.focus = false
+        keyboardReleased()
     }
     function goIntoFolder() {
         // Keep the last file-grid selection when switching back to monitors;
@@ -92,8 +114,8 @@ Item {
             keyboardMode = keyboardMode === "screens" ? "files" : "screens"
             if (keyboardMode === "files" && keyboardIndex < 0 && files.count > 0)
                 keyboardIndex = 0
-        } else if (key === Qt.Key_F) {
-            chooseFolder()
+        } else if (key === Qt.Key_F && folderEditable) {
+            editFolder()
         } else if (key === Qt.Key_M) {
             mode = mode === "dark" ? "light" : "dark"
         } else if (keyboardMode === "screens" && key === Qt.Key_Up) {
@@ -112,8 +134,7 @@ Item {
             moveKeyboardSelection(columns)
         else if (keyboardMode === "files" && (key === Qt.Key_Return || key === Qt.Key_Enter))
             activateKeyboardSelection()
-        else if (keyboardMode === "files" && key === Qt.Key_Backspace
-                && files.folder.toString() !== rootFolder.toString())
+        else if (keyboardMode === "files" && key === Qt.Key_Backspace && !inRootFolder)
             goToParent()
         else
             return false
@@ -178,10 +199,6 @@ Item {
                 current[match[1]] = match[2]
         }
         live = current
-    }
-    function chooseFolder() {
-        folderPickerRequested()
-        settings.pickWallpaperFolder(() => root.folderPicked())
     }
 
     onRootFolderChanged: files.folder = rootFolder
@@ -252,6 +269,51 @@ Item {
         anchors.fill: parent
         spacing: 8
 
+        Item {
+            visible: root.folderEditable
+            width: parent.width
+            height: Theme.controlHeight
+
+            Text {
+                id: folderLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Folder"
+                color: Theme.grey1
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize
+            }
+
+            Rectangle {
+                anchors { left: folderLabel.right; leftMargin: 12; right: parent.right; top: parent.top; bottom: parent.bottom }
+                color: folderField.activeFocus ? Theme.bg : "transparent"
+                border.width: 1
+                border.color: folderField.activeFocus ? Theme.fg : Theme.bg4
+
+                TextInput {
+                    id: folderField
+                    anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+                    verticalAlignment: TextInput.AlignVCenter
+                    clip: true
+                    text: root.settings.wallpaperFolder
+                    color: Theme.fg
+                    selectionColor: Theme.bg4
+                    selectedTextColor: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    onActiveFocusChanged: if (!activeFocus) text = root.settings.wallpaperFolder
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                            root.finishFolderEdit(true)
+                        else if (event.key === Qt.Key_Escape)
+                            root.finishFolderEdit(false)
+                        else return
+                        event.accepted = true
+                    }
+                }
+            }
+        }
+
         Row {
             width: parent.width
             height: folderActions.implicitHeight
@@ -260,7 +322,8 @@ Item {
             Text {
                 width: parent.width - folderActions.implicitWidth - parent.spacing
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.localPath(files.folder)
+                // The Folder field above already shows the top level.
+                text: root.folderEditable && root.inRootFolder ? "" : root.localPath(files.folder)
                 elide: Text.ElideLeft
                 color: Theme.grey1
                 font.family: Theme.fontFamily
@@ -274,7 +337,7 @@ Item {
                 Rectangle {
                     width: upText.implicitWidth + 20
                     height: Theme.controlHeight
-                    readonly property bool available: files.folder.toString() !== root.rootFolder.toString()
+                    readonly property bool available: !root.inRootFolder
                     color: Theme.controlBackground(false, false, available && upHover.hovered)
                     border.width: 1
                     border.color: Theme.controlBorder(false, false, available && upHover.hovered, root.accent)
@@ -291,23 +354,6 @@ Item {
                         enabled: parent.available
                         onTapped: root.goToParent()
                     }
-                }
-                Rectangle {
-                    width: folderText.implicitWidth + 20
-                    height: Theme.controlHeight
-                    color: Theme.controlBackground(false, false, folderHover.hovered)
-                    border.width: 1
-                    border.color: Theme.controlBorder(false, false, folderHover.hovered, root.accent)
-                    Text {
-                        id: folderText
-                        anchors.centerIn: parent
-                        text: "Choose folder · F"
-                        color: root.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                    HoverHandler { id: folderHover }
-                    TapHandler { onTapped: root.chooseFolder() }
                 }
             }
         }
@@ -453,6 +499,7 @@ Item {
             visible: root.keyboardActive
             text: root.keyboardMode === "screens"
                 ? "←/→: monitor · M: dark/light · ↑: parent · ↓: folder · Tab: wallpapers"
+                    + (root.folderEditable ? " · F: folder path" : "")
                 : "Arrows: navigate · Enter: select · M: dark/light · Tab: monitors"
         }
     }

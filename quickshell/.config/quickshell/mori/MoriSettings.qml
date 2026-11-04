@@ -26,6 +26,9 @@ Item {
     required property var panelWindow
     required property var popupCoordinator
     required property var settings
+    // Shared services from shell.qml (via Bar.qml) behind the Network and Power profile pages.
+    property var networkService: null
+    property var powerProfiles: null
 
     width: 0
     height: 0
@@ -55,7 +58,7 @@ Item {
     property int keyboardThemeIndex: 0
     // Appearance page: keys go to the light & dark rows or the wallpaper browser.
     property string appearanceFocus: "theme"
-    // Page to show when Settings reopens itself (after the wallpaper folder dialog).
+    // Page to show once Settings opens (IPC openSettings <page>).
     property string reopenPage: ""
     property int keyboardPowerIndex: 0
     property bool editingPowerCommand: false
@@ -118,7 +121,7 @@ Item {
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
         "notifications", "powerMenu", "systemTray", "theme", "updates", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "theme", "clock", "updates", "power", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "theme", "sound", "network", "notifications", "profile", "clock", "updates", "power", "displays", "input", "about"]
     readonly property var updateIntervals: [
         { label: "15 min", minutes: 15 }, { label: "1 hour", minutes: 60 },
         { label: "3 hours", minutes: 180 }, { label: "Manual", minutes: 0 }
@@ -195,6 +198,10 @@ Item {
         case "modules":
         case "appearance": return "Bar & widgets"
         case "theme": return "Appearance"
+        case "sound": return "Sound"
+        case "network": return "Network"
+        case "notifications": return "Notifications"
+        case "profile": return "Power profile"
         case "clock": return "Time & date"
         case "updates": return "Updates"
         case "power": return "Power menu"
@@ -222,7 +229,7 @@ Item {
         }
     }
 
-    // Open Settings on a page (IPC openSettings, and the wallpaper folder dialog).
+    // Open Settings on a page (IPC openSettings).
     function openTo(name) {
         if (categoryPages.indexOf(name) < 0) name = "home"
         if (settingsWindow.visible) {
@@ -347,6 +354,8 @@ Item {
             keyboardThemeIndex = 0
             appearanceFocus = "theme"
             Qt.callLater(() => { if (themePage.item) themePage.item.browser.reset() })
+        } else if (name === "sound") {
+            Qt.callLater(() => { if (soundPage.item) soundPage.item.keyboardIndex = 0 })
         } else if (name === "clock") {
             keyboardClockIndex = 0
         } else if (name === "updates") {
@@ -519,6 +528,16 @@ Item {
         if (settings.themeSchedule === "times")
             return "Light from " + ThemeSchedule.formatMinutes(settings.themeLightTime)
                 + " to " + ThemeSchedule.formatMinutes(settings.themeDarkTime)
+        return ""
+    }
+
+    // Which cat drawing the About page shows (CatDoodle.qml); "" is the everyday cat.
+    function catSeason(date) {
+        const month = date.getMonth() + 1, day = date.getDate()
+        if (month === 10 && day >= 15) return "halloween"
+        if (month === 12 && day <= 26) return "christmas"
+        if (month === 2 && (day === 13 || day === 14)) return "valentine"
+        if (month === 7 && day === 24) return "birthday"
         return ""
     }
 
@@ -765,6 +784,22 @@ Item {
             } else if (key === Qt.Key_Escape)
                 revertDisplayConfiguration("Reverting display settings…")
             else return
+            event.accepted = true
+            return
+        }
+        if (page === "network" && networkPage.item && networkPage.item.handleKey(event)) {
+            event.accepted = true
+            return
+        }
+        if (page === "profile" && profilePage.item && profilePage.item.handleKey(event)) {
+            event.accepted = true
+            return
+        }
+        if (page === "notifications" && notificationsPage.item && notificationsPage.item.handleKey(event)) {
+            event.accepted = true
+            return
+        }
+        if (page === "sound" && soundPage.item && soundPage.item.handleKey(event)) {
             event.accepted = true
             return
         }
@@ -2087,6 +2122,10 @@ Item {
                                     model: [
                                         { "key": "modules", "label": "Bar & widgets", "description": "Widget layout, visibility, and colors" },
                                         { "key": "theme", "label": "Appearance", "description": "Light and dark mode, wallpapers" },
+                                        { "key": "sound", "label": "Sound", "description": "Output and input device, volume" },
+                                        { "key": "network", "label": "Network", "description": "Wi-Fi, wired, VPN and Bluetooth" },
+                                        { "key": "notifications", "label": "Notifications", "description": "Do Not Disturb" },
+                                        { "key": "profile", "label": "Power profile", "description": "Power saver, balanced or performance" },
                                         { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
                                         { "key": "updates", "label": "Updates", "description": "Package update check interval" },
                                         { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
@@ -2478,12 +2517,52 @@ Item {
                                 // Settings stays monochrome; module accents are for the bar.
                                 accent: Theme.fg
                                 keyboardActive: root.appearanceFocus === "wallpaper"
-                                onFolderPickerRequested: root.close()
-                                onFolderPicked: {
-                                    root.openTo("theme")
-                                    root.appearanceFocus = "wallpaper"
-                                }
+                                folderEditable: true
+                                onKeyboardReleased: keyboardScope.forceActiveFocus()
                             }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: soundPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "sound"
+                    sourceComponent: Component {
+                        SoundSettings { visible: root.page === "sound" }
+                    }
+                }
+
+                Loader {
+                    id: notificationsPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "notifications"
+                    sourceComponent: Component {
+                        NotificationSettings { visible: root.page === "notifications"; settings: root.settings }
+                    }
+                }
+
+                Loader {
+                    id: profilePage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "profile"
+                    sourceComponent: Component {
+                        PowerProfileSettings { visible: root.page === "profile"; profiles: root.powerProfiles }
+                    }
+                }
+
+                Loader {
+                    id: networkPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "network"
+                    sourceComponent: Component {
+                        NetworkPanel {
+                            visible: root.page === "network"
+                            anchors.margins: -12
+                            service: root.networkService
+                            accent: Theme.fg
+                            embedded: true
+                            shown: true
                         }
                     }
                 }
@@ -3496,73 +3575,86 @@ Item {
                     active: settingsWindow.visible && root.page === "about"
 
                     sourceComponent: Component {
-                        Column {
+                        Item {
                             visible: root.page === "about"
-                            width: parent.width
-                            spacing: 12
-                            SettingsLabel {
-                                text: "Mori 森"
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.headingFontSize + 4
-                            }
-                            Text {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                text: "A personal Quickshell configuration built around Niri and the Everforest palette."
-                                color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                            SettingsLabel {
-                                text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                            SettingsLabel {
-                                text: "Built with · ↑↓ / Enter opens in your browser"
-                                color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
+
                             Column {
                                 width: parent.width
-                                spacing: 6
-                                Repeater {
-                                    model: root.aboutLinks
-                                    delegate: Rectangle {
-                                        id: aboutLink
-                                        required property var modelData
-                                        required property int index
-                                        readonly property bool focused: index === root.keyboardAboutIndex
-                                        width: parent.width
-                                        height: Theme.controlHeight
-                                        color: root.controlBackground(false, focused, aboutHover.hovered)
-                                        border.width: 1
-                                        border.color: root.controlBorder(false, focused, aboutHover.hovered)
-                                        SettingsLabel {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 10
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: (aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
-                                            color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
+                                spacing: 12
+                                SettingsLabel {
+                                    text: "Mori 森"
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.headingFontSize + 4
+                                }
+                                Text {
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    text: "A personal Quickshell configuration built around Niri and the Everforest palette."
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                                SettingsLabel {
+                                    text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                                SettingsLabel {
+                                    text: "Built with · ↑↓ / Enter opens in your browser"
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                                Column {
+                                    width: parent.width
+                                    spacing: 6
+                                    Repeater {
+                                        model: root.aboutLinks
+                                        delegate: Rectangle {
+                                            id: aboutLink
+                                            required property var modelData
+                                            required property int index
+                                            readonly property bool focused: index === root.keyboardAboutIndex
+                                            width: parent.width
+                                            height: Theme.controlHeight
+                                            color: root.controlBackground(false, focused, aboutHover.hovered)
+                                            border.width: 1
+                                            border.color: root.controlBorder(false, focused, aboutHover.hovered)
+                                            SettingsLabel {
+                                                anchors.left: parent.left
+                                                anchors.leftMargin: 10
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: (aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
+                                                color: Theme.fg
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            SettingsLabel {
+                                                anchors.right: parent.right
+                                                anchors.rightMargin: 10
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: aboutLink.modelData.detail
+                                                color: Theme.grey1
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                                            }
+                                            HoverHandler { id: aboutHover; cursorShape: Qt.PointingHandCursor }
+                                            TapHandler { onTapped: root.openAboutLink(aboutLink.index) }
                                         }
-                                        SettingsLabel {
-                                            anchors.right: parent.right
-                                            anchors.rightMargin: 10
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: aboutLink.modelData.detail
-                                            color: Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Math.max(10, Theme.fontSize - 2)
-                                        }
-                                        HoverHandler { id: aboutHover; cursorShape: Qt.PointingHandCursor }
-                                        TapHandler { onTapped: root.openAboutLink(aboutLink.index) }
                                     }
                                 }
+                            }
+
+                            // The cat doodle; seasonal versions on their dates.
+                            CatDoodle {
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                // Shared 364 px frame; keeps the cat's body about 100 px wide.
+                                width: 190
+                                height: implicitWidth > 0 ? width * implicitHeight / implicitWidth : width
+                                season: root.catSeason(new Date())
                             }
                         }
                     }

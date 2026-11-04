@@ -80,11 +80,6 @@ Item {
                 anchors { topMargin: 8; leftMargin: 12; rightMargin: 12; bottomMargin: 12 }
                 settings: root.settings
                 accent: root.accent
-                onFolderPickerRequested: root.close()
-                onFolderPicked: {
-                    if (!popup.visible) root.toggle()
-                    browser.keyboardMode = "files"
-                }
             }
         }
     }

@@ -21,6 +21,9 @@ ShellRoot {
     NiriEvents { id: niriState }
     UpdateService { id: updateService; settings: settings }
     ThemeScheduler { settings: settings }
+    Prompt { id: prompt }
+    NetworkService { id: networkService; prompt: prompt }
+    PowerProfileService { id: powerProfiles }
     ThemeTransition { id: themeTransition }
 
     NotificationServer {
@@ -37,6 +40,8 @@ ShellRoot {
         niriEvents: niriState
         settings: settings
         updateService: updateService
+        networkService: networkService
+        powerProfiles: powerProfiles
         // Keep the bar on the primary output. Without an explicit screen,
         // Quickshell may remap the panel to the currently active monitor.
         screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
@@ -56,7 +61,7 @@ ShellRoot {
         function toggleWallpaperPicker(): void { bar.toggleWallpaperPicker() }
         function toggleNotifications(): void { bar.toggleNotifications() }
         function toggleSettings(): void { bar.toggleSettings() }
-        // Opens Settings on a page: modules, theme (Appearance), clock, updates, power, displays, input, about.
+        // Opens Settings on a page: modules, theme (Appearance), sound, network, notifications, profile, clock, updates, power, displays, input, about.
         function openSettings(page: string): void { bar.openSettings(page) }
         function volumeUp(): void { bar.volumeUp(); osd.showVolume() }
         function volumeDown(): void { bar.volumeDown(); osd.showVolume() }

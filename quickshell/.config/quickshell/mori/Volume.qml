@@ -268,7 +268,7 @@ RowLayout {
             sourceComponent: Component {
                 PopupSurface {
                     readonly property alias deviceListRef: deviceList
-                    readonly property alias deviceRepeaterRef: deviceRepeater
+                    readonly property var deviceRepeaterRef: devicePickerList.repeater
                     readonly property alias appRepeaterRef: appRepeater
                     readonly property alias masterControlRef: masterControl
                     implicitHeight: deviceList.implicitHeight + volumeHint.implicitHeight + 36
@@ -353,49 +353,15 @@ RowLayout {
                             TapHandler { enabled: parent.available; onTapped: root.toggleDevicePicker() }
                         }
 
-                        Column {
+                        AudioDeviceList {
+                            id: devicePickerList
                             width: parent.width
                             visible: root.devicePickerOpen
-                            spacing: 4
-                            Repeater {
-                                id: deviceRepeater
-                                model: Pipewire.nodes
-                                delegate: Loader {
-                                    id: nodeLoader
-                                    required property var modelData
-                                    required property int index
-                                    active: root.devicePickerOpen && !!modelData && modelData.ready
-                                        && !!modelData.audio && !modelData.isStream
-                                        && modelData.isSink !== root.microphoneView
-                                    visible: active
-                                    width: deviceList.width
-                                    sourceComponent: Component {
-                                        Rectangle {
-                                            width: nodeLoader.width
-                                            implicitHeight: Theme.controlHeight
-                                            readonly property bool selected: nodeLoader.modelData === root.currentDevice
-                                            readonly property bool focused: nodeLoader.modelData === root.keyboardNode
-                                            color: Theme.controlBackground(selected, focused, deviceHover.hovered)
-                                            border.width: 1
-                                            border.color: Theme.controlBorder(selected, focused, deviceHover.hovered, root.accent)
-                                            Text {
-                                                anchors.fill: parent
-                                                leftPadding: 8
-                                                rightPadding: 8
-                                                verticalAlignment: Text.AlignVCenter
-                                                text: (parent.selected ? "✓  " : "   ")
-                                                    + (nodeLoader.modelData.description || nodeLoader.modelData.nickname || nodeLoader.modelData.name)
-                                                color: parent.selected ? root.accent : Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
-                                                elide: Text.ElideRight
-                                            }
-                                            HoverHandler { id: deviceHover }
-                                            TapHandler { onTapped: root.selectDevice(nodeLoader.modelData) }
-                                        }
-                                    }
-                                }
-                            }
+                            microphone: root.microphoneView
+                            current: root.currentDevice
+                            focusedNode: root.keyboardNode
+                            accent: root.accent
+                            onSelected: node => root.selectDevice(node)
                         }
 
                         AudioDeviceControl {

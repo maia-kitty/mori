@@ -37,6 +37,8 @@ Item {
     property int themeDarkTime: 1140
     property real themeLatitude: 0
     property real themeLongitude: 0
+    // Hides notification popups; notifications still reach the notification centre.
+    property bool doNotDisturb: false
     property string wallpaperFolder: Quickshell.env("HOME") + "/Pictures/Wallpapers"
     property var leftModuleOrder: ["calendar", "media", "kdeConnect"]
     property var centerModuleOrder: ["workspaces"]
@@ -197,34 +199,16 @@ Item {
         noteChange()
     }
 
+    function setDoNotDisturb(enabled) {
+        if (typeof enabled !== "boolean" || doNotDisturb === enabled) return
+        doNotDisturb = enabled
+        noteChange()
+    }
+
     function setWallpaperFolder(path) {
         if (typeof path !== "string" || !path.startsWith("/") || wallpaperFolder === path) return
         wallpaperFolder = path
         noteChange()
-    }
-
-    // zenity's folder dialog; lives here so it outlives the popup or Settings
-    // page that asked for it (both close while the dialog is open).
-    property var folderPickedCallback: null
-    function pickWallpaperFolder(callback) {
-        folderPickedCallback = callback
-        folderPicker.exec([
-            "zenity", "--file-selection", "--directory",
-            "--title=Choose wallpaper folder", "--filename=" + wallpaperFolder + "/"
-        ])
-    }
-
-    Process {
-        id: folderPicker
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const path = this.text.replace(/\r?\n$/, "")
-                if (path.length > 0) root.setWallpaperFolder(path)
-                const callback = root.folderPickedCallback
-                root.folderPickedCallback = null
-                if (callback) Qt.callLater(callback)
-            }
-        }
     }
 
     function moduleColor(name) {
@@ -385,6 +369,10 @@ Item {
                 if (typeof clock.showSeconds === "boolean")
                     clockShowSeconds = clock.showSeconds
 
+                const notifications = parsed.notifications || {}
+                if ("doNotDisturb" in notifications)
+                    setDoNotDisturb(notifications.doNotDisturb)
+
                 const wallpaper = parsed.wallpaper || {}
                 if ("folder" in wallpaper)
                     setWallpaperFolder(wallpaper.folder)
@@ -440,6 +428,7 @@ Item {
                 "dateFormat": clockDateFormat,
                 "showSeconds": clockShowSeconds
             },
+            "notifications": { "doNotDisturb": doNotDisturb },
             "wallpaper": { "folder": wallpaperFolder },
             "theme": {
                 "schedule": themeSchedule,

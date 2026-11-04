@@ -57,15 +57,20 @@ Zen needs its theme set to **Auto**, Discord's **Appearance** to **Sync with com
 Open **Settings** from the bar or with **Mod+Period**:
 
 - **Bar & widgets:** **Widgets** controls visibility, left/center/right order, and compact modes; **Colors** controls widget accent colors. Click the tabs or press **Tab** to switch views.
-- **Appearance:** light/dark mode and automatic switching (see [light and dark mode](#light-and-dark-mode)), and below it the same wallpaper chooser as the bar's popup: folder, monitor, and a **Dark** and **Light** wallpaper for each (**M** switches between them). The current mode's choice applies right away; the other is used when you switch. **Tab** moves between the two parts.
+- **Appearance:** light/dark mode and automatic switching (see [light and dark mode](#light-and-dark-mode)), and below it the same wallpaper chooser as the bar's popup plus the wallpaper **Folder** path (**F** or click to edit, Enter saves, `~/…` works): monitor, and a **Dark** and **Light** wallpaper for each (**M** switches between them). The current mode's choice applies right away; the other is used when you switch. **Tab** moves between the two parts.
+- **Sound:** output and input device, volume, and mute (per-app volumes stay in the volume popup).
+- **Network:** the same panel as the network popup (Ethernet, VPN, Wi-Fi, and Bluetooth on its own tab); it works whether or not the Network widget is on the bar. Wi-Fi passwords are asked in the shell's own prompt.
+- **Notifications:** Do Not Disturb; it is saved, so it survives restarts.
+- **Power profile:** power saver, balanced, or performance through power-profiles-daemon (also in the battery popup).
 - **Time & date:** clock format, seconds, and date order; time format also applies to calendar events.
 - **Input:** keyboard layout, mouse/touchpad acceleration, tapping, natural scrolling, and disable-while-typing. An empty keyboard layout follows the system.
+- **About:** links, and a cat doodle in the corner: a Halloween version Oct 15–31, Christmas Dec 1–26, Valentine's Feb 13–14, and a birthday hat on July 24. The drawings are split into one mask per color (`assets/split-cat.py`) and painted with the theme colors, so they follow light and dark mode.
 - **Displays:** monitor layout and output settings, with timed confirmation and rollback.
 - **Power menu** and **Updates:** see below.
 
 Bar, widget, clock, and update interval settings save immediately. Input, display, and power changes use **Apply**; closing settings discards pending edits. Shell settings live in `~/.config/quickshell/mori-settings.json` (under `$XDG_CONFIG_HOME` when set); input and display settings update Niri’s configuration.
 
-The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call bar openSettings <page>` opens Settings on a page (`modules`, `theme` for Appearance, `clock`, `updates`, `power`, `displays`, `input`, `about`).
+The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call bar openSettings <page>` opens Settings on a page (`modules`, `theme` for Appearance, `sound`, `network`, `notifications`, `profile`, `clock`, `updates`, `power`, `displays`, `input`, `about`).
 
 ## Desktop widgets
 
@@ -76,7 +81,7 @@ The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call
 | Battery | Battery status and power profiles |
 | Media | Media player controls |
 | Calendar | Calendar view, with optional khal events and vdirsyncer sync |
-| Wallpapers | Folder picker and per-output wallpaper selection through awww, with a separate wallpaper for dark and light mode; the folder is saved |
+| Wallpapers | Per-output wallpaper selection through awww, with a separate wallpaper for dark and light mode, browsing inside the wallpaper folder (set it in **Settings → Appearance**) |
 | Light/dark mode | Sun or moon icon for the current mode; click to switch (see [light and dark mode](#light-and-dark-mode)) |
 | Notifications | Notification popups, a stored-notification count, and the newest 500 history entries for the current shell session |
 | KDE Connect | Paired phone status and clipboard sending; shows “Unavailable” when its QML module is missing |

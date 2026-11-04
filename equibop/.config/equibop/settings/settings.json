@@ -177,9 +177,6 @@
         "Experiments": {
             "enabled": false
         },
-        "ExpressionCloner": {
-            "enabled": false
-        },
         "F8Break": {
             "enabled": false
         },
@@ -436,7 +433,8 @@
             "enabled": false
         },
         "ReadAllNotificationsButton": {
-            "enabled": true
+            "enabled": true,
+            "compact": false
         },
         "RelationshipNotifier": {
             "enabled": true,
@@ -513,7 +511,7 @@
             "displayNames": false,
             "mode": "user-nick",
             "inReplies": false,
-            "triggerNameRerender": true,
+            "triggerNameRerender": false,
             "messages": true,
             "replies": true,
             "mentions": true,
@@ -543,7 +541,8 @@
             "styleDirectMessagesList": true,
             "gradientGlow": true,
             "styleFriendsList": true,
-            "styleActiveNow": true
+            "styleActiveNow": true,
+            "voiceChannels": true
         },
         "ShowTimeoutDuration": {
             "enabled": false
@@ -1159,7 +1158,7 @@
             "notifyOnNewExcludedQuests": false,
             "notifyOnNewQuests": true,
             "questButtonIndicator": "both",
-            "questButtonBadgeCount": 18,
+            "questButtonBadgeCount": 15,
             "questButtonBadgeColor": 2842239,
             "questButtonLeftClickAction": "open-quests",
             "questButtonMiddleClickAction": "plugin-settings",
@@ -1681,7 +1680,8 @@
             "noOnboarding": false,
             "enableAutoCorrect": false,
             "disableHolidayNotifications": false,
-            "showAllBadges": false
+            "showAllBadges": false,
+            "gifPickerTyping": false
         },
         "FavoriteAnything": {
             "enabled": false
@@ -1697,6 +1697,18 @@
         },
         "ExternalPlayer": {
             "enabled": false
+        },
+        "DraftNavigator": {
+            "enabled": false
+        },
+        "ExpressionManager": {
+            "enabled": false
+        },
+        "MutedServersActivityBadge": {
+            "enabled": false
+        },
+        "EquicordHelper": {
+            "enabled": true
         }
     },
     "uiElements": {
@@ -1714,12 +1726,13 @@
         "authenticated": false,
         "url": "https://api.vencord.dev/",
         "settingsSync": false,
-        "settingsSyncVersion": 1793056353417
+        "settingsSyncVersion": 1793828991767
     },
     "ignoreResetWarning": false,
     "userCssVars": {},
     "mainWindowFrameless": false,
     "themeActivationModes": {},
     "windowsMaterial": "none",
-    "nativeTitleBar": false
+    "nativeTitleBar": false,
+    "noRoundCorners": false
 }

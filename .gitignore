@@ -4,6 +4,7 @@
 !/bin/.local/
 !/fonts/.local/
 !/qt/.local/
+!/kew/.local/
 *.log
 *.lock
 

@@ -183,7 +183,7 @@ Item {
     FolderListModel {
         id: files
         folder: root.wallpaperFolder
-        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.avif", "*.bmp"]
+        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.avif", "*.bmp", "*.gif"]
         showDirs: true
         showDotAndDotDot: false
         showHidden: false

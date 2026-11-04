@@ -1,142 +1,26 @@
 import QtQuick
-import Qt.labs.folderlistmodel
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import "./theme"
 
+// Bar module: wallpaper icon and popup. The chooser itself is
+// WallpaperBrowser, shared with Settings → Wallpaper.
 Item {
     id: root
     required property var panelWindow
     required property var popupCoordinator
+    required property var settings
     property color accent: Theme.green
-    property var wallpapers: ({})
-    property var selectedScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
-    property url wallpaperFolder: "file://" + Quickshell.env("HOME") + "/Pictures/Wallpapers"
-    property int keyboardIndex: -1
-    property string keyboardMode: "screens"
     implicitWidth: icon.implicitWidth
     implicitHeight: icon.implicitHeight
 
     function close() { popup.visible = false }
-    function goToParent() {
-        if (files.folder.toString() !== root.wallpaperFolder.toString())
-            files.folder = files.parentFolder
-    }
-    function goIntoFolder() {
-        // Keep the last file-grid selection when switching back to monitors;
-        // otherwise descend into the first folder in the current directory.
-        if (keyboardIndex >= 0 && keyboardIndex < files.count
-                && files.isFolder(keyboardIndex)) {
-            files.folder = files.get(keyboardIndex, "fileUrl")
-            return
-        }
-        for (let i = 0; i < files.count; ++i) {
-            if (files.isFolder(i)) {
-                files.folder = files.get(i, "fileUrl")
-                return
-            }
-        }
-    }
-    function moveKeyboardSelection(offset) {
-        if (files.count === 0)
-            return
-        const start = keyboardIndex < 0 ? 0 : keyboardIndex
-        keyboardIndex = Math.max(0, Math.min(files.count - 1, start + offset))
-        grid.positionViewAtIndex(keyboardIndex, GridView.Contain)
-    }
-    function activateKeyboardSelection() {
-        if (keyboardIndex < 0 || keyboardIndex >= files.count)
-            return
-        const fileUrl = files.get(keyboardIndex, "fileUrl")
-        if (files.isFolder(keyboardIndex))
-            files.folder = fileUrl
-        else
-            selectWallpaper(fileUrl)
-    }
     function handleKeyPressed(event) {
-        const columns = Math.max(1, Math.round(grid.width / grid.cellWidth))
-        if (event.key === Qt.Key_Tab) {
-            keyboardMode = keyboardMode === "screens" ? "files" : "screens"
-            if (keyboardMode === "files" && keyboardIndex < 0 && files.count > 0)
-                keyboardIndex = 0
-        } else if (event.key === Qt.Key_F) {
-            openFolderPicker()
-        } else if (keyboardMode === "screens" && event.key === Qt.Key_Up) {
-            goToParent()
-        } else if (keyboardMode === "screens" && event.key === Qt.Key_Down) {
-            goIntoFolder()
-        } else if (keyboardMode === "screens" && (event.key === Qt.Key_Left
-                || event.key === Qt.Key_Right)) {
-            const screens = Quickshell.screens
-            if (screens.length > 0) {
-                const index = Math.max(0, screens.indexOf(selectedScreen))
-                const step = event.key === Qt.Key_Left ? -1 : 1
-                selectedScreen = screens[Math.max(0, Math.min(screens.length - 1, index + step))]
-            }
-        } else if (keyboardMode === "files" && event.key === Qt.Key_Left)
-            moveKeyboardSelection(-1)
-        else if (keyboardMode === "files" && event.key === Qt.Key_Right)
-            moveKeyboardSelection(1)
-        else if (keyboardMode === "files" && event.key === Qt.Key_Up)
-            moveKeyboardSelection(-columns)
-        else if (keyboardMode === "files" && event.key === Qt.Key_Down)
-            moveKeyboardSelection(columns)
-        else if (keyboardMode === "files" && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter))
-            activateKeyboardSelection()
-        else if (keyboardMode === "files" && event.key === Qt.Key_Backspace)
-            goToParent()
-        else if (event.key === Qt.Key_Escape)
+        if (event.key === Qt.Key_Escape)
             close()
-        else
+        else if (!browser.handleKey(event))
             return
         event.accepted = true
-    }
-    function localPath(fileUrl) {
-        return decodeURIComponent(fileUrl.toString()).replace(/^file:\/\//, "")
-    }
-    function wallpaperFor(screen) {
-        return screen && wallpapers[screen.name] ? wallpapers[screen.name] : ""
-    }
-    function selectWallpaper(fileUrl) {
-        if (!selectedScreen)
-            return
-
-        const path = localPath(fileUrl)
-        const updatedWallpapers = Object.assign({}, wallpapers)
-        updatedWallpapers[selectedScreen.name] = path
-        wallpapers = updatedWallpapers
-        wallpaperSetter.exec([
-            "awww", "img",
-            "--outputs", selectedScreen.name,
-            "--transition-type", "fade",
-            "--transition-duration", "0.8",
-            path
-        ])
-    }
-    function refreshWallpapers() {
-        if (!wallpaperQuery.running)
-            wallpaperQuery.exec(["awww", "query"])
-    }
-    function parseAwwwQuery(output) {
-        const current = {}
-        for (const line of output.split(/\r?\n/)) {
-            const match = line.match(/^: ([^:]+): .*currently displaying: image: (.+)$/)
-            if (match)
-                current[match[1]] = match[2]
-        }
-        wallpapers = current
-    }
-    function openFolderPicker() {
-        const currentPath = decodeURIComponent(wallpaperFolder.toString()).replace("file://", "")
-        close()
-        folderPicker.exec([
-            "zenity",
-            "--file-selection",
-            "--directory",
-            "--title=Choose wallpaper folder",
-            "--filename=" + currentPath + "/"
-        ])
     }
     function toggle() {
         if (popup.visible) {
@@ -144,29 +28,7 @@ Item {
         } else {
             popupCoordinator.showPopup(root)
             popup.visible = true
-            keyboardMode = "screens"
-            keyboardIndex = -1
-            refreshWallpapers()
-        }
-    }
-
-    Connections {
-        target: Quickshell
-
-        function onScreensChanged() {
-            if (!root.selectedScreen) {
-                root.selectedScreen = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
-                return
-            }
-
-            for (let i = 0; i < Quickshell.screens.length; ++i) {
-                if (Quickshell.screens[i].name === root.selectedScreen.name) {
-                    root.selectedScreen = Quickshell.screens[i]
-                    return
-                }
-            }
-
-            root.selectedScreen = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+            browser.reset()
         }
     }
 
@@ -180,61 +42,11 @@ Item {
         TapHandler { onTapped: root.toggle() }
     }
 
-    FolderListModel {
-        id: files
-        folder: root.wallpaperFolder
-        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.avif", "*.bmp", "*.gif"]
-        showDirs: true
-        showDotAndDotDot: false
-        showHidden: false
-        showOnlyReadable: true
-        sortField: FolderListModel.Name
-        sortCaseSensitive: false
-        showDirsFirst: true
-        onFolderChanged: root.keyboardIndex = -1
-        onCountChanged: {
-            if (root.keyboardIndex >= count)
-                root.keyboardIndex = count - 1
-            else if (root.keyboardIndex < 0 && count > 0 && popup.visible)
-                root.keyboardIndex = 0
-        }
-    }
-
-    Process {
-        id: folderPicker
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const selectedPath = this.text.replace(/\r?\n$/, "")
-                if (selectedPath.length > 0) {
-                    root.wallpaperFolder = "file://" + selectedPath
-                    Qt.callLater(() => {
-                        if (!popup.visible)
-                            root.toggle()
-                        root.keyboardMode = "files"
-                    })
-                }
-            }
-        }
-    }
-
-    Process {
-        id: wallpaperSetter
-    }
-
-    Process {
-        id: wallpaperQuery
-
-        stdout: StdioCollector {
-            onStreamFinished: root.parseAwwwQuery(this.text)
-        }
-    }
-
     PopupWindow {
         id: popup
         visible: false
         implicitWidth: 420
-        implicitHeight: 410
+        implicitHeight: 440
         color: "transparent"
         grabFocus: false
         anchor.window: root.panelWindow
@@ -255,186 +67,23 @@ Item {
             border.width: 2
             border.color: root.accent
 
-            Column {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 8
+            WidgetHeader {
+                id: header
+                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
+                text: "Wallpapers"
+                color: root.accent
+            }
 
-                WidgetHeader {
-                    text: "Wallpapers"
-                    color: root.accent
-                }
-
-                Row {
-                    width: parent.width
-                    height: folderActions.implicitHeight
-                    spacing: 12
-
-                    Text {
-                        width: parent.width - folderActions.implicitWidth - parent.spacing
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: decodeURIComponent(files.folder.toString()).replace("file://", "")
-                        elide: Text.ElideLeft
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-
-                    Row {
-                        id: folderActions
-                        spacing: 12
-
-                        Rectangle {
-                            width: upText.implicitWidth + 20
-                            height: Theme.controlHeight
-                            readonly property bool available: files.folder.toString() !== root.wallpaperFolder.toString()
-                            color: Theme.controlBackground(false, false, available && upHover.hovered)
-                            border.width: 1
-                            border.color: Theme.controlBorder(false, false, available && upHover.hovered, root.accent)
-                            Text {
-                                id: upText
-                                anchors.centerIn: parent
-                                text: "↑ Up"
-                                color: parent.available ? root.accent : Theme.disabledText
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                            HoverHandler { id: upHover }
-                            TapHandler {
-                                enabled: parent.available
-                                onTapped: root.goToParent()
-                            }
-                        }
-                        Rectangle {
-                            width: folderText.implicitWidth + 20
-                            height: Theme.controlHeight
-                            color: Theme.controlBackground(false, false, folderHover.hovered)
-                            border.width: 1
-                            border.color: Theme.controlBorder(false, false, folderHover.hovered, root.accent)
-                            Text {
-                                id: folderText
-                                anchors.centerIn: parent
-                                text: "Choose folder · F"
-                                color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                            HoverHandler { id: folderHover }
-                            TapHandler { onTapped: root.openFolderPicker() }
-                        }
-                    }
-                }
-
-                Flow {
-                    width: parent.width
-                    spacing: 6
-
-                    Repeater {
-                        model: Quickshell.screens
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            height: Theme.controlHeight
-                            width: screenName.implicitWidth + 16
-                            color: Theme.controlBackground(root.selectedScreen === modelData,
-                                root.keyboardMode === "screens" && root.selectedScreen === modelData, screenHover.hovered)
-                            border.width: 1
-                            border.color: Theme.controlBorder(root.selectedScreen === modelData,
-                                root.keyboardMode === "screens" && root.selectedScreen === modelData, screenHover.hovered, root.accent)
-
-                            Text {
-                                id: screenName
-                                anchors.centerIn: parent
-                                text: (root.keyboardMode === "screens" && root.selectedScreen === modelData ? "› " : "  ") + modelData.name
-                                color: root.selectedScreen === modelData ? root.accent : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-
-                            HoverHandler { id: screenHover }
-                            TapHandler { onTapped: root.selectedScreen = modelData }
-                        }
-                    }
-                }
-
-                GridView {
-                    id: grid
-                    width: parent.width
-                    height: Math.max(0, parent.height - y - wallpaperHint.implicitHeight - parent.spacing)
-                    clip: true
-                    cellWidth: width / 3
-                    cellHeight: 100
-                    model: files
-
-                    delegate: Rectangle {
-                        id: tile
-                        required property int index
-                        required property url fileUrl
-                        required property string fileName
-                        required property bool fileIsDir
-                        width: grid.cellWidth - 6
-                        height: grid.cellHeight - 6
-                        color: Theme.controlBackground(false,
-                            root.keyboardMode === "files" && root.keyboardIndex === tile.index, hover.hovered)
-                        border.width: 1
-                        border.color: Theme.controlBorder(root.wallpaperFor(root.selectedScreen) === root.localPath(fileUrl),
-                            root.keyboardMode === "files" && root.keyboardIndex === tile.index, hover.hovered, root.accent)
-
-                        Image {
-                            id: preview
-                            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 4 }
-                            height: 62
-                            visible: !tile.fileIsDir
-                            source: tile.fileIsDir ? "" : tile.fileUrl
-                            sourceSize.width: 240
-                            sourceSize.height: 140
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: 20
-                            visible: tile.fileIsDir || preview.status === Image.Error
-                            text: tile.fileIsDir ? "▸" : "?"
-                            color: root.accent
-                            font.pixelSize: 28
-                        }
-                        Text {
-                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 5 }
-                            text: (root.keyboardMode === "files" && root.keyboardIndex === tile.index ? "› " : "  ") + tile.fileName
-                            elide: Text.ElideRight
-                            color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
-                        HoverHandler { id: hover }
-                        TapHandler {
-                            onTapped: {
-                                root.keyboardMode = "files"
-                                root.keyboardIndex = tile.index
-                                if (tile.fileIsDir)
-                                    files.folder = tile.fileUrl
-                                else if (preview.status === Image.Ready)
-                                    root.selectWallpaper(tile.fileUrl)
-                            }
-                        }
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: files.count === 0
-                        text: "No wallpapers in this folder"
-                        color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
-                }
-
-                KeyboardHint {
-                    id: wallpaperHint
-                    text: root.keyboardMode === "screens"
-                        ? "←/→: monitor  ·  ↑: parent  ·  ↓: folder  ·  Tab: wallpapers"
-                        : "Arrows: navigate  ·  Enter: select  ·  Tab: monitors"
+            WallpaperBrowser {
+                id: browser
+                anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+                anchors { topMargin: 8; leftMargin: 12; rightMargin: 12; bottomMargin: 12 }
+                settings: root.settings
+                accent: root.accent
+                onFolderPickerRequested: root.close()
+                onFolderPicked: {
+                    if (!popup.visible) root.toggle()
+                    browser.keyboardMode = "files"
                 }
             }
         }
@@ -460,7 +109,6 @@ Item {
             id: keyCapture
             anchors.fill: parent
             focus: dismissLayer.visible
-
             Keys.onPressed: event => root.handleKeyPressed(event)
 
             MouseArea {

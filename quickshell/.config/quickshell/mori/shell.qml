@@ -20,6 +20,8 @@ ShellRoot {
 
     NiriEvents { id: niriState }
     UpdateService { id: updateService; settings: settings }
+    ThemeScheduler { settings: settings }
+    ThemeTransition { id: themeTransition }
 
     NotificationServer {
         id: notificationServer
@@ -54,10 +56,14 @@ ShellRoot {
         function toggleWallpaperPicker(): void { bar.toggleWallpaperPicker() }
         function toggleNotifications(): void { bar.toggleNotifications() }
         function toggleSettings(): void { bar.toggleSettings() }
+        // Opens Settings on a page: modules, theme (Appearance), clock, updates, power, displays, input, about.
+        function openSettings(page: string): void { bar.openSettings(page) }
         function volumeUp(): void { bar.volumeUp(); osd.showVolume() }
         function volumeDown(): void { bar.volumeDown(); osd.showVolume() }
         function toggleMute(): void { bar.toggleMute(); osd.showVolume() }
         function brightnessUp(): void { osd.showBrightness(bar.adjustBrightness(0.05)) }
         function brightnessDown(): void { osd.showBrightness(bar.adjustBrightness(-0.05)) }
+        // mori-theme hands dark/light/toggle here so the switch can crossfade.
+        function setTheme(mode: string): void { themeTransition.switchTo(mode) }
     }
 }

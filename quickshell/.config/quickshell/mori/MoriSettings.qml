@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "./theme"
 import "PowerCommands.js" as PowerCommands
+import "ThemeSchedule.js" as ThemeSchedule
 
 Item {
     id: root
@@ -51,6 +52,11 @@ Item {
         { "label": "Mori", "detail": "Source for these dotfiles", "url": "https://github.com/maia-kitty/mori" }
     ]
     property int keyboardClockIndex: 0
+    property int keyboardThemeIndex: 0
+    // Appearance page: keys go to the light & dark rows or the wallpaper browser.
+    property string appearanceFocus: "theme"
+    // Page to show when Settings reopens itself (after the wallpaper folder dialog).
+    property string reopenPage: ""
     property int keyboardPowerIndex: 0
     property bool editingPowerCommand: false
     property var powerDrafts: ({})
@@ -110,9 +116,9 @@ Item {
 
     readonly property var allModules: [
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
-        "notifications", "powerMenu", "systemTray", "updates", "volume", "wallpaper", "workspaces"
+        "notifications", "powerMenu", "systemTray", "theme", "updates", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "clock", "updates", "power", "displays", "input", "about"]
+    readonly property var categoryPages: ["modules", "theme", "clock", "updates", "power", "displays", "input", "about"]
     readonly property var updateIntervals: [
         { label: "15 min", minutes: 15 }, { label: "1 hour", minutes: 60 },
         { label: "3 hours", minutes: 180 }, { label: "Manual", minutes: 0 }
@@ -171,6 +177,7 @@ Item {
         case "powerMenu": return "Power menu"
         case "battery": return "Battery"
         case "workspaces": return "Workspaces"
+        case "theme": return "Light/dark mode"
         default: return name
         }
     }
@@ -187,6 +194,7 @@ Item {
         switch (page) {
         case "modules":
         case "appearance": return "Bar & widgets"
+        case "theme": return "Appearance"
         case "clock": return "Time & date"
         case "updates": return "Updates"
         case "power": return "Power menu"
@@ -214,6 +222,18 @@ Item {
         }
     }
 
+    // Open Settings on a page (IPC openSettings, and the wallpaper folder dialog).
+    function openTo(name) {
+        if (categoryPages.indexOf(name) < 0) name = "home"
+        if (settingsWindow.visible) {
+            if (name === "home") page = "home"
+            else openPage(name)
+            return
+        }
+        reopenPage = name === "home" ? "" : name
+        toggle()
+    }
+
     function screenByName(name) {
         for (const screen of Quickshell.screens) {
             if (screen.name === name)
@@ -235,6 +255,10 @@ Item {
         }
         popupCoordinator.showPopup(root)
         settingsWindow.visible = true
+        if (reopenPage) {
+            openPage(reopenPage)
+            reopenPage = ""
+        }
     }
 
     function close() {
@@ -319,6 +343,10 @@ Item {
         } else if (name === "appearance") {
             keyboardColorRow = 0
             syncKeyboardColor()
+        } else if (name === "theme") {
+            keyboardThemeIndex = 0
+            appearanceFocus = "theme"
+            Qt.callLater(() => { if (themePage.item) themePage.item.browser.reset() })
         } else if (name === "clock") {
             keyboardClockIndex = 0
         } else if (name === "updates") {
@@ -417,6 +445,81 @@ Item {
         const index = option.values.indexOf(clockOptionValue(option.key))
         const next = (index + offset + option.values.length) % option.values.length
         settings.setClockOption(option.key, option.values[next])
+    }
+
+    // Rows on the Light & dark page; the last two depend on the schedule.
+    function themeRows() {
+        const rows = [
+            { "key": "mode", "label": "Mode", "kind": "choice",
+                "values": ["dark", "light"], "labels": ["Dark", "Light"] },
+            { "key": "schedule", "label": "Switch automatically", "kind": "choice",
+                "values": ["off", "sun", "times"], "labels": ["Off", "Sunrise & sunset", "Fixed times"] }
+        ]
+        if (settings.themeSchedule === "times")
+            rows.push({ "key": "lightTime", "label": "Light from", "kind": "step" },
+                { "key": "darkTime", "label": "Dark from", "kind": "step" })
+        else if (settings.themeSchedule === "sun")
+            rows.push({ "key": "latitude", "label": "Latitude", "kind": "step" },
+                { "key": "longitude", "label": "Longitude", "kind": "step" })
+        return rows
+    }
+
+    function themeOptionValue(key) {
+        switch (key) {
+        case "mode": return Theme.dark ? "dark" : "light"
+        case "schedule": return settings.themeSchedule
+        case "lightTime": return settings.themeLightTime
+        case "darkTime": return settings.themeDarkTime
+        case "latitude": return settings.themeLatitude
+        default: return settings.themeLongitude
+        }
+    }
+
+    function themeValueLabel(key) {
+        const value = themeOptionValue(key)
+        if (key === "latitude")
+            return Math.abs(value) + "° " + (value < 0 ? "S" : "N")
+        if (key === "longitude")
+            return Math.abs(value) + "° " + (value < 0 ? "W" : "E")
+        return ThemeSchedule.formatMinutes(value)
+    }
+
+    function setThemeChoice(key, value) {
+        if (key === "mode") {
+            if (value !== themeOptionValue("mode"))
+                Quickshell.execDetached(["mori-theme", value])
+        } else
+            settings.setThemeOption(key, value)
+    }
+
+    // ←→ cycles a choice or steps a value; large steps by an hour or 10°.
+    function changeThemeOption(offset, large) {
+        const row = themeRows()[keyboardThemeIndex]
+        if (!row) return
+        const value = themeOptionValue(row.key)
+        if (row.kind === "choice") {
+            const index = row.values.indexOf(value)
+            setThemeChoice(row.key, row.values[(index + offset + row.values.length) % row.values.length])
+        } else if (row.key === "lightTime" || row.key === "darkTime") {
+            settings.setThemeOption(row.key, (value + offset * (large ? 60 : 15) + 1440) % 1440)
+        } else {
+            const limit = row.key === "latitude" ? 90 : 180
+            settings.setThemeOption(row.key,
+                Math.max(-limit, Math.min(limit, Math.round(value) + offset * (large ? 10 : 1))))
+        }
+    }
+
+    function themeSchedulePreview() {
+        if (settings.themeSchedule === "sun") {
+            const sun = ThemeSchedule.sunTimes(new Date(), settings.themeLatitude, settings.themeLongitude)
+            if (sun.polar) return "Today: polar " + sun.polar + ", " + (sun.polar === "day" ? "light" : "dark") + " all day"
+            return "Today: light from " + ThemeSchedule.formatMinutes(sun.rise)
+                + " to " + ThemeSchedule.formatMinutes(sun.set)
+        }
+        if (settings.themeSchedule === "times")
+            return "Light from " + ThemeSchedule.formatMinutes(settings.themeLightTime)
+                + " to " + ThemeSchedule.formatMinutes(settings.themeDarkTime)
+        return ""
     }
 
     function clockPreview() {
@@ -665,6 +768,20 @@ Item {
             event.accepted = true
             return
         }
+        if (page === "theme" && themePage.item && key !== Qt.Key_Escape) {
+            const browser = themePage.item.browser
+            if (key === Qt.Key_Tab && (appearanceFocus === "theme" || browser.keyboardMode === "files")) {
+                // Tab cycles light & dark → monitors → wallpapers → light & dark.
+                appearanceFocus = appearanceFocus === "theme" ? "wallpaper" : "theme"
+                browser.keyboardMode = "screens"
+                event.accepted = true
+                return
+            }
+            if (appearanceFocus === "wallpaper" && browser.handleKey(event)) {
+                event.accepted = true
+                return
+            }
+        }
         if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
             if (page !== "home") page = "home"
             else close()
@@ -718,6 +835,14 @@ Item {
             else if (key === Qt.Key_Return || key === Qt.Key_Enter)
                 settings.setModuleColor(allModules[keyboardColorRow],
                     colorChoices[keyboardColorIndex].token)
+            else return
+        } else if (page === "theme" && appearanceFocus === "theme") {
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardThemeIndex = Math.max(0, Math.min(themeRows().length - 1,
+                    keyboardThemeIndex + (key === Qt.Key_Up ? -1 : 1)))
+            else if (key === Qt.Key_Left || key === Qt.Key_Right
+                    || key === Qt.Key_Return || key === Qt.Key_Enter)
+                changeThemeOption(key === Qt.Key_Left ? -1 : 1, event.modifiers & Qt.ShiftModifier)
             else return
         } else if (page === "clock") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
@@ -1961,6 +2086,7 @@ Item {
                                     id: categoryRepeater
                                     model: [
                                         { "key": "modules", "label": "Bar & widgets", "description": "Widget layout, visibility, and colors" },
+                                        { "key": "theme", "label": "Appearance", "description": "Light and dark mode, wallpapers" },
                                         { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
                                         { "key": "updates", "label": "Updates", "description": "Package update check interval" },
                                         { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
@@ -2213,6 +2339,149 @@ Item {
                                         }
                                         HoverHandler { id: colorHover }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: themePage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "theme"
+
+                    sourceComponent: Component {
+                        Item {
+                            readonly property alias browser: wallpaperBrowser
+                            visible: root.page === "theme"
+
+                            Column {
+                                id: themeColumn
+                                anchors { top: parent.top; left: parent.left; right: parent.right }
+                                spacing: 6
+
+                                WidgetHeader { text: "Light & dark"; color: Theme.fg }
+
+                                SettingsLabel {
+                                    text: root.appearanceFocus === "theme"
+                                        ? "↑↓ setting · ←→ / Enter change · Shift+←→ bigger steps · Tab wallpaper"
+                                        : "Tab: back to light & dark"
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+
+                                Repeater {
+                                    model: root.themeRows()
+                                    delegate: Item {
+                                        id: themeRow
+                                        required property var modelData
+                                        required property int index
+                                        readonly property bool focusedRow: root.appearanceFocus === "theme"
+                                            && index === root.keyboardThemeIndex
+                                        width: parent.width
+                                        height: Theme.controlHeight
+
+                                        SettingsLabel {
+                                            anchors.left: parent.left
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: (themeRow.focusedRow ? "› " : "  ") + themeRow.modelData.label
+                                            color: Theme.grey1
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+
+                                        Row {
+                                            anchors.right: parent.right
+                                            spacing: 6
+                                            Repeater {
+                                                model: themeRow.modelData.kind === "choice"
+                                                    ? themeRow.modelData.values : [-1, 0, 1]
+                                                delegate: Rectangle {
+                                                    id: themeControl
+                                                    required property var modelData
+                                                    required property int index
+                                                    readonly property bool isChoice: themeRow.modelData.kind === "choice"
+                                                    readonly property bool isValue: !isChoice && modelData === 0
+                                                    readonly property bool selected: isChoice
+                                                        ? root.themeOptionValue(themeRow.modelData.key) === modelData
+                                                        : isValue
+                                                    readonly property bool focused: themeRow.focusedRow && selected
+                                                    width: isChoice || isValue
+                                                        ? Math.max(72, themeControlLabel.implicitWidth + 20)
+                                                        : Theme.controlHeight
+                                                    height: Theme.controlHeight
+                                                    color: root.controlBackground(selected, focused,
+                                                        !isValue && themeControlHover.hovered)
+                                                    border.width: 1
+                                                    border.color: root.controlBorder(selected, focused,
+                                                        !isValue && themeControlHover.hovered)
+                                                    SettingsLabel {
+                                                        id: themeControlLabel
+                                                        anchors.centerIn: parent
+                                                        text: themeControl.isChoice
+                                                            ? themeRow.modelData.labels[themeControl.index]
+                                                            : themeControl.isValue
+                                                                ? root.themeValueLabel(themeRow.modelData.key)
+                                                                : (themeControl.modelData < 0 ? "−" : "+")
+                                                        color: themeControl.selected || !themeControl.isChoice
+                                                            ? Theme.fg : Theme.grey1
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: Theme.fontSize
+                                                    }
+                                                    HoverHandler { id: themeControlHover }
+                                                    TapHandler {
+                                                        enabled: !themeControl.isValue
+                                                        onTapped: {
+                                                            root.appearanceFocus = "theme"
+                                                            root.keyboardThemeIndex = themeRow.index
+                                                            if (themeControl.isChoice)
+                                                                root.setThemeChoice(themeRow.modelData.key, themeControl.modelData)
+                                                            else
+                                                                root.changeThemeOption(themeControl.modelData, false)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    textFormat: Text.PlainText
+                                    text: root.themeSchedulePreview()
+                                        + (root.settings.themeSchedule === "sun"
+                                            ? " · coordinates stay in mori-settings.json on this computer" : "")
+                                        + (root.settings.themeSchedule !== "off"
+                                            ? " · a manual switch lasts until the next change" : "")
+                                    visible: root.settings.themeSchedule !== "off"
+                                    color: Theme.grey1
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+
+                            WidgetHeader {
+                                id: wallpaperHeader
+                                anchors { top: themeColumn.bottom; topMargin: 18; left: parent.left }
+                                text: "Wallpaper"
+                                color: Theme.fg
+                            }
+
+                            WallpaperBrowser {
+                                id: wallpaperBrowser
+                                anchors { top: wallpaperHeader.bottom; topMargin: 8 }
+                                anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                settings: root.settings
+                                // Settings stays monochrome; module accents are for the bar.
+                                accent: Theme.fg
+                                keyboardActive: root.appearanceFocus === "wallpaper"
+                                onFolderPickerRequested: root.close()
+                                onFolderPicked: {
+                                    root.openTo("theme")
+                                    root.appearanceFocus = "wallpaper"
                                 }
                             }
                         }

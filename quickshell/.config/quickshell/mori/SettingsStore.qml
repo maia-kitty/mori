@@ -30,11 +30,19 @@ Item {
     property var powerCommands: ({})
     property bool batteryEnabled: true
     property bool workspacesEnabled: true
+    property bool themeEnabled: true
+    // Light/dark schedule: "off", "sun" (sunrise to sunset) or "times" (fixed).
+    property string themeSchedule: "off"
+    property int themeLightTime: 420
+    property int themeDarkTime: 1140
+    property real themeLatitude: 0
+    property real themeLongitude: 0
+    property string wallpaperFolder: Quickshell.env("HOME") + "/Pictures/Wallpapers"
     property var leftModuleOrder: ["calendar", "media", "kdeConnect"]
     property var centerModuleOrder: ["workspaces"]
     property var rightModuleOrder: [
-        "systemTray", "updates", "network", "volume", "brightness", "wallpaper", "notifications", "battery",
-        "powerMenu"
+        "systemTray", "updates", "network", "volume", "brightness", "wallpaper", "theme", "notifications",
+        "battery", "powerMenu"
     ]
     property var moduleColors: ({
         "calendar": "fg",
@@ -46,6 +54,7 @@ Item {
         "volume": "yellow",
         "brightness": "yellow",
         "wallpaper": "green",
+        "theme": "yellow",
         "notifications": "purple",
         "battery": "green",
         "workspaces": "fg",
@@ -95,6 +104,7 @@ Item {
         case "powerMenu": return powerMenuEnabled
         case "battery": return batteryEnabled
         case "workspaces": return workspacesEnabled
+        case "theme": return themeEnabled
         default: return false
         }
     }
@@ -114,6 +124,7 @@ Item {
         case "powerMenu": powerMenuEnabled = enabled; break
         case "battery": batteryEnabled = enabled; break
         case "workspaces": workspacesEnabled = enabled; break
+        case "theme": themeEnabled = enabled; break
         default: return
         }
 
@@ -161,6 +172,59 @@ Item {
             clockShowSeconds = value
         } else return
         noteChange()
+    }
+
+    function setThemeOption(name, value) {
+        if (name === "schedule" && ["off", "sun", "times"].indexOf(value) >= 0) {
+            if (themeSchedule === value) return
+            themeSchedule = value
+        } else if ((name === "lightTime" || name === "darkTime")
+                && Number.isInteger(value) && value >= 0 && value < 1440) {
+            if (name === "lightTime") {
+                if (themeLightTime === value) return
+                themeLightTime = value
+            } else {
+                if (themeDarkTime === value) return
+                themeDarkTime = value
+            }
+        } else if (name === "latitude" && typeof value === "number" && value >= -90 && value <= 90) {
+            if (themeLatitude === value) return
+            themeLatitude = value
+        } else if (name === "longitude" && typeof value === "number" && value >= -180 && value <= 180) {
+            if (themeLongitude === value) return
+            themeLongitude = value
+        } else return
+        noteChange()
+    }
+
+    function setWallpaperFolder(path) {
+        if (typeof path !== "string" || !path.startsWith("/") || wallpaperFolder === path) return
+        wallpaperFolder = path
+        noteChange()
+    }
+
+    // zenity's folder dialog; lives here so it outlives the popup or Settings
+    // page that asked for it (both close while the dialog is open).
+    property var folderPickedCallback: null
+    function pickWallpaperFolder(callback) {
+        folderPickedCallback = callback
+        folderPicker.exec([
+            "zenity", "--file-selection", "--directory",
+            "--title=Choose wallpaper folder", "--filename=" + wallpaperFolder + "/"
+        ])
+    }
+
+    Process {
+        id: folderPicker
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const path = this.text.replace(/\r?\n$/, "")
+                if (path.length > 0) root.setWallpaperFolder(path)
+                const callback = root.folderPickedCallback
+                root.folderPickedCallback = null
+                if (callback) Qt.callLater(callback)
+            }
+        }
     }
 
     function moduleColor(name) {
@@ -238,7 +302,7 @@ Item {
         const defaultCenter = ["workspaces"]
         const defaultRight = [
             "systemTray", "updates", "network", "volume", "brightness", "wallpaper",
-            "notifications", "battery", "powerMenu"
+            "theme", "notifications", "battery", "powerMenu"
         ]
         const allowed = defaultLeft.concat(defaultCenter, defaultRight)
         const left = []
@@ -320,6 +384,16 @@ Item {
                     clockDateFormat = clock.dateFormat
                 if (typeof clock.showSeconds === "boolean")
                     clockShowSeconds = clock.showSeconds
+
+                const wallpaper = parsed.wallpaper || {}
+                if ("folder" in wallpaper)
+                    setWallpaperFolder(wallpaper.folder)
+
+                const theme = parsed.theme || {}
+                for (const name of ["schedule", "lightTime", "darkTime", "latitude", "longitude"]) {
+                    if (name in theme)
+                        setThemeOption(name, theme[name])
+                }
             } catch (error) {
                 console.warn("Could not parse Mori settings:", error)
             }
@@ -344,6 +418,7 @@ Item {
                 "notifications": notificationsEnabled,
                 "battery": batteryEnabled,
                 "workspaces": workspacesEnabled,
+                "theme": themeEnabled,
                 "powerMenu": powerMenuEnabled
             },
             "order": {
@@ -364,6 +439,14 @@ Item {
                 "timeFormat": clockTimeFormat,
                 "dateFormat": clockDateFormat,
                 "showSeconds": clockShowSeconds
+            },
+            "wallpaper": { "folder": wallpaperFolder },
+            "theme": {
+                "schedule": themeSchedule,
+                "lightTime": themeLightTime,
+                "darkTime": themeDarkTime,
+                "latitude": themeLatitude,
+                "longitude": themeLongitude
             }
         }
         settingsFile.setText(JSON.stringify(contents, null, 2) + "\n")

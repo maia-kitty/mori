@@ -30,7 +30,11 @@ Volume and brightness shortcuts show a short level indicator at the bottom of th
 
 ## Light and dark mode
 
-`mori-theme toggle` (or **Mod+Shift+D**) switches the whole desktop between Everforest dark and light; `mori-theme dark`, `mori-theme light` and `mori-theme get` also work. Running `mori-theme` with no argument re-applies the saved mode, which Niri does at startup. The mode is stored in `~/.local/state/mori/mode`.
+`mori-theme toggle` (or **Mod+Shift+D**, or the sun/moon icon in the bar) switches the whole desktop between Everforest dark and light; `mori-theme dark`, `mori-theme light` and `mori-theme get` also work. Running `mori-theme` with no argument re-applies the saved mode; at login Niri runs `mori-theme init`, which only does that when a state file is missing. The mode is stored in `~/.local/state/mori/mode`. While the bar is running, the switch crossfades: every monitor briefly freezes on a screenshot while the apps repaint underneath, then the screenshot fades out.
+
+**Settings → Appearance** sets the mode and can switch automatically: **Sunrise & sunset** (from a latitude and longitude in whole degrees, saved only in `mori-settings.json`) or **Fixed times** (15-minute steps; Shift+←→ moves by an hour or 10°). The bar checks the schedule every 30 seconds. A manual switch lasts until the next scheduled change; changing the schedule applies it immediately.
+
+Each mode remembers its own wallpaper per monitor. Choose both in the wallpaper picker or **Settings → Appearance** (**Dark** / **Light**); a mode you never chose for keeps the current wallpaper when you switch. Saved in `~/.local/state/mori/wallpapers-dark` and `wallpapers-light`.
 
 | App | How it follows |
 | --- | --- |
@@ -53,6 +57,7 @@ Zen needs its theme set to **Auto**, Discord's **Appearance** to **Sync with com
 Open **Settings** from the bar or with **Mod+Period**:
 
 - **Bar & widgets:** **Widgets** controls visibility, left/center/right order, and compact modes; **Colors** controls widget accent colors. Click the tabs or press **Tab** to switch views.
+- **Appearance:** light/dark mode and automatic switching (see [light and dark mode](#light-and-dark-mode)), and below it the same wallpaper chooser as the bar's popup: folder, monitor, and a **Dark** and **Light** wallpaper for each (**M** switches between them). The current mode's choice applies right away; the other is used when you switch. **Tab** moves between the two parts.
 - **Time & date:** clock format, seconds, and date order; time format also applies to calendar events.
 - **Input:** keyboard layout, mouse/touchpad acceleration, tapping, natural scrolling, and disable-while-typing. An empty keyboard layout follows the system.
 - **Displays:** monitor layout and output settings, with timed confirmation and rollback.
@@ -60,7 +65,7 @@ Open **Settings** from the bar or with **Mod+Period**:
 
 Bar, widget, clock, and update interval settings save immediately. Input, display, and power changes use **Apply**; closing settings discards pending edits. Shell settings live in `~/.config/quickshell/mori-settings.json` (under `$XDG_CONFIG_HOME` when set); input and display settings update Niri’s configuration.
 
-The bar uses the main monitor only, with one widget layout.
+The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call bar openSettings <page>` opens Settings on a page (`modules`, `theme` for Appearance, `clock`, `updates`, `power`, `displays`, `input`, `about`).
 
 ## Desktop widgets
 
@@ -71,7 +76,8 @@ The bar uses the main monitor only, with one widget layout.
 | Battery | Battery status and power profiles |
 | Media | Media player controls |
 | Calendar | Calendar view, with optional khal events and vdirsyncer sync |
-| Wallpapers | Folder picker and per-output wallpaper selection through awww |
+| Wallpapers | Folder picker and per-output wallpaper selection through awww, with a separate wallpaper for dark and light mode; the folder is saved |
+| Light/dark mode | Sun or moon icon for the current mode; click to switch (see [light and dark mode](#light-and-dark-mode)) |
 | Notifications | Notification popups, a stored-notification count, and the newest 500 history entries for the current shell session |
 | KDE Connect | Paired phone status and clipboard sending; shows “Unavailable” when its QML module is missing |
 | Updates | Per-source update counts, errors, last check time, and reboot hints |

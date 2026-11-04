@@ -17,6 +17,7 @@ Install GNU Stow and the dependencies for the components you want.
 | NetworkManager, or iw + wpa_supplicant | Wi-Fi |
 | brightnessctl / power-profiles-daemon | Backlight / power profiles |
 | wl-clipboard + cliphist | Clipboard history |
+| grim | Screenshots for the light/dark crossfade (without it, switches aren't faded) |
 | Bash, jq, Python 3.9+, Zenity | Helpers and dialogs |
 | [upkeep](https://github.com/maia-kitty/upkeep) | Updater behind the Updates widget |
 

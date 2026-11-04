@@ -63,6 +63,7 @@ PanelWindow {
         case "volume": return volumeComponent
         case "brightness": return brightnessComponent
         case "wallpaper": return wallpaperComponent
+        case "theme": return themeComponent
         case "notifications": return notificationComponent
         case "battery": return batteryComponent
         case "workspaces": return workspacesComponent
@@ -96,6 +97,7 @@ PanelWindow {
         if (module) module.toggle()
     }
     function toggleSettings() { settingsPanel.toggle() }
+    function openSettings(page) { settingsPanel.openTo(page) }
     function volumeUp() {
         const module = loadedModule("volume")
         if (module) module.adjustVolume(0.03)
@@ -312,9 +314,25 @@ PanelWindow {
                 id: wallpaperPicker
                 panelWindow: barWindow
                 popupCoordinator: barWindow
+                settings: barWindow.settings
                 accent: barWindow.settings.moduleColor("wallpaper")
             }
             BarBracket { text: "]"; color: wallpaperPicker.accent; action: () => wallpaperPicker.toggle() }
+        }
+    }
+
+    Component {
+        id: themeComponent
+        Row {
+            height: Theme.barContentHeight
+            readonly property alias module: themeToggle
+            spacing: barWindow.bracketSpacing
+            BarBracket { text: "["; color: themeToggle.accent; action: () => themeToggle.toggle() }
+            ThemeToggle {
+                id: themeToggle
+                accent: barWindow.settings.moduleColor("theme")
+            }
+            BarBracket { text: "]"; color: themeToggle.accent; action: () => themeToggle.toggle() }
         }
     }
 

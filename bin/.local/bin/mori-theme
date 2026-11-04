@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Switch the desktop between Everforest dark and light.
-# Usage: mori-theme [dark|light|toggle|get]   (no argument re-applies the saved mode)
+# Usage: mori-theme [dark|light|toggle|get|init]   (no argument re-applies the saved mode;
+# init only applies it when a state file is missing, as Niri does at login)
 #
 # Quickshell watches ~/.local/state/mori/mode. Foot, Fuzzel and Niri include
 # files written here. Zen, Equibop, libadwaita and Electron apps follow the
-# portal color-scheme, which comes from gsettings.
+# portal color-scheme, which comes from gsettings. Each mode remembers its own
+# wallpaper per output (awww).
 
 set -uo pipefail
 
@@ -14,13 +16,22 @@ current="$(cat "$state/mode" 2>/dev/null)"
 
 case "${1:-apply}" in
     get) echo "$current"; exit 0 ;;
+    init)
+        [ -e "$state/mode" ] && [ -e "$state/foot.ini" ] && [ -e "$state/fuzzel.ini" ] && exit 0
+        mode=$current ;;
     apply) mode=$current ;;
     toggle) if [ "$current" = dark ]; then mode=light; else mode=dark; fi ;;
     dark | light) mode=$1 ;;
-    *) echo "usage: mori-theme [dark|light|toggle|get]" >&2; exit 2 ;;
+    *) echo "usage: mori-theme [dark|light|toggle|get|init]" >&2; exit 2 ;;
 esac
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# With the bar running, let it crossfade the switch; it calls back with MORI_THEME_DIRECT=1.
+if [ -z "${MORI_THEME_DIRECT:-}" ] && [ "${1:-}" = toggle -o "${1:-}" = dark -o "${1:-}" = light ] \
+    && have qs && qs -c mori ipc call bar setTheme "$mode" >/dev/null 2>&1; then
+    exit 0
+fi
 
 if [ "$mode" = dark ]; then
     gtk_theme=adw-gtk3-dark prefer_dark=1 foot_signal=USR1
@@ -31,6 +42,20 @@ else
 fi
 
 mkdir -p "$state"
+
+# Wallpapers: save this mode's wallpaper per output, restore the other mode's.
+# The first switch keeps the current wallpaper; pick one and it is remembered.
+if [ "$mode" != "$current" ] && have awww; then
+    awww query 2>/dev/null \
+        | sed -n 's/^: \([^:]*\): .*currently displaying: image: \(.*\)$/\1\t\2/p' > "$state/wallpapers-$current"
+    if [ -s "$state/wallpapers-$mode" ]; then
+        while IFS=$'\t' read -r output image; do
+            [ -f "$image" ] && awww img --outputs "$output" --transition-type fade \
+                --transition-duration 0.8 "$image"
+        done < "$state/wallpapers-$mode"
+    fi
+fi
+
 printf '%s\n' "$mode" > "$state/mode"
 
 # Foot: new windows read initial-color-theme; running windows switch on signal.

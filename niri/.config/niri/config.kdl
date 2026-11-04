@@ -36,7 +36,7 @@ overview {
 
 spawn-at-startup "awww-daemon" "--quiet"
 // Re-creates the light/dark include files that Foot and Fuzzel require.
-spawn-at-startup "mori-theme"
+spawn-at-startup "mori-theme" "init"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 

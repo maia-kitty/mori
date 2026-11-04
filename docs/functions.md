@@ -46,11 +46,17 @@ Each mode remembers its own wallpaper per monitor. Choose both in the wallpaper 
 | libadwaita apps, Zen, Equibop, Obsidian, Zed | Through the `color-scheme` portal setting (gsettings) |
 | GTK3 apps such as Nemo | Next launch; the GTK file picker portal is restarted automatically |
 | Qt apps (qt5ct, qt6ct, KDE apps) | Next launch |
-| Fuzzel, Swaylock (via `mori-lock`) | Next launch |
+| Fuzzel, lock screen | Next launch (Swaylock, the fallback, too) |
 | btop | Immediately (live config is edited and btop reloads it) |
 | kew | Next launch, when the Mori theme is selected |
 
 Zen needs its theme set to **Auto**, Discord's **Appearance** to **Sync with computer**, Obsidian's base color scheme to **Adapt to system**, and Zed's theme mode to System. SDDM stays dark. Foot windows opened before `[colors-light]` was added to foot.ini switch to Foot's default colors until they're reopened.
+
+## Lock screen (mori-lock)
+
+**Mod+Alt+L** or **Lock** in the power menu (both run `mori-lock`) take a screenshot of each monitor, lock the session, and let the screenshot dissolve into fog and soft boxes in its own colors. The effect is **Kiri**, Mori's fog engine (`KiriEffect.qml`, `shaders/kiri.frag`), which the login screen uses too. The clock and password field show on the monitor you were using; click another monitor to move them. The right password plays the fog backwards and unlocks. `qs -c mori ipc call bar lockPreview` shows it without locking (Escape closes).
+
+If the bar isn't running, `mori-lock` uses Swaylock. If the session lock doesn't take within two seconds, the lock screen starts Swaylock itself; if the bar restarts while locked, it locks again at once.
 
 ## Shell settings
 
@@ -117,7 +123,7 @@ Commands are saved with the other shell settings in `~/.config/quickshell/mori-s
 }
 ```
 
-Replace those examples with your installed commands or executable wrapper paths. Omit any action to keep automatic selection for it. Each stored override is a nonempty array of nonempty strings: the executable followed by its arguments. The settings editor handles quoting and converts commands to these arrays. Arguments are passed literally; shell expressions and aliases are not evaluated. Terminal password prompts do not work in the menu, so configure wrappers with suitable authorization beforehand. Overrides are read each time the menu opens and when an action runs, and survive pulls and changes to other settings. Lock and logout continue to use Swaylock and Niri.
+Replace those examples with your installed commands or executable wrapper paths. Omit any action to keep automatic selection for it. Each stored override is a nonempty array of nonempty strings: the executable followed by its arguments. The settings editor handles quoting and converts commands to these arrays. Arguments are passed literally; shell expressions and aliases are not evaluated. Terminal password prompts do not work in the menu, so configure wrappers with suitable authorization beforehand. Overrides are read each time the menu opens and when an action runs, and survive pulls and changes to other settings. Lock uses Mori's lock screen (Swaylock when the bar isn't running) and logout uses Niri.
 
 Run `mori-power --resolve` to inspect the selected commands without executing a power action. Starting the shell directly with `qs --no-duplicate -c mori` also works without systemd; init-specific session startup is separate from the power menu.
 

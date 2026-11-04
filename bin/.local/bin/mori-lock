@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# swaylock with the config matching mori-theme's mode; falls back to the default config.
+# Lock the screen: Mori's lock screen (LockScreen.qml) while the bar runs,
+# otherwise swaylock with the config matching mori-theme's mode. If the bar's
+# session lock doesn't take, it starts swaylock itself within 2 s.
+
+if command -v qs >/dev/null 2>&1 && qs -c mori ipc call bar lock >/dev/null 2>&1; then
+    exit 0
+fi
 
 light="$HOME/.config/swaylock/config-light"
 if [ "$(cat "$HOME/.local/state/mori/mode" 2>/dev/null)" = light ] && [ -r "$light" ]; then

@@ -24,6 +24,7 @@ ShellRoot {
     Prompt { id: prompt }
     NetworkService { id: networkService; prompt: prompt }
     PowerProfileService { id: powerProfiles }
+    LockScreen { id: lockScreen; settings: settings }
     ThemeTransition { id: themeTransition }
 
     NotificationServer {
@@ -70,5 +71,8 @@ ShellRoot {
         function brightnessDown(): void { osd.showBrightness(bar.adjustBrightness(-0.05)) }
         // mori-theme hands dark/light/toggle here so the switch can crossfade.
         function setTheme(mode: string): void { themeTransition.switchTo(mode) }
+        // mori-lock calls this; lockPreview shows the lock screen without locking (Escape closes).
+        function lock(): void { lockScreen.lock() }
+        function lockPreview(): void { lockScreen.preview() }
     }
 }

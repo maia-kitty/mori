@@ -35,6 +35,8 @@ overview {
 }
 
 spawn-at-startup "awww-daemon" "--quiet"
+// Re-creates the light/dark include files that Foot and Fuzzel require.
+spawn-at-startup "mori-theme"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 
@@ -114,3 +116,6 @@ include optional=true "mori/binds.kdl"
 include optional=true "mori/outputs.kdl"
 include optional=true "mori/cursor.kdl"
 include optional=true "mori/windowrules.kdl"
+
+// Written by mori-theme: links to mori/colors-light.kdl in light mode, absent in dark mode.
+include optional=true "~/.local/state/mori/niri-colors.kdl"

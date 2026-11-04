@@ -220,7 +220,7 @@ Item {
                 Repeater {
                     id: powerActions
                     model: [
-                        { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["swaylock"] },
+                        { label: "Lock", shortcut: "L", key: Qt.Key_L, command: ["mori-lock"] },
                         { label: "Log out", shortcut: "X", key: Qt.Key_X, command: ["niri", "msg", "action", "quit", "--skip-confirmation"] },
                         { label: "Suspend", shortcut: "S", key: Qt.Key_S, action: "suspend" },
                         { label: "Restart", shortcut: "R", key: Qt.Key_R, action: "reboot" },

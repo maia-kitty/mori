@@ -1,54 +1,85 @@
 /* Mori Everforest theme for Zen Browser.
- * Ported from the DMS Matugen Zen template with fixed dark colors. */
+ * Ported from the DMS Matugen Zen template with Everforest dark and light colors. */
+
+:root {
+  --mori-bg: #2d353b;
+  --mori-bg1: #343f44;
+  --mori-fg: #d3c6aa;
+  --mori-grey2: #9da9a0;
+  --mori-green: #a7c080;
+  --mori-blue: #7fbbb3;
+  --mori-aqua: #83c092;
+  --mori-yellow: #dbbc7f;
+  --mori-orange: #e69875;
+  --mori-red: #e67e80;
+  --mori-purple: #d699b6;
+}
+
+/* Zen follows the system color-scheme (set by mori-theme) when its theme is Auto. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --mori-bg: #fdf6e3;
+    --mori-bg1: #f4f0d9;
+    --mori-fg: #5c6a72;
+    --mori-grey2: #829181;
+    --mori-green: #8da101;
+    --mori-blue: #3a94c5;
+    --mori-aqua: #35a77c;
+    --mori-yellow: #dfa000;
+    --mori-orange: #f57d26;
+    --mori-red: #f85552;
+    --mori-purple: #df69ba;
+  }
+}
 
 :root {
   font-family: "Literata", serif !important;
-  --zen-primary-color: #a7c080 !important;
-  --toolbarbutton-icon-fill: #a7c080 !important;
-  --toolbar-field-color: #d3c6aa !important;
-  --tab-selected-textcolor: #a7c080 !important;
-  --toolbar-color: #d3c6aa !important;
-  --arrowpanel-background: #343f44 !important;
-  --sidebar-text-color: #d3c6aa !important;
-  --zen-main-browser-background: #2d353b !important;
-  --zen-main-browser-background-toolbar: #2d353b !important;
+  --zen-primary-color: var(--mori-green) !important;
+  --toolbarbutton-icon-fill: var(--mori-green) !important;
+  --toolbar-field-color: var(--mori-fg) !important;
+  --tab-selected-textcolor: var(--mori-green) !important;
+  --toolbar-color: var(--mori-fg) !important;
+  --arrowpanel-background: var(--mori-bg1) !important;
+  --sidebar-text-color: var(--mori-fg) !important;
+  --zen-main-browser-background: var(--mori-bg) !important;
+  --zen-main-browser-background-toolbar: var(--mori-bg) !important;
 }
 
-/* Menus default to the GTK MenuText system color, which is dark here. */
+/* Menus default to the GTK MenuText system color, which may not match. */
 menupopup,
 panel {
-  --panel-text-color: #d3c6aa !important;
-  --panel-background-color: #343f44 !important;
+  --panel-text-color: var(--mori-fg) !important;
+  --panel-background-color: var(--mori-bg1) !important;
 }
 
 #zen-browser-background {
-  --zen-main-browser-background: #2d353b !important;
+  --zen-main-browser-background: var(--mori-bg) !important;
   --zen-background-opacity: 1 !important;
 }
 
 #zen-toolbar-background {
-  --zen-main-browser-background-toolbar: #2d353b !important;
+  --zen-main-browser-background-toolbar: var(--mori-bg) !important;
   --zen-background-opacity: 1 !important;
 }
 
 .sidebar-placesTree,
 #zen-workspaces-button,
 .urlbar-background {
-  background-color: #343f44 !important;
+  background-color: var(--mori-bg1) !important;
 }
 
 #TabsToolbar,
 #zen-appcontent-navbar-container {
-  background-color: #2d353b !important;
+  background-color: var(--mori-bg) !important;
 }
 
 .urlbar-input::selection {
-  color: #2d353b !important;
-  background-color: #a7c080 !important;
+  color: var(--mori-bg) !important;
+  background-color: var(--mori-green) !important;
 }
 
 .urlbarView-url {
-  color: #9da9a0 !important;
+  color: var(--mori-grey2) !important;
 }
 
 toolbar .toolbarbutton-1 {
@@ -59,45 +90,45 @@ toolbar .toolbarbutton-1 {
         .toolbarbutton-text,
         .toolbarbutton-badge-stack
       ) {
-      fill: #a7c080 !important;
+      fill: var(--mori-green) !important;
     }
   }
 }
 
 .identity-color-blue {
-  --identity-tab-color: #7fbbb3 !important;
-  --identity-icon-color: #7fbbb3 !important;
+  --identity-tab-color: var(--mori-blue) !important;
+  --identity-icon-color: var(--mori-blue) !important;
 }
 
 .identity-color-turquoise {
-  --identity-tab-color: #83c092 !important;
-  --identity-icon-color: #83c092 !important;
+  --identity-tab-color: var(--mori-aqua) !important;
+  --identity-icon-color: var(--mori-aqua) !important;
 }
 
 .identity-color-green {
-  --identity-tab-color: #a7c080 !important;
-  --identity-icon-color: #a7c080 !important;
+  --identity-tab-color: var(--mori-green) !important;
+  --identity-icon-color: var(--mori-green) !important;
 }
 
 .identity-color-yellow {
-  --identity-tab-color: #dbbc7f !important;
-  --identity-icon-color: #dbbc7f !important;
+  --identity-tab-color: var(--mori-yellow) !important;
+  --identity-icon-color: var(--mori-yellow) !important;
 }
 
 .identity-color-orange {
-  --identity-tab-color: #e69875 !important;
-  --identity-icon-color: #e69875 !important;
+  --identity-tab-color: var(--mori-orange) !important;
+  --identity-icon-color: var(--mori-orange) !important;
 }
 
 .identity-color-red {
-  --identity-tab-color: #e67e80 !important;
-  --identity-icon-color: #e67e80 !important;
+  --identity-tab-color: var(--mori-red) !important;
+  --identity-icon-color: var(--mori-red) !important;
 }
 
 .identity-color-pink,
 .identity-color-purple {
-  --identity-tab-color: #d699b6 !important;
-  --identity-icon-color: #d699b6 !important;
+  --identity-tab-color: var(--mori-purple) !important;
+  --identity-icon-color: var(--mori-purple) !important;
 }
 
 #PanelUI-menu-button .toolbarbutton-icon,
@@ -107,7 +138,7 @@ toolbar .toolbarbutton-1 {
 #downloads-button .toolbarbutton-badge-stack,
 #unified-extensions-button .toolbarbutton-badge-stack,
 toolbar .toolbarbutton-1 > .toolbarbutton-icon {
-  fill: #a7c080 !important;
-  color: #a7c080 !important;
+  fill: var(--mori-green) !important;
+  color: var(--mori-green) !important;
 }
 

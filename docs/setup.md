@@ -46,6 +46,8 @@ stow -t ~ gtk qt fish nvim yazi btop
 
 Ensure `~/.local/bin` is on your graphical session’s PATH. The bar and Niri shortcuts use the bundled helpers there.
 
+Foot and Fuzzel include files that `mori-theme` writes to `~/.local/state/mori/`. Niri creates them at startup; outside Niri, run `mori-theme` once. See [light and dark mode](functions.md#light-and-dark-mode).
+
 ## 4. Start the desktop
 
 Start a Niri session through your login manager or your usual session launcher. Its config starts `awww-daemon` and clipboard history automatically.

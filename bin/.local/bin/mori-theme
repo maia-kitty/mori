@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Switch the desktop between Everforest dark and light.
+# Usage: mori-theme [dark|light|toggle|get]   (no argument re-applies the saved mode)
+#
+# Quickshell watches ~/.local/state/mori/mode. Foot, Fuzzel and Niri include
+# files written here. Zen, Equibop, libadwaita and Electron apps follow the
+# portal color-scheme, which comes from gsettings.
+
+set -uo pipefail
+
+state="$HOME/.local/state/mori"
+current="$(cat "$state/mode" 2>/dev/null)"
+[ "$current" = light ] || current=dark
+
+case "${1:-apply}" in
+    get) echo "$current"; exit 0 ;;
+    apply) mode=$current ;;
+    toggle) if [ "$current" = dark ]; then mode=light; else mode=dark; fi ;;
+    dark | light) mode=$1 ;;
+    *) echo "usage: mori-theme [dark|light|toggle|get]" >&2; exit 2 ;;
+esac
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+if [ "$mode" = dark ]; then
+    gtk_theme=adw-gtk3-dark prefer_dark=1 foot_signal=USR1
+    qt5_scheme=mori.conf qt6_scheme=Mori btop_theme=everforest-dark-medium kew_theme=mori
+else
+    gtk_theme=adw-gtk3 prefer_dark=0 foot_signal=USR2
+    qt5_scheme=mori-light.conf qt6_scheme=MoriLight btop_theme=everforest-light-medium kew_theme=mori-light
+fi
+
+mkdir -p "$state"
+printf '%s\n' "$mode" > "$state/mode"
+
+# Foot: new windows read initial-color-theme; running windows switch on signal.
+printf 'initial-color-theme=%s\n' "$mode" > "$state/foot.ini"
+pkill "-$foot_signal" -x foot
+
+# Fuzzel: the light file overrides the dark [colors] in fuzzel.ini.
+if [ "$mode" = light ]; then
+    printf 'include=~/.config/fuzzel/colors-light.ini\n' > "$state/fuzzel.ini"
+else
+    : > "$state/fuzzel.ini"
+fi
+
+# Niri: optional include of the light colors, after mori/colors.kdl.
+if [ "$mode" = light ]; then
+    ln -sfn "$HOME/.config/niri/mori/colors-light.kdl" "$state/niri-colors.kdl"
+else
+    rm -f "$state/niri-colors.kdl"
+fi
+[ -n "${NIRI_SOCKET:-}" ] && have niri && niri msg action load-config-file >/dev/null
+
+# GTK: gtk.css imports mori-colors.css; gsettings drives the portal color-scheme.
+[ -d "$HOME/.config/gtk-3.0" ] && ln -sfn "mori-$mode.css" "$HOME/.config/gtk-3.0/mori-colors.css"
+for ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+    [ -f "$ini" ] && sed -i --follow-symlinks \
+        -e "s/^gtk-theme-name=.*/gtk-theme-name=$gtk_theme/" \
+        -e "s/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=$prefer_dark/" "$ini"
+done
+if have gsettings; then
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
+    gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+fi
+
+# Qt: qt5ct/qt6ct palettes, plus kdeglobals for KDE apps' KColorScheme.
+qt5="$HOME/.config/qt5ct/qt5ct.conf" qt6="$HOME/.config/qt6ct/qt6ct.conf"
+scheme="$HOME/.local/share/color-schemes/$qt6_scheme.colors"
+[ -f "$qt5" ] && sed -i --follow-symlinks "s|^color_scheme_path=.*|color_scheme_path=$HOME/.config/qt5ct/colors/$qt5_scheme|" "$qt5"
+[ -f "$qt6" ] && sed -i --follow-symlinks "s|^color_scheme_path=.*|color_scheme_path=$scheme|" "$qt6"
+if [ -f "$scheme" ] && have python3; then
+    python3 - "$scheme" "$HOME/.config/kdeglobals" "$qt6_scheme" <<'EOF'
+import configparser, sys
+
+def load(path):
+    config = configparser.ConfigParser(interpolation=None, strict=False)
+    config.optionxform = str
+    config.read(path)
+    return config
+
+scheme, kdeglobals = load(sys.argv[1]), load(sys.argv[2])
+for section in scheme.sections():
+    if section != "General":
+        kdeglobals[section] = dict(scheme[section])
+if not kdeglobals.has_section("General"):
+    kdeglobals.add_section("General")
+kdeglobals["General"]["ColorScheme"] = sys.argv[3]
+with open(sys.argv[2], "w") as out:
+    kdeglobals.write(out, space_around_delimiters=False)
+EOF
+fi
+
+# btop rewrites its config on exit, so edit the live file and ask it to reload.
+btop_conf="$HOME/.config/btop/btop.conf"
+if [ -f "$btop_conf" ]; then
+    sed -i --follow-symlinks "s/^color_theme = .*/color_theme = \"$btop_theme\"/" "$btop_conf"
+    pkill -USR2 -x btop
+fi
+
+# kew: only swap when a Mori theme is already selected; it applies on next start.
+kew_state="$HOME/.local/state/kew/kewstaterc"
+[ -f "$kew_state" ] && sed -i -E "s/^theme=mori(-light)?$/theme=$kew_theme/" "$kew_state"
+
+exit 0

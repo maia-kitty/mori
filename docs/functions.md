@@ -14,6 +14,7 @@
 | Mod+X / Mod+Y / Mod+N | Power menu / wallpapers / notifications |
 | Mod+Z / Mod+Shift+N | Zen Browser / Obsidian |
 | Mod+Alt+L / Mod+Shift+E | Lock / quit Niri |
+| Mod+Shift+D | Toggle light/dark mode |
 | Mod+Tab / Alt+Tab | Overview / recent windows |
 | Mod+Q / Mod+F / Mod+Shift+F | Close / maximize column / fullscreen |
 | Mod+Left/Right / Mod+Up/Down | Focus column / workspace |
@@ -26,6 +27,25 @@
 | Volume and brightness keys | Volume down / mute / up, brightness down / up |
 
 Volume and brightness shortcuts show a short level indicator at the bottom of the main monitor.
+
+## Light and dark mode
+
+`mori-theme toggle` (or **Mod+Shift+D**) switches the whole desktop between Everforest dark and light; `mori-theme dark`, `mori-theme light` and `mori-theme get` also work. Running `mori-theme` with no argument re-applies the saved mode, which Niri does at startup. The mode is stored in `~/.local/state/mori/mode`.
+
+| App | How it follows |
+| --- | --- |
+| Bar, popups, settings | Immediately (Quickshell watches the mode file) |
+| Niri borders, focus ring, recent windows | Immediately (optional include of `mori/colors-light.kdl`) |
+| Foot | Open windows switch by signal; new windows start in the current mode |
+| Neovim | Follows Foot's background, live where the terminal reports changes |
+| Fish, Yazi, Fastfetch, Cava | Use terminal colors, so they follow Foot |
+| GTK and libadwaita apps, Zen, Equibop, Obsidian, Zed | Through the `color-scheme` portal setting (gsettings) |
+| Qt apps (qt5ct, qt6ct, KDE apps) | Next launch |
+| Fuzzel, Swaylock (via `mori-lock`) | Next launch |
+| btop | Immediately (live config is edited and btop reloads it) |
+| kew | Next launch, when the Mori theme is selected |
+
+Zen needs its theme set to **Auto**, Discord's **Appearance** to **Sync with computer**, Obsidian's base color scheme to **Adapt to system**, and Zed's theme mode to System. SDDM stays dark. Foot windows opened before `[colors-light]` was added to foot.ini switch to Foot's default colors until they're reopened.
 
 ## Shell settings
 

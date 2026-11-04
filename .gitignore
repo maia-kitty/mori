@@ -16,6 +16,7 @@
 /kew/.config/kew/layouts/
 /kew/.config/kew/themes/*.theme
 !/kew/.config/kew/themes/mori.theme
+!/kew/.config/kew/themes/mori-light.theme
 /kew/.config/kew/themes/*.theme.bak
 /kew/.config/kew/themes/*.txt
 /kew/.config/kew/themes/*.txt.bak
@@ -32,6 +33,9 @@ secrets*
 # Editor and OS files
 .DS_Store
 *~
+
+# mori-theme's light/dark symlink (lands here when Stow folds gtk-3.0)
+/gtk/.config/gtk-3.0/mori-colors.css
 
 # Local legacy terminal configuration
 /kitty/

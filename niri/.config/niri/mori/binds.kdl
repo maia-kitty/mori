@@ -23,9 +23,10 @@ binds {
     Mod+O hotkey-overlay-title="Notepad" { spawn "obsidian"; }
 
     Mod+Alt+L hotkey-overlay-title="Lock Screen" {
-        spawn "swaylock";
+        spawn "mori-lock";
     }
     Mod+Shift+E { quit; }
+    Mod+Shift+D hotkey-overlay-title="Toggle Light/Dark Mode" { spawn "mori-theme" "toggle"; }
 
     Mod+F2 allow-when-locked=true {
         spawn "qs" "-c" "mori" "ipc" "call" "bar" "volumeUp";

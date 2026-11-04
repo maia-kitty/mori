@@ -1,6 +1,7 @@
 return {
   "AvengeMedia/base46",
   lazy = true,
-  opts = {},
-  colorscheme = { "base46-everforest" },
+  -- Leave 'background' to terminal detection, which colorscheme.lua follows.
+  opts = { set_background = false },
+  colorscheme = { "base46-everforest", "base46-everforest_light" },
 }

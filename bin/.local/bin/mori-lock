@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# swaylock with the config matching mori-theme's mode; falls back to the default config.
+
+light="$HOME/.config/swaylock/config-light"
+if [ "$(cat "$HOME/.local/state/mori/mode" 2>/dev/null)" = light ] && [ -r "$light" ]; then
+    exec swaylock -C "$light" "$@"
+fi
+exec swaylock "$@"

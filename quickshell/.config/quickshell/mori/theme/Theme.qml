@@ -5,11 +5,12 @@ import QtQuick
 
 Singleton {
     // ~/.local/state/mori/mode is written by mori-theme; a missing file means dark.
+    // The login screen points MORI_MODE_FILE at its copy in /var/lib/mori-greeter.
     readonly property bool dark: modeFile.text().trim() !== "light"
 
     FileView {
         id: modeFile
-        path: Quickshell.env("HOME") + "/.local/state/mori/mode"
+        path: Quickshell.env("MORI_MODE_FILE") || Quickshell.env("HOME") + "/.local/state/mori/mode"
         watchChanges: true
         printErrors: false
         onFileChanged: reload()

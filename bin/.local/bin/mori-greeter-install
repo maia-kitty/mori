@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Install Mori's login screen (greetd + Quickshell). The greeter user can't read
+# ~/, so files are copied rather than stowed; run this again after changing the
+# login screen or the files it shares with the shell.
+#
+#   mori-greeter-install            copy files, prepare /var/lib/mori-greeter (sudo)
+#   mori-greeter-install --preview  show the login screen in this session; any
+#                                   password works except "wrong", Escape quits
+#
+# Switching from SDDM is left to you (and back the same way):
+#   sudo systemctl disable sddm && sudo systemctl enable greetd
+
+set -euo pipefail
+
+repo="$(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)"
+shell="$repo/quickshell/.config/quickshell/mori"
+niri="$repo/niri/.config/niri/mori"
+
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage" "${state:-}"' EXIT
+cp -r "$repo/greeter/usr/share/mori-greeter/." "$stage/"
+cp "$shell/KiriEffect.qml" "$stage/"
+mkdir -p "$stage/shaders"
+cp "$shell/shaders/kiri.frag.qsb" "$stage/shaders/"
+cp -r "$shell/theme" "$stage/"
+cp "$niri/outputs.kdl" "$niri/input.kdl" "$niri/cursor.kdl" "$stage/"
+
+if [ "${1:-}" = --preview ]; then
+    state="$(mktemp -d)"
+    MORI_GREETER_STATE="$state" mori-greeter-sync
+    printf '%s\n' "$USER" > "$state/last-user"
+    MORI_GREETER_STATE="$state" MORI_MODE_FILE="$state/mode" qs -p "$stage/shell.qml"
+    exit 0
+fi
+
+command -v greetd >/dev/null || { echo "greetd is not installed" >&2; exit 1; }
+id greeter >/dev/null 2>&1 || { echo "the greeter user does not exist (install greetd)" >&2; exit 1; }
+
+sudo rm -rf /usr/share/mori-greeter
+sudo install -d -m 755 /usr/share/mori-greeter
+sudo cp -r "$stage/." /usr/share/mori-greeter/
+sudo chmod -R a+rX,go-w /usr/share/mori-greeter
+
+# Owned by you (mori-greeter-sync writes here), group greeter so the login
+# screen can remember the last user.
+sudo install -d -o "$USER" -g greeter -m 2775 /var/lib/mori-greeter
+[ -e /var/lib/mori-greeter/last-user ] || install -m 664 /dev/null /var/lib/mori-greeter/last-user
+[ -s /var/lib/mori-greeter/last-user ] || printf '%s\n' "$USER" > /var/lib/mori-greeter/last-user
+
+if [ -e /etc/greetd/config.toml ] || [ -L /etc/greetd/config.toml ]; then
+    sudo mv /etc/greetd/config.toml "/etc/greetd/config.toml.before-mori-$(date +%Y%m%d-%H%M%S)"
+fi
+sudo install -m 644 "$repo/greeter/etc/greetd/config.toml" /etc/greetd/config.toml
+
+mori-greeter-sync
+echo "Installed. To switch from SDDM: sudo systemctl disable sddm && sudo systemctl enable greetd"

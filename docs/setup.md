@@ -95,6 +95,20 @@ ln -s "$PWD/zen/userChrome.css" /path/to/zen/profile/chrome/userChrome.css
 
 Replace the example profile path with yours and back up any existing `userChrome.css` first. Copying the CSS instead is also an option. Enable `toolkit.legacyUserProfileCustomizations.stylesheets` in `about:config` and restart Zen.
 
+## Login screen (mori-greeter)
+
+Mori's own login screen, mori-greeter, runs on greetd and uses Kiri, the same fog engine as mori-lock: your last wallpaper under settled fog, the last user filled in (Tab to type another), and logging in clears the fog before Niri starts. It needs greetd, `jq`, and Literata in the system fonts (see SDDM below).
+
+The login screen runs as the `greeter` user, which cannot read your home directory, so `mori-greeter-install` copies its files instead of using Stow:
+
+```bash
+mori-greeter-install --preview   # try it in your session: any password but "wrong" works, Escape quits
+mori-greeter-install             # copy to /usr/share/mori-greeter and /etc/greetd (asks for sudo)
+sudo systemctl disable sddm && sudo systemctl enable greetd
+```
+
+Run `mori-greeter-install` again after pulling changes to the login screen. Mori keeps `/var/lib/mori-greeter` up to date with your light/dark mode, clock format, and wallpapers. To go back, swap the two services: `sudo systemctl disable greetd && sudo systemctl enable sddm`.
+
 ## SDDM
 
 With SDDM installed, deploy its theme to the system root rather than your home directory:

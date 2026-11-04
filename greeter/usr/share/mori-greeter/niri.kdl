@@ -1,0 +1,23 @@
+// Niri for the Mori login screen. outputs.kdl, input.kdl and cursor.kdl are
+// copies of the session's (mori-greeter-install), so monitors and the
+// keyboard layout match.
+include "outputs.kdl"
+include "input.kdl"
+include optional=true "cursor.kdl"
+
+environment {
+    MORI_MODE_FILE "/var/lib/mori-greeter/mode"
+    QT_QPA_PLATFORM "wayland"
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+layout {
+    background-color "#000000"
+}
+
+// Once the user logs in, the greeter quits and so does this Niri; greetd then
+// starts the session.
+spawn-at-startup "sh" "-c" "qs -p /usr/share/mori-greeter/shell.qml; niri msg action quit --skip-confirmation"

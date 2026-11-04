@@ -1,0 +1,8 @@
+# Mori's login screen: greetd runs a small Niri (as the greeter user) that
+# shows /usr/share/mori-greeter/shell.qml. Installed by mori-greeter-install.
+[terminal]
+vt = 1
+
+[default_session]
+command = "niri -c /usr/share/mori-greeter/niri.kdl"
+user = "greeter"

@@ -179,6 +179,8 @@ Item {
                 "--transition-duration", "0.8",
                 path
             ])
+            // The login screen shows the same wallpaper.
+            Quickshell.execDetached(["sh", "-c", "sleep 1; exec mori-greeter-sync"])
         }
     }
     function parseSaved(forMode, text) {

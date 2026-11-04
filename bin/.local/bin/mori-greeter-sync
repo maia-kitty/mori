@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Copy what the login screen shows into /var/lib/mori-greeter: light/dark mode,
+# clock format and each monitor's current wallpaper. The login screen runs as
+# the greeter user, which can't read ~/. Does nothing until mori-greeter-install
+# has created the folder. MORI_GREETER_STATE overrides the folder (preview).
+
+set -uo pipefail
+
+dir="${MORI_GREETER_STATE:-/var/lib/mori-greeter}"
+[ -d "$dir" ] && [ -w "$dir" ] || exit 0
+umask 022
+
+write() { printf '%s\n' "$2" > "$dir/$1.tmp" && mv -f "$dir/$1.tmp" "$dir/$1"; }
+
+write mode "$(mori-theme get 2>/dev/null || echo dark)"
+settings="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/mori-settings.json"
+write clock "$(jq -r '.clock.timeFormat // "24h"' "$settings" 2>/dev/null || echo 24h)"
+
+command -v awww >/dev/null 2>&1 || exit 0
+index=""
+while IFS=$'\t' read -r output image; do
+    [ -f "$image" ] || continue
+    ext="${image##*.}"
+    name="wallpaper-$output.${ext,,}"
+    cp -f -- "$image" "$dir/$name.tmp" && mv -f "$dir/$name.tmp" "$dir/$name" || continue
+    index+="$output"$'\t'"$name"$'\n'
+done < <(awww query 2>/dev/null | sed -n 's/^: \([^:]*\): .*currently displaying: image: \(.*\)$/\1\t\2/p')
+[ -n "$index" ] && printf '%s' "$index" > "$dir/wallpapers"
+exit 0

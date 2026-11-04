@@ -174,6 +174,8 @@ Item {
             clockShowSeconds = value
         } else return
         noteChange()
+        // The login screen copies the clock format.
+        if (name === "timeFormat") Quickshell.execDetached(["mori-greeter-sync"])
     }
 
     function setThemeOption(name, value) {

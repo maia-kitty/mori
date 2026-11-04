@@ -130,4 +130,7 @@ fi
 kew_state="$HOME/.local/state/kew/kewstaterc"
 [ -f "$kew_state" ] && sed -i -E "s/^theme=mori(-light)?$/theme=$kew_theme/" "$kew_state"
 
+# The login screen shows the last mode and wallpapers (after awww settles).
+have mori-greeter-sync && setsid -f sh -c 'sleep 1; exec mori-greeter-sync' >/dev/null 2>&1
+
 exit 0

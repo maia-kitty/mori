@@ -37,7 +37,7 @@ These are optional. Apps without bundled configs use external themes or setup; Z
 | Cava / Kew | Visualizer / music player |
 | Equibop | Discord client |
 | Zen Browser / Obsidian | Browser / notes |
-| SDDM | Login manager |
+| greetd or SDDM | Login manager (Mori's login screen, or the SDDM theme) |
 | KDE Connect | Phone integration |
 | khal + vdirsyncer | Calendar integration |
 | lavat / tty-clock | Terminal visuals |

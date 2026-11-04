@@ -39,7 +39,8 @@ Volume and brightness shortcuts show a short level indicator at the bottom of th
 | Foot | Open windows switch by signal; new windows start in the current mode |
 | Neovim | Follows Foot's background, live where the terminal reports changes |
 | Fish, Yazi, Fastfetch, Cava | Use terminal colors, so they follow Foot |
-| GTK and libadwaita apps, Zen, Equibop, Obsidian, Zed | Through the `color-scheme` portal setting (gsettings) |
+| libadwaita apps, Zen, Equibop, Obsidian, Zed | Through the `color-scheme` portal setting (gsettings) |
+| GTK3 apps such as Nemo | Next launch; the GTK file picker portal is restarted automatically |
 | Qt apps (qt5ct, qt6ct, KDE apps) | Next launch |
 | Fuzzel, Swaylock (via `mori-lock`) | Next launch |
 | btop | Immediately (live config is edited and btop reloads it) |

@@ -5,6 +5,8 @@
 !/fonts/.local/
 !/qt/.local/
 !/kew/.local/
+# fontconfig writes a .uuid into every font directory
+.uuid
 *.log
 *.lock
 

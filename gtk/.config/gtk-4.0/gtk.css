@@ -1,4 +1,7 @@
 @import url("../gtk-3.0/gtk.css");
+/* libadwaita ignores themes; mori-colors.css is a symlink to mori-dark.css or mori-light.css,
+   set by mori-theme, and apps read it at startup. */
+@import url("../gtk-3.0/mori-colors.css");
 
 :root {
     --window-radius: 0px;

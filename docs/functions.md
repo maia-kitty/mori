@@ -44,8 +44,9 @@ Each mode remembers its own wallpaper per monitor. Choose both in the wallpaper 
 | Neovim | Follows Foot's background, live where the terminal reports changes |
 | Fish, Yazi, Fastfetch, Cava | Use terminal colors, so they follow Foot |
 | libadwaita apps, Zen, Equibop, Obsidian, Zed | Through the `color-scheme` portal setting (gsettings) |
-| GTK3 apps such as Nemo | Next launch; the GTK file picker portal is restarted automatically |
-| Qt apps (qt5ct, qt6ct, KDE apps) | Next launch |
+| GTK3 apps such as Nemo, GTK file pickers | Immediately (the `Mori-dark` / `Mori-light` themes in `gtk/.local/share/themes` carry the colors) |
+| Qt apps (qt5ct, qt6ct) | About 3 s later (qt6ct rereads its config folder when it changes) |
+| KDE apps such as Gwenview | Next launch (they set their own palette from `kdeglobals` at startup) |
 | Fuzzel, lock screen | Next launch (Swaylock, the fallback, too) |
 | btop | Immediately (live config is edited and btop reloads it) |
 | kew | Next launch, when the Mori theme is selected |

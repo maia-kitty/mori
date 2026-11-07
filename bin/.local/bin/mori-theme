@@ -34,10 +34,10 @@ if [ -z "${MORI_THEME_DIRECT:-}" ] && [ "${1:-}" = toggle -o "${1:-}" = dark -o 
 fi
 
 if [ "$mode" = dark ]; then
-    gtk_theme=adw-gtk3-dark prefer_dark=1 foot_signal=USR1
+    gtk_theme=Mori-dark prefer_dark=1 foot_signal=USR1
     qt5_scheme=mori.conf qt6_scheme=Mori btop_theme=everforest-dark-medium kew_theme=mori
 else
-    gtk_theme=adw-gtk3 prefer_dark=0 foot_signal=USR2
+    gtk_theme=Mori-light prefer_dark=0 foot_signal=USR2
     qt5_scheme=mori-light.conf qt6_scheme=MoriLight btop_theme=everforest-light-medium kew_theme=mori-light
 fi
 
@@ -77,16 +77,14 @@ else
 fi
 [ -n "${NIRI_SOCKET:-}" ] && have niri && niri msg action load-config-file >/dev/null
 
-# GTK: gtk.css imports mori-colors.css; gsettings drives the portal color-scheme.
+# GTK: the Mori-dark/Mori-light themes carry the GTK 3 colors and restyle running apps
+# when gsettings changes the theme name. libadwaita reads mori-colors.css at startup.
 [ -d "$HOME/.config/gtk-3.0" ] && ln -sfn "mori-$mode.css" "$HOME/.config/gtk-3.0/mori-colors.css"
 for ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
     [ -f "$ini" ] && sed -i --follow-symlinks \
         -e "s/^gtk-theme-name=.*/gtk-theme-name=$gtk_theme/" \
         -e "s/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=$prefer_dark/" "$ini"
 done
-# GTK3 reads gtk.css and settings.ini only at startup, so restart the portal that
-# draws file pickers. try-restart leaves it alone if it isn't running.
-have systemctl && systemctl --user try-restart xdg-desktop-portal-gtk.service
 if have gsettings; then
     gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
     gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"

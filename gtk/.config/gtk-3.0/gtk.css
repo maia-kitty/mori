@@ -1,5 +1,5 @@
-/* mori-colors.css is a symlink to mori-dark.css or mori-light.css, set by mori-theme. */
-@import url("mori-colors.css");
+/* Colors come from the Mori-dark / Mori-light themes (~/.local/share/themes), so running
+   apps restyle on a switch. User CSS would override them and is only read at startup. */
 
 window.background,
 window.csd,

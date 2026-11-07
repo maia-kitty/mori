@@ -1,0 +1,4 @@
+/* adw-gtk3 with the Mori palette. mori-theme switches the gtk-theme setting between
+   Mori-dark and Mori-light; running GTK 3 apps restyle when the theme name changes. */
+@import url("file:///usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");
+@import url("mori.css");

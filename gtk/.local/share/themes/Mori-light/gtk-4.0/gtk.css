@@ -1,0 +1,2 @@
+/* Plain GTK 4 apps follow the theme name too; libadwaita apps ignore themes. */
+@import url("file:///usr/share/themes/adw-gtk3/gtk-4.0/gtk.css");

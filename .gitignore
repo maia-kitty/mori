@@ -5,6 +5,7 @@
 !/fonts/.local/
 !/qt/.local/
 !/kew/.local/
+!/gtk/.local/
 # fontconfig writes a .uuid into every font directory
 .uuid
 *.log

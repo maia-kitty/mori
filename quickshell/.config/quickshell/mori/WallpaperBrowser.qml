@@ -44,6 +44,12 @@ Item {
     // Settings shows an editable wallpaper folder path; the bar popup doesn't.
     property bool folderEditable: false
     readonly property bool editingFolder: folderField.activeFocus
+    // Settings shows the keys above the page instead of the hint at the bottom.
+    property bool showHint: true
+    readonly property string keyHint: keyboardMode === "screens"
+        ? "←/→: monitor · M: dark/light · ↑: parent · ↓: folder · Tab: wallpapers"
+            + (folderEditable ? " · F: folder path" : "")
+        : "Arrows: navigate · Enter: select · M: dark/light · Tab: monitors"
     // Emitted when the path field gives the keyboard back to the host.
     signal keyboardReleased()
     readonly property bool inRootFolder: files.folder.toString() === rootFolder.toString()
@@ -424,7 +430,8 @@ Item {
         GridView {
             id: grid
             width: parent.width
-            height: Math.max(0, parent.height - y - wallpaperHint.implicitHeight - parent.spacing)
+            height: Math.max(0, parent.height - y
+                - (wallpaperHint.visible ? wallpaperHint.implicitHeight + parent.spacing : 0))
             clip: true
             cellWidth: width / 3
             cellHeight: 100
@@ -498,11 +505,8 @@ Item {
 
         KeyboardHint {
             id: wallpaperHint
-            visible: root.keyboardActive
-            text: root.keyboardMode === "screens"
-                ? "←/→: monitor · M: dark/light · ↑: parent · ↓: folder · Tab: wallpapers"
-                    + (root.folderEditable ? " · F: folder path" : "")
-                : "Arrows: navigate · Enter: select · M: dark/light · Tab: monitors"
+            visible: root.keyboardActive && root.showHint
+            text: root.keyHint
         }
     }
 }

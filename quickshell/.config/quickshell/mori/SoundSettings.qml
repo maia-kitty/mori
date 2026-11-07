@@ -73,7 +73,7 @@ Item {
 
     ScrollableColumn {
         id: content
-        anchors { top: parent.top; left: parent.left; right: parent.right; bottom: hint.top; bottomMargin: 10 }
+        anchors { top: hint.bottom; topMargin: 8; left: parent.left; right: parent.right; bottom: parent.bottom }
         spacing: 8
 
         Repeater {
@@ -118,9 +118,12 @@ Item {
         }
     }
 
-    KeyboardHint {
+    SettingsLabel {
         id: hint
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-        text: "↑↓: device or volume · Enter: use device · ←→: volume · M: mute"
+        anchors { top: parent.top; left: parent.left; right: parent.right }
+        text: "↑↓ device or volume · ←→ volume · Enter use device · M mute"
+        color: Theme.grey1
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSize
     }
 }

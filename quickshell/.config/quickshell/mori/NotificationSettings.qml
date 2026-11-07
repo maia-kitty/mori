@@ -7,16 +7,23 @@ Column {
 
     required property var settings
     spacing: 8
+    // False while Settings keyboard focus is on the sidebar or tabs.
+    property bool active: true
 
     function handleKey(event) {
-        if ([Qt.Key_Left, Qt.Key_Right, Qt.Key_Return, Qt.Key_Enter, Qt.Key_D].indexOf(event.key) < 0)
+        if (event.key === Qt.Key_Left || event.key === Qt.Key_Right)
+            dnd.pick(event.key === Qt.Key_Left ? -1 : 1)
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+            dnd.apply()
+        else if (event.key === Qt.Key_D)
+            dnd.step(1)
+        else
             return false
-        dnd.step(event.key === Qt.Key_Left ? -1 : 1)
         return true
     }
 
     SettingsLabel {
-        text: "←→ / Enter / D change"
+        text: "←→ pick · Enter apply · D toggle"
         color: Theme.grey1
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
@@ -28,7 +35,7 @@ Column {
         values: [false, true]
         labels: ["Off", "On"]
         value: root.settings.doNotDisturb
-        focused: true
+        focused: root.active
         onChosen: value => root.settings.setDoNotDisturb(value)
     }
 

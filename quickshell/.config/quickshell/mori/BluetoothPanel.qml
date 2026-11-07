@@ -7,6 +7,8 @@ Column {
     id: root
     property color accent: Theme.blue
     property bool active: false
+    // False while the host's tab row has the keyboard; hides the row cursor.
+    property bool keyboardActive: true
     property int selectedIndex: 0
     readonly property var adapter: Bluetooth.defaultAdapter
     readonly property var devices: adapter ? adapter.devices.values : []
@@ -29,6 +31,24 @@ Column {
         else if (device.paired) device.connect()
         else device.pair()
     }
+    function togglePower() {
+        if (!adapter || [BluetoothAdapterState.Blocked, BluetoothAdapterState.Enabling,
+                BluetoothAdapterState.Disabling].indexOf(adapter.state) >= 0) return
+        stopScan()
+        adapter.enabled = !adapter.enabled
+    }
+
+    function toggleScan() {
+        if (!adapter || !adapter.enabled) return
+        if (adapter.discovering) {
+            adapter.discovering = false
+            scanningAdapter = null
+        } else {
+            scanningAdapter = adapter
+            adapter.discovering = true
+        }
+    }
+
     function handleKeyPressed(event) {
         if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             selectedIndex = Math.max(0, Math.min(devices.length - 1,
@@ -40,6 +60,10 @@ Column {
         } else if (event.key === Qt.Key_D) {
             const device = devices[selectedIndex]
             if (!event.isAutoRepeat && device && device.connected) device.disconnect()
+        } else if (event.key === Qt.Key_P) {
+            if (!event.isAutoRepeat) togglePower()
+        } else if (event.key === Qt.Key_S) {
+            if (!event.isAutoRepeat) toggleScan()
         } else return
         event.accepted = true
     }
@@ -75,19 +99,7 @@ Column {
                 HoverHandler { id: controlHover }
                 TapHandler {
                     enabled: parent.available
-                    onTapped: {
-                        if (parent.power) {
-                            root.stopScan()
-                            root.adapter.enabled = !root.adapter.enabled
-                        } else if (root.adapter.discovering) {
-                            root.adapter.discovering = false
-                            root.scanningAdapter = null
-                        }
-                        else {
-                            root.scanningAdapter = root.adapter
-                            root.adapter.discovering = true
-                        }
-                    }
+                    onTapped: parent.power ? root.togglePower() : root.toggleScan()
                 }
             }
         }
@@ -113,7 +125,7 @@ Column {
             id: deviceRow
             required property var modelData
             required property int index
-            readonly property bool selected: root.selectedIndex === index
+            readonly property bool selected: root.keyboardActive && root.selectedIndex === index
             readonly property bool busy: modelData.pairing
                 || modelData.state === BluetoothDeviceState.Connecting
                 || modelData.state === BluetoothDeviceState.Disconnecting

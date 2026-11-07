@@ -31,8 +31,11 @@ RowLayout {
     function close() { popup.visible = false }
 
     function handleKeyPressed(event) {
-        if (event.key === Qt.Key_Escape) close()
-        else if (!popupContent.item || !popupContent.item.handleKey(event)) return
+        // The panel uses Escape to leave its list; on its tabs Escape closes.
+        if (!popupContent.item || !popupContent.item.handleKey(event)) {
+            if (event.key === Qt.Key_Escape) close()
+            else return
+        }
         event.accepted = true
     }
 

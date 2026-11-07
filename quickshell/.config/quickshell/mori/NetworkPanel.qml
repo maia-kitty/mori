@@ -12,11 +12,15 @@ PopupSurface {
     // Inside Settings: no card, no duplicate header, Escape goes back.
     property bool embedded: false
     property bool bluetoothView: false
+    // Keyboard starts on the Network / Bluetooth tabs: ←→ picks, Enter shows, ↓ goes into the list.
+    property bool tabFocused: true
+    property int keyboardTabIndex: 0
     property int keyboardNetworkIndex: 0
     readonly property alias bluetoothPanel: bluetoothControls
 
     function setView(bluetooth) {
         bluetoothView = bluetooth
+        keyboardTabIndex = bluetooth ? 1 : 0
         keyboardNetworkIndex = 0
         listCol.contentY = 0
     }
@@ -69,11 +73,28 @@ PopupSurface {
                 entry.isConnected, entry.networkId)
         }
     }
-    // Returns true when the key was used; hosts handle Escape.
+    function atTopOfList() {
+        return bluetoothView ? bluetoothControls.selectedIndex <= 0 : keyboardNetworkIndex <= 0
+    }
+    // Returns true when the key was used. Escape from the list goes back to the tabs;
+    // on the tabs it's left to the host (close the popup, or back in Settings).
     function handleKey(event) {
         if (event.modifiers !== Qt.NoModifier) return false
-        if (event.key === Qt.Key_Tab) {
+        const key = event.key
+        if (key === Qt.Key_Tab) {
             if (!event.isAutoRepeat) setView(!bluetoothView)
+        } else if (tabFocused) {
+            if (key === Qt.Key_Left || key === Qt.Key_Right)
+                keyboardTabIndex = key === Qt.Key_Left ? 0 : 1
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+                if ((keyboardTabIndex === 1) !== bluetoothView) setView(keyboardTabIndex === 1)
+                else tabFocused = false
+            } else if (key === Qt.Key_Down)
+                tabFocused = false
+            else return false
+        } else if (key === Qt.Key_Escape || (key === Qt.Key_Up && atTopOfList())) {
+            tabFocused = true
+            keyboardTabIndex = bluetoothView ? 1 : 0
         } else if (bluetoothView) {
             bluetoothControls.handleKeyPressed(event)
             return event.accepted
@@ -99,11 +120,11 @@ PopupSurface {
     ScrollableColumn {
         id: listCol
         anchors.top: parent.top
-        anchors.bottom: networkHint.top
+        anchors.bottom: root.embedded ? parent.bottom : networkHint.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 12
-        anchors.bottomMargin: 10
+        anchors.bottomMargin: root.embedded ? 12 : 10
         spacing: 12
 
         WidgetHeader { text: "Network"; color: root.accent; visible: !root.embedded }
@@ -117,22 +138,38 @@ PopupSurface {
                     required property int index
                     required property string modelData
                     readonly property bool selected: root.bluetoothView === (index === 1)
+                    readonly property bool highlighted: root.tabFocused && root.keyboardTabIndex === index
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlHeight
-                    color: Theme.controlBackground(selected, false, tabHover.hovered)
+                    color: Theme.controlBackground(selected, highlighted, tabHover.hovered)
                     border.width: 1
-                    border.color: Theme.controlBorder(selected, false, tabHover.hovered, root.accent)
+                    border.color: Theme.controlBorder(selected, highlighted, tabHover.hovered, root.accent)
                     Text {
                         anchors.centerIn: parent
-                        text: modelData
+                        text: (parent.highlighted ? "› " : "") + modelData
                         color: parent.selected ? root.accent : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                     }
                     HoverHandler { id: tabHover }
-                    TapHandler { onTapped: root.setView(index === 1) }
+                    TapHandler {
+                        onTapped: {
+                            root.setView(index === 1)
+                            root.tabFocused = true
+                        }
+                    }
                 }
             }
+        }
+
+        // In Settings the keys sit under the tabs, like its other pages, in its style (no colons).
+        SettingsLabel {
+            visible: root.embedded
+            width: parent.width
+            text: root.keyHint.replace(/: /g, " ")
+            color: Theme.grey1
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize
         }
 
         BluetoothPanel {
@@ -141,6 +178,7 @@ PopupSurface {
             accent: root.accent
             visible: root.bluetoothView
             active: root.bluetoothView
+            keyboardActive: !root.tabFocused
         }
 
         Column {
@@ -162,7 +200,7 @@ PopupSurface {
                     required property string deviceName
                     required property string displayName
                     required property bool isConnected
-                    readonly property bool selected: root.keyboardNetworkIndex === index
+                    readonly property bool selected: !root.tabFocused && root.keyboardNetworkIndex === index
                     width: parent.width
                     implicitHeight: Theme.controlHeight
                     color: Theme.controlBackground(isConnected, selected, rowHover.hovered)
@@ -258,7 +296,7 @@ PopupSurface {
                     id: vpnRow
                     required property int index
                     required property var modelData
-                    readonly property bool selected: root.keyboardNetworkIndex === root.service.wiredDevices.count + index
+                    readonly property bool selected: !root.tabFocused && root.keyboardNetworkIndex === root.service.wiredDevices.count + index
                     width: parent.width
                     implicitHeight: Theme.controlHeight
                     color: Theme.controlBackground(true, selected, rowHover.hovered)
@@ -380,7 +418,7 @@ PopupSurface {
                     required property bool isKnown
                     required property bool isConnected
                     required property int networkId
-                    readonly property bool selected: root.keyboardNetworkIndex === root.service.wiredDevices.count + root.service.vpnConnections.length + index
+                    readonly property bool selected: !root.tabFocused && root.keyboardNetworkIndex === root.service.wiredDevices.count + root.service.vpnConnections.length + index
                     width: parent.width
                     implicitHeight: Theme.controlHeight
                     color: Theme.controlBackground(isConnected, selected, rowHover.hovered)
@@ -444,15 +482,20 @@ PopupSurface {
         }
     }
 
+    readonly property string keyHint: tabFocused
+        ? "←→: tab · Enter: show · ↓: list · Esc: " + (embedded ? "back" : "close")
+        : bluetoothView
+            ? "↑↓: select · Enter: pair / connect · D: disconnect · P: power · S: scan · Esc: tabs"
+            : "↑↓: select · Enter: connect · D: disconnect · Esc: tabs"
+
     KeyboardHint {
         id: networkHint
+        visible: !root.embedded
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 12
-        text: root.bluetoothView
-            ? "Tab: Network / Bluetooth · ↑↓: select\nEnter: pair / connect · D: disconnect · Esc: " + (root.embedded ? "back" : "close")
-            : "Tab: Network / Bluetooth · ↑↓: select\nEnter: connect · D: disconnect · Esc: " + (root.embedded ? "back" : "close")
+        text: root.keyHint
     }
 
 }

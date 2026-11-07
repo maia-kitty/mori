@@ -12,7 +12,11 @@ Item {
     property var value
     property bool focused: false
     property bool available: true
+    // Choice highlighted with ←→ until apply(); -1 means the current value.
+    property int pendingIndex: -1
     signal chosen(var value)
+    onFocusedChanged: pendingIndex = -1
+    onValueChanged: pendingIndex = -1
 
     width: parent ? parent.width : 0
     height: Theme.controlHeight
@@ -36,11 +40,13 @@ Item {
                 required property var modelData
                 required property int index
                 readonly property bool selected: root.value === modelData
+                readonly property bool highlighted: root.focused
+                    && (root.pendingIndex >= 0 ? index === root.pendingIndex : selected)
                 width: Math.max(72, choiceLabel.implicitWidth + 20)
                 height: Theme.controlHeight
-                color: Theme.controlBackground(selected, root.focused && selected, root.available && choiceHover.hovered)
+                color: Theme.controlBackground(selected, highlighted, root.available && choiceHover.hovered)
                 border.width: 1
-                border.color: Theme.controlBorder(selected, root.focused && selected, root.available && choiceHover.hovered)
+                border.color: Theme.controlBorder(selected, highlighted, root.available && choiceHover.hovered)
                 SettingsLabel {
                     id: choiceLabel
                     anchors.centerIn: parent
@@ -58,7 +64,19 @@ Item {
         }
     }
 
-    // ←→ / Enter: step through the choices.
+    // ←→ moves the highlight, Enter applies it.
+    function pick(offset) {
+        if (!available || values.length === 0) return
+        const base = pendingIndex >= 0 ? pendingIndex : Math.max(0, values.indexOf(value))
+        pendingIndex = Math.max(0, Math.min(values.length - 1, base + offset))
+    }
+
+    function apply() {
+        if (available && pendingIndex >= 0) chosen(values[pendingIndex])
+        pendingIndex = -1
+    }
+
+    // Next choice right away (shortcut keys such as D for Do Not Disturb).
     function step(offset) {
         if (!available || values.length === 0) return
         const index = values.indexOf(value)

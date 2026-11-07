@@ -60,23 +60,23 @@ If the bar isn't running, `mori-lock` uses Swaylock. If the session lock doesn't
 
 ## Shell settings
 
-Open **Settings** from the bar or with **Mod+Period**:
+Open **Settings** from the bar or with **Mod+Period**. A sidebar lists the pages. **↑↓** moves through it (the page follows), **Enter** goes into the page, and **Escape** goes back one level (page → tabs → sidebar → close). Appearance and Power open on their tab row: **←→** picks a tab and **Enter** shows it; **↓** (or Enter on the shown tab) goes into it. Inside a page, **↑↓** picks a row, **←→** highlights a choice and **Enter** applies it; sliders and steppers (volume, pointer speed, schedule times) change right away. **↑** on the first row goes back to the tabs. **Tab** moves between parts of a page, and **Ctrl+Enter** applies Input, Displays and Power menu changes. **Delete** clears a power command (automatic) or the keyboard layout (system); on the Bluetooth tab **P** toggles power and **S** scans.
 
-- **Bar & widgets:** **Widgets** controls visibility, left/center/right order, and compact modes; **Colors** controls widget accent colors. Click the tabs or press **Tab** to switch views.
-- **Appearance:** light/dark mode and automatic switching (see [light and dark mode](#light-and-dark-mode)), and below it the same wallpaper chooser as the bar's popup plus the wallpaper **Folder** path (**F** or click to edit, Enter saves, `~/…` works): monitor, and a **Dark** and **Light** wallpaper for each (**M** switches between them). The current mode's choice applies right away; the other is used when you switch. **Tab** moves between the two parts.
-- **Sound:** output and input device, volume, and mute (per-app volumes stay in the volume popup).
-- **Network:** the same panel as the network popup (Ethernet, VPN, Wi-Fi, and Bluetooth on its own tab); it works whether or not the Network widget is on the bar. Wi-Fi passwords are asked in the shell's own prompt.
+- **Appearance:** three tabs. **Wallpaper** is the same chooser as the bar's popup plus the wallpaper **Folder** path (**F** or click to edit, Enter saves, `~/…` works): monitor, and a **Dark** and **Light** wallpaper for each (**M** switches between them). The current mode's choice applies right away; the other is used when you switch. **Light & dark** has the mode and automatic switching (see [light and dark mode](#light-and-dark-mode)). **Widget colors** sets each widget's accent color.
+- **Bar:** widget visibility, left/center/right order, and compact modes.
 - **Notifications:** Do Not Disturb; it is saved, so it survives restarts.
-- **Power profile:** power saver, balanced, or performance through power-profiles-daemon (also in the battery popup).
 - **Time & date:** clock format, seconds, and date order; time format also applies to calendar events.
-- **Input:** keyboard layout, mouse/touchpad acceleration, tapping, natural scrolling, and disable-while-typing. An empty keyboard layout follows the system.
-- **About:** links, and a cat doodle in the corner: a Halloween version Oct 15–31, Christmas Dec 1–26, Valentine's Feb 13–14, and a birthday hat on July 24. The drawings are split into one mask per color (`assets/split-cat.py`) and painted with the theme colors, so they follow light and dark mode.
+- **Network:** the same panel as the network popup (Ethernet, VPN, Wi-Fi, and Bluetooth on its own tab); it works whether or not the Network widget is on the bar. Wi-Fi passwords are asked in the shell's own prompt.
+- **Sound:** output and input device, volume, and mute (per-app volumes stay in the volume popup).
 - **Displays:** monitor layout and output settings, with timed confirmation and rollback.
-- **Power menu** and **Updates:** see below.
+- **Input:** keyboard layout, mouse/touchpad acceleration, tapping, natural scrolling, and disable-while-typing. An empty keyboard layout follows the system.
+- **Power:** the **Profile** tab picks power saver, balanced, or performance through power-profiles-daemon (also in the battery popup); **Menu commands** is described [below](#power-menu).
+- **Updates:** see below.
+- **About:** links, and a cat doodle in the corner: a Halloween version Oct 15–31, Christmas Dec 1–26, Valentine's Feb 13–14, and a birthday hat on July 24. The drawings are split into one mask per color (`assets/split-cat.py`) and painted with the theme colors, so they follow light and dark mode.
 
 Bar, widget, clock, and update interval settings save immediately. Input, display, and power changes use **Apply**; closing settings discards pending edits. Shell settings live in `~/.config/quickshell/mori-settings.json` (under `$XDG_CONFIG_HOME` when set); input and display settings update Niri’s configuration.
 
-The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call bar openSettings <page>` opens Settings on a page (`modules`, `theme` for Appearance, `sound`, `network`, `notifications`, `profile`, `clock`, `updates`, `power`, `displays`, `input`, `about`).
+The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call bar openSettings <page>` opens Settings on a page (`wallpaper`, `theme` and `appearance` for Appearance's three tabs, `modules` for Bar, `notifications`, `clock`, `network`, `sound`, `displays`, `input`, `profile` and `power` for Power's two tabs, `updates`, `about`). Settings reopens on the page you last used.
 
 ## Desktop widgets
 
@@ -101,7 +101,7 @@ The volume popup has **Playback** and **Microphone** tabs (**Tab** switches betw
 
 In the network popup, use **Up/Down** to select Ethernet, an active VPN, or Wi-Fi; **Enter** connects and **D** disconnects the selected connection.
 
-Press **Tab** or click the **Network / Bluetooth** tabs to switch views. Bluetooth provides adapter power, scanning, pairing, connection controls, and device battery levels when available. Use **Up/Down** to select a device, **Enter** to pair or connect, and **D** to disconnect. Scanning stops when the Bluetooth view closes.
+The popup opens on its **Network / Bluetooth** tabs: **←→** picks one, **Enter** shows it, **↓** goes into the list, and **↑** at the top or **Escape** comes back to the tabs (Escape there closes). **Tab** or a click also switches views. On the Bluetooth view **P** toggles power and **S** scans. Bluetooth provides adapter power, scanning, pairing, connection controls, and device battery levels when available. Use **Up/Down** to select a device, **Enter** to pair or connect, and **D** to disconnect. Scanning stops when the Bluetooth view closes.
 
 ## Power menu
 
@@ -109,7 +109,7 @@ The power menu uses the `mori-power` helper from the `bin` package; keep `~/.loc
 
 On Void with elogind, no command overrides are needed. Elogind power actions require a correctly configured session and polkit permissions; see the [Void power-management handbook](https://docs.voidlinux.org/config/power-management.html). Native commands run as your user and may need an authorized wrapper. Mori does not automatically invoke sudo, doas, or pkexec, and does not retry another backend after an action fails.
 
-To override individual actions, open **Settings → Power menu**, enter commands such as `loginctl --no-ask-password suspend` or your authorized wrapper, and click **Apply** (Ctrl+Enter). Leave a field blank, or choose **Use automatic**, to restore automatic selection for that action. Quote paths and arguments containing spaces. Closing settings discards unapplied edits.
+To override individual actions, open **Settings → Power → Menu commands**, enter commands such as `loginctl --no-ask-password suspend` or your authorized wrapper, and click **Apply** (Ctrl+Enter). Leave a field blank, or choose **Use automatic** (**Delete**), to restore automatic selection for that action. Quote paths and arguments containing spaces. Closing settings discards unapplied edits.
 
 Commands are saved with the other shell settings in `~/.config/quickshell/mori-settings.json` (or `$XDG_CONFIG_HOME/quickshell/mori-settings.json` when set), outside the checkout. Its optional `power` section looks like:
 
@@ -133,7 +133,7 @@ The updater now lives in its own repository, [upkeep](https://github.com/maia-ki
 
 ## Updates widget
 
-The Mori bar's **Updates** module shows the number of pending updates and opens a popup with per-source update counts, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Bar & widgets**, in the **Widgets** or **Colors** tab. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
+The Mori bar's **Updates** module shows the number of pending updates and opens a popup with per-source update counts, check errors, the last check time, and reboot hints. Move, recolor, or disable it in **Settings → Bar**, or recolor it in **Settings → Appearance → Widget colors**. Existing saved bar layouts retain their order and gain the new module. The popup unloads its contents when closed; its background controller stays shared so moving the module does not duplicate checks.
 
 Checks run shortly after startup and hourly by default. Choose **15 min**, **1 hour**, **3 hours**, or **Manual** in **Settings → Updates**; the interval saves with the other Mori settings. Disabling the module stops future scheduled checks. **Check now** (`C`) starts a read-only check. **Update** (`U`) opens Foot with `upkeep --refresh`, where password prompts, update confirmations, cleanup, service restarts, and reboots are handled. Foot waits for Enter after completion so you can review the output, then closes. It runs independently of the widget. The bar rechecks after the updater session completes. Press Up/Down to scroll or Escape to close.
 

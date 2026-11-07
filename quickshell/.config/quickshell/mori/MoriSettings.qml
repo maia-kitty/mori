@@ -12,8 +12,6 @@ Item {
     id: root
     // Page controls exist only while that page is open. Saving and rollback
     // state stays in this controller when a page or the window closes.
-    readonly property var categoriesFlick: homePage.item ? homePage.item.flick : null
-    readonly property var categoryRows: homePage.item ? homePage.item.rows : null
     readonly property var modulesFlick: modulesPage.item
     readonly property var anchorRepeater: modulesPage.item ? modulesPage.item.anchorRows : null
     readonly property var appearanceFlick: appearancePage.item
@@ -33,14 +31,23 @@ Item {
     width: 0
     height: 0
 
-    property string page: "home"
+    property string page: "wallpaper"
+    // Keyboard focus levels: sidebar → tab row (pages with tabs) → page. Arrows move a
+    // highlight and Enter confirms; Escape goes back one level.
+    property bool sidebarFocused: true
+    property bool tabFocused: false
+    readonly property bool contentFocused: !sidebarFocused && !tabFocused
+    property int keyboardNavIndex: 0
+    property int keyboardTabIndex: 0
+    // Choice highlighted with ←→ on the focused row, applied by Enter; -1 means the current value.
+    property int keyboardPick: -1
     onPageChanged: {
+        keyboardPick = -1
         if (page !== "input" && editingKeyboardLayout)
             keyboardScope.forceActiveFocus()
         if (page !== "power" && editingPowerCommand)
             keyboardScope.forceActiveFocus()
     }
-    property int keyboardCategoryIndex: 0
     property string keyboardModule: ""
     property int keyboardColorRow: 0
     property int keyboardColorIndex: 0
@@ -56,8 +63,6 @@ Item {
     ]
     property int keyboardClockIndex: 0
     property int keyboardThemeIndex: 0
-    // Appearance page: keys go to the light & dark rows or the wallpaper browser.
-    property string appearanceFocus: "theme"
     // Page to show once Settings opens (IPC openSettings <page>).
     property string reopenPage: ""
     property int keyboardPowerIndex: 0
@@ -121,7 +126,66 @@ Item {
         "battery", "brightness", "calendar", "kdeConnect", "media", "network",
         "notifications", "powerMenu", "systemTray", "theme", "updates", "volume", "wallpaper", "workspaces"
     ]
-    readonly property var categoryPages: ["modules", "theme", "sound", "network", "notifications", "profile", "clock", "updates", "power", "displays", "input", "about"]
+    // Sidebar order; an entry with several pages shows them as tabs.
+    readonly property var navEntries: [
+        { label: "Appearance", pages: ["wallpaper", "theme", "appearance"], tabs: ["Wallpaper", "Light & dark", "Widget colors"] },
+        { label: "Bar", pages: ["modules"] },
+        { label: "Notifications", pages: ["notifications"] },
+        { label: "Time & date", pages: ["clock"] },
+        { label: "Network", pages: ["network"] },
+        { label: "Sound", pages: ["sound"] },
+        { label: "Displays", pages: ["displays"] },
+        { label: "Input", pages: ["input"] },
+        { label: "Power", pages: ["profile", "power"], tabs: ["Profile", "Menu commands"] },
+        { label: "Updates", pages: ["updates"] },
+        { label: "About", pages: ["about"] }
+    ]
+    readonly property var categoryPages: navEntries.reduce((all, entry) => all.concat(entry.pages), [])
+    readonly property var currentEntry: navEntry(page)
+    function navEntry(name) {
+        return navEntries.find(entry => entry.pages.indexOf(name) >= 0) || navEntries[0]
+    }
+
+    function focusSidebar() {
+        sidebarFocused = true
+        tabFocused = false
+        keyboardNavIndex = navEntries.indexOf(currentEntry)
+    }
+
+    // Open a sidebar entry; pages with tabs start on the tab row.
+    function enterEntry(index) {
+        const entry = navEntries[index]
+        if (entry.label !== currentEntry.label)
+            openPage(entry.pages[0])
+        sidebarFocused = false
+        tabFocused = !!entry.tabs
+        keyboardTabIndex = Math.max(0, entry.pages.indexOf(page))
+    }
+
+    // ↑ on a tabbed page's first row goes back up to the tab row.
+    function atTopOfTab() {
+        switch (page) {
+        case "theme": return keyboardThemeIndex === 0
+        // In the browser ↑ means parent folder, so only the top folder's monitor row leads up.
+        case "wallpaper": return !wallpaperPage.item
+            || (wallpaperPage.item.browser.keyboardMode === "screens" && wallpaperPage.item.browser.inRootFolder)
+        case "appearance": return keyboardColorRow === 0
+        case "power": return keyboardPowerIndex === 0
+        default: return true
+        }
+    }
+
+    function movePick(count, current, offset) {
+        const base = keyboardPick >= 0 ? keyboardPick : Math.max(0, current)
+        keyboardPick = Math.max(0, Math.min(count - 1, base + offset))
+    }
+
+    // Enter: the highlighted choice's index (or -1), clearing the highlight.
+    function takePick() {
+        const index = keyboardPick
+        keyboardPick = -1
+        return index
+    }
     readonly property var updateIntervals: [
         { label: "15 min", minutes: 15 }, { label: "1 hour", minutes: 60 },
         { label: "3 hours", minutes: 180 }, { label: "Manual", minutes: 0 }
@@ -193,24 +257,7 @@ Item {
         return Theme.controlBorder(selected, focused, hovered)
     }
 
-    function pageTitle() {
-        switch (page) {
-        case "modules":
-        case "appearance": return "Bar & widgets"
-        case "theme": return "Appearance"
-        case "sound": return "Sound"
-        case "network": return "Network"
-        case "notifications": return "Notifications"
-        case "profile": return "Power profile"
-        case "clock": return "Time & date"
-        case "updates": return "Updates"
-        case "power": return "Power menu"
-        case "displays": return "Displays"
-        case "input": return "Input"
-        case "about": return "About"
-        default: return "Mori settings"
-        }
-    }
+    function pageTitle() { return currentEntry.label }
 
     function toggle() {
         if (settingsWindow.visible) {
@@ -221,8 +268,7 @@ Item {
                 settingsWindow.visible = true
                 return
             }
-            page = "home"
-            keyboardCategoryIndex = 0
+            focusSidebar()
             focusQueryResolved = false
             if (!focusedOutputQuery.running)
                 focusedOutputQuery.exec(["niri", "msg", "--json", "focused-output"])
@@ -231,14 +277,22 @@ Item {
 
     // Open Settings on a page (IPC openSettings).
     function openTo(name) {
-        if (categoryPages.indexOf(name) < 0) name = "home"
+        // Unknown names (and "home") just open Settings with the sidebar focused.
+        const known = categoryPages.indexOf(name) >= 0
         if (settingsWindow.visible) {
-            if (name === "home") page = "home"
-            else openPage(name)
+            if (known) {
+                openPage(name)
+                sidebarFocused = false
+                tabFocused = false
+            }
             return
         }
-        reopenPage = name === "home" ? "" : name
+        reopenPage = known ? name : ""
         toggle()
+        if (known) {
+            sidebarFocused = false
+            tabFocused = false
+        }
     }
 
     function screenByName(name) {
@@ -262,10 +316,8 @@ Item {
         }
         popupCoordinator.showPopup(root)
         settingsWindow.visible = true
-        if (reopenPage) {
-            openPage(reopenPage)
-            reopenPage = ""
-        }
+        openPage(reopenPage || page)
+        reopenPage = ""
     }
 
     function close() {
@@ -352,8 +404,8 @@ Item {
             syncKeyboardColor()
         } else if (name === "theme") {
             keyboardThemeIndex = 0
-            appearanceFocus = "theme"
-            Qt.callLater(() => { if (themePage.item) themePage.item.browser.reset() })
+        } else if (name === "wallpaper") {
+            Qt.callLater(() => { if (wallpaperPage.item) wallpaperPage.item.browser.reset() })
         } else if (name === "sound") {
             Qt.callLater(() => { if (soundPage.item) soundPage.item.keyboardIndex = 0 })
         } else if (name === "clock") {
@@ -449,11 +501,15 @@ Item {
         return settings.clockDateFormat
     }
 
-    function cycleClockOption(offset) {
+    function pickClockOption(offset) {
         const option = clockOptions[keyboardClockIndex]
-        const index = option.values.indexOf(clockOptionValue(option.key))
-        const next = (index + offset + option.values.length) % option.values.length
-        settings.setClockOption(option.key, option.values[next])
+        movePick(option.values.length, option.values.indexOf(clockOptionValue(option.key)), offset)
+    }
+
+    function applyClockPick() {
+        const option = clockOptions[keyboardClockIndex]
+        const index = takePick()
+        if (index >= 0) settings.setClockOption(option.key, option.values[index])
     }
 
     // Rows on the Light & dark page; the last two depend on the schedule.
@@ -501,14 +557,13 @@ Item {
             settings.setThemeOption(key, value)
     }
 
-    // ←→ cycles a choice or steps a value; large steps by an hour or 10°.
+    // ←→ highlights a choice (Enter applies it) or steps a value; large steps by an hour or 10°.
     function changeThemeOption(offset, large) {
         const row = themeRows()[keyboardThemeIndex]
         if (!row) return
         const value = themeOptionValue(row.key)
         if (row.kind === "choice") {
-            const index = row.values.indexOf(value)
-            setThemeChoice(row.key, row.values[(index + offset + row.values.length) % row.values.length])
+            movePick(row.values.length, row.values.indexOf(value), offset)
         } else if (row.key === "lightTime" || row.key === "darkTime") {
             settings.setThemeOption(row.key, (value + offset * (large ? 60 : 15) + 1440) % 1440)
         } else {
@@ -516,6 +571,13 @@ Item {
             settings.setThemeOption(row.key,
                 Math.max(-limit, Math.min(limit, Math.round(value) + offset * (large ? 10 : 1))))
         }
+    }
+
+    function applyThemePick() {
+        const row = themeRows()[keyboardThemeIndex]
+        const index = takePick()
+        if (row && row.kind === "choice" && index >= 0)
+            setThemeChoice(row.key, row.values[index])
     }
 
     function themeSchedulePreview() {
@@ -676,10 +738,6 @@ Item {
             flick.contentY = y + item.height - flick.height
     }
 
-    function scrollToKeyboardCategory() {
-        scrollIntoView(categoriesFlick, categoryRows ? categoryRows.itemAt(keyboardCategoryIndex) : null)
-    }
-
     function scrollToKeyboardModule() {
         if (!anchorRepeater) return
         for (let i = 0; i < anchorRepeater.count; ++i) {
@@ -753,6 +811,9 @@ Item {
 
     function handleSettingsKey(event) {
         const key = event.key
+        if (key === Qt.Key_Up || key === Qt.Key_Down || key === Qt.Key_Tab
+                || key === Qt.Key_Backtab || key === Qt.Key_Escape)
+            keyboardPick = -1
         if (page === "power" && editingPowerCommand) {
             if ((event.modifiers & Qt.ControlModifier)
                     && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
@@ -787,6 +848,49 @@ Item {
             event.accepted = true
             return
         }
+        if (key === Qt.Key_S && (event.modifiers & Qt.ControlModifier) && settings.saveError.length > 0) {
+            settings.save()
+            event.accepted = true
+            return
+        }
+        if (sidebarFocused) {
+            // ↑↓ previews the entry's page; Enter goes into it.
+            if (key === Qt.Key_Up || key === Qt.Key_Down) {
+                keyboardNavIndex = Math.max(0, Math.min(navEntries.length - 1,
+                    keyboardNavIndex + (key === Qt.Key_Up ? -1 : 1)))
+                const entry = navEntries[keyboardNavIndex]
+                if (entry.label !== currentEntry.label) openPage(entry.pages[0])
+            } else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                enterEntry(keyboardNavIndex)
+            else if (key === Qt.Key_Escape || key === Qt.Key_Backspace)
+                close()
+            else return
+            event.accepted = true
+            return
+        }
+        if (tabFocused) {
+            const pages = currentEntry.pages
+            if (key === Qt.Key_Left || key === Qt.Key_Right)
+                keyboardTabIndex = Math.max(0, Math.min(pages.length - 1,
+                    keyboardTabIndex + (key === Qt.Key_Left ? -1 : 1)))
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+                // Enter switches tabs and stays here; on the shown tab it goes in, like ↓.
+                if (pages[keyboardTabIndex] !== page) openPage(pages[keyboardTabIndex])
+                else tabFocused = false
+            } else if (key === Qt.Key_Down)
+                tabFocused = false
+            else if (key === Qt.Key_Escape || key === Qt.Key_Backspace)
+                focusSidebar()
+            else return
+            event.accepted = true
+            return
+        }
+        if (key === Qt.Key_Up && currentEntry.tabs && atTopOfTab()) {
+            tabFocused = true
+            keyboardTabIndex = Math.max(0, currentEntry.pages.indexOf(page))
+            event.accepted = true
+            return
+        }
         if (page === "network" && networkPage.item && networkPage.item.handleKey(event)) {
             event.accepted = true
             return
@@ -803,48 +907,28 @@ Item {
             event.accepted = true
             return
         }
-        if (page === "theme" && themePage.item && key !== Qt.Key_Escape) {
-            const browser = themePage.item.browser
-            if (key === Qt.Key_Tab && (appearanceFocus === "theme" || browser.keyboardMode === "files")) {
-                // Tab cycles light & dark → monitors → wallpapers → light & dark.
-                appearanceFocus = appearanceFocus === "theme" ? "wallpaper" : "theme"
-                browser.keyboardMode = "screens"
-                event.accepted = true
-                return
-            }
-            if (appearanceFocus === "wallpaper" && browser.handleKey(event)) {
-                event.accepted = true
-                return
-            }
+        if (page === "wallpaper" && wallpaperPage.item && key !== Qt.Key_Escape
+                && wallpaperPage.item.browser.handleKey(event)) {
+            event.accepted = true
+            return
         }
         if (key === Qt.Key_Escape || key === Qt.Key_Backspace) {
-            if (page !== "home") page = "home"
-            else close()
+            if (currentEntry.tabs) {
+                tabFocused = true
+                keyboardTabIndex = Math.max(0, currentEntry.pages.indexOf(page))
+            } else focusSidebar()
             event.accepted = true
             return
         }
         if ((event.modifiers & Qt.ControlModifier)
                 && (key === Qt.Key_Return || key === Qt.Key_Enter)) {
             if (page !== "input" && page !== "displays" && page !== "power") return
+            keyboardConfirmationIndex = 0
             applyCurrentPage()
             event.accepted = true
             return
         }
-        if ((page === "modules" || page === "appearance")
-                && (key === Qt.Key_Tab || key === Qt.Key_Backtab)) {
-            openPage(page === "modules" ? "appearance" : "modules")
-            event.accepted = true
-            return
-        }
-        if (page === "home") {
-            if (key === Qt.Key_Up || key === Qt.Key_Down) {
-                keyboardCategoryIndex = Math.max(0, Math.min(categoryPages.length - 1,
-                    keyboardCategoryIndex + (key === Qt.Key_Up ? -1 : 1)))
-                Qt.callLater(scrollToKeyboardCategory)
-            } else if (key === Qt.Key_Return || key === Qt.Key_Enter)
-                openPage(categoryPages[keyboardCategoryIndex])
-            else return
-        } else if (page === "modules") {
+        if (page === "modules") {
             if (event.modifiers & Qt.ShiftModifier
                     && (key === Qt.Key_Up || key === Qt.Key_Down))
                 moveKeyboardModuleInAnchor(key === Qt.Key_Up ? -1 : 1)
@@ -871,21 +955,23 @@ Item {
                 settings.setModuleColor(allModules[keyboardColorRow],
                     colorChoices[keyboardColorIndex].token)
             else return
-        } else if (page === "theme" && appearanceFocus === "theme") {
+        } else if (page === "theme") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardThemeIndex = Math.max(0, Math.min(themeRows().length - 1,
                     keyboardThemeIndex + (key === Qt.Key_Up ? -1 : 1)))
-            else if (key === Qt.Key_Left || key === Qt.Key_Right
-                    || key === Qt.Key_Return || key === Qt.Key_Enter)
+            else if (key === Qt.Key_Left || key === Qt.Key_Right)
                 changeThemeOption(key === Qt.Key_Left ? -1 : 1, event.modifiers & Qt.ShiftModifier)
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                applyThemePick()
             else return
         } else if (page === "clock") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardClockIndex = Math.max(0, Math.min(clockOptions.length - 1,
                     keyboardClockIndex + (key === Qt.Key_Up ? -1 : 1)))
-            else if (key === Qt.Key_Left || key === Qt.Key_Right
-                    || key === Qt.Key_Return || key === Qt.Key_Enter)
-                cycleClockOption(key === Qt.Key_Left ? -1 : 1)
+            else if (key === Qt.Key_Left || key === Qt.Key_Right)
+                pickClockOption(key === Qt.Key_Left ? -1 : 1)
+            else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                applyClockPick()
             else return
         } else if (page === "about") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
@@ -909,7 +995,9 @@ Item {
             } else if (key === Qt.Key_Return || key === Qt.Key_Enter) {
                 const row = powerRows ? powerRows.itemAt(keyboardPowerIndex) : null
                 if (row) row.editor.forceActiveFocus()
-            } else return
+            } else if (key === Qt.Key_Delete)
+                setPowerDraft(powerOptions[keyboardPowerIndex].key, "")
+            else return
         } else if (page === "input") {
             if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardInputIndex = Math.max(0, Math.min(inputOptions.length - 1,
@@ -925,11 +1013,11 @@ Item {
                     if (key === Qt.Key_Left || key === Qt.Key_Right)
                         setInputValue(option, inputValue(option.key)
                             + (key === Qt.Key_Left ? -0.05 : 0.05))
-                } else {
-                    const next = key === Qt.Key_Left ? false
-                        : key === Qt.Key_Right ? true : !inputValue(option.key)
-                    setInputValue(option, next)
-                }
+                } else if (key === Qt.Key_Return || key === Qt.Key_Enter)
+                    setInputValue(option, !inputValue(option.key))
+            } else if (key === Qt.Key_Delete && inputOptions[keyboardInputIndex].kind === "layout") {
+                const editor = keyboardLayoutEditor()
+                if (editor) editor.text = ""
             } else if (key === Qt.Key_R && !inputApplyPending && !inputRestoring) {
                 inputDirty = false
                 keyboardLayoutDraft = keyboardLayout
@@ -937,11 +1025,7 @@ Item {
             } else return
         } else if (page === "displays") {
             if (key === Qt.Key_R && !displayQuery.running) refreshDisplays()
-            else if (key === Qt.Key_S && displays.length > 0
-                    && displaySavePhase === "idle") {
-                keyboardConfirmationIndex = 0
-                applyCurrentPage()
-            } else if (key === Qt.Key_Tab)
+            else if (key === Qt.Key_Tab)
                 keyboardDisplaySection = keyboardDisplaySection === "outputs"
                     ? "editor" : "outputs"
             else if (keyboardDisplaySection === "outputs") {
@@ -1249,12 +1333,15 @@ Item {
             (displayCanvas.height - 40) / displayLayoutHeight)
     }
 
+    // The canvas is gone while the Displays page unloads, before its tiles are.
     function displayCanvasX(output) {
+        if (!displayCanvas) return 0
         return (displayCanvas.width - displayLayoutWidth * displayViewScale) / 2
             + (output.x - displayOriginX) * displayViewScale
     }
 
     function displayCanvasY(output) {
+        if (!displayCanvas) return 0
         return (displayCanvas.height - displayLayoutHeight * displayViewScale) / 2
             + (output.y - displayOriginY) * displayViewScale
     }
@@ -1748,7 +1835,7 @@ Item {
 
                 SettingsLabel {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: (root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
+                    text: (root.contentFocused && root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
                         + root.moduleLabel(moduleRow.moduleKey)
                     color: moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
                     font.family: Theme.fontFamily
@@ -1870,7 +1957,7 @@ Item {
             id: settingsCard
             shown: settingsWindow.visible
             anchors.centerIn: parent
-            width: Math.min(600, settingsWindow.width - 48)
+            width: Math.min(820, settingsWindow.width - 48)
             height: Math.min(650, settingsWindow.height - 48)
             color: Theme.bg1
             border.width: 2
@@ -1881,36 +1968,85 @@ Item {
                 onClicked: mouse => mouse.accepted = true
             }
 
+            Column {
+                id: sidebar
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.margins: 18
+                width: 168
+                spacing: 4
+
+                Item {
+                    width: parent.width
+                    height: Theme.controlHeight
+                    SettingsLabel {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Settings"
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.headingFontSize + 2
+                        font.weight: Font.DemiBold
+                    }
+                }
+
+                Repeater {
+                    model: root.navEntries
+                    delegate: Item {
+                        id: navItem
+                        required property var modelData
+                        required property int index
+                        // modelData is a copy, so compare by label rather than identity.
+                        readonly property bool selected: root.currentEntry.label === modelData.label
+                        readonly property bool highlighted: root.sidebarFocused && index === root.keyboardNavIndex
+                        width: sidebar.width
+                        // Space under the title before the first entry.
+                        height: Theme.controlHeight + (index === 0 ? 14 : 0)
+
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: Theme.controlHeight
+                            color: root.controlBackground(navItem.selected, navItem.highlighted, navHover.hovered)
+                            border.width: 1
+                            border.color: root.controlBorder(navItem.selected, navItem.highlighted, navHover.hovered)
+                            SettingsLabel {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: (navItem.highlighted ? "› " : "  ")
+                                    + navItem.modelData.label
+                                color: navItem.selected ? Theme.fg : Theme.grey2
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            HoverHandler { id: navHover }
+                            TapHandler {
+                                onTapped: root.enterEntry(navItem.index)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: sidebarDivider
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.left: sidebar.right
+                anchors.margins: 18
+                width: 1
+                color: Theme.fg
+            }
+
             Item {
                 id: header
                 anchors.top: parent.top
-                anchors.left: parent.left
+                anchors.left: sidebarDivider.right
                 anchors.right: parent.right
                 anchors.margins: 18
                 height: Theme.controlHeight
 
-                Rectangle {
-                    id: backButton
-                    visible: root.page !== "home"
-                    anchors.right: closeButton.left
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 28
-                    height: Theme.controlHeight
-                    color: root.controlBackground(false, false, backHover.hovered)
-                    border.width: 1
-                    border.color: root.controlBorder(false, false, backHover.hovered)
-
-                    SettingsLabel {
-                        anchors.centerIn: parent
-                        text: "←"
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize + 2
-                    }
-                    HoverHandler { id: backHover }
-                    TapHandler { onTapped: root.page = "home" }
-                }
                 SettingsLabel {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
@@ -1992,7 +2128,7 @@ Item {
             Rectangle {
                 id: headerDivider
                 anchors.top: header.bottom
-                anchors.left: parent.left
+                anchors.left: sidebarDivider.right
                 anchors.right: parent.right
                 anchors.leftMargin: 18
                 anchors.rightMargin: 18
@@ -2006,7 +2142,7 @@ Item {
                 visible: root.settings.saveError.length > 0
                 anchors.top: headerDivider.bottom
                 anchors.topMargin: 10
-                anchors.left: parent.left
+                anchors.left: sidebarDivider.right
                 anchors.right: parent.right
                 anchors.leftMargin: 18
                 anchors.rightMargin: 18
@@ -2034,7 +2170,7 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Retry"
+                    text: "Retry (Ctrl+S)"
                     color: Theme.fg
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
@@ -2045,32 +2181,43 @@ Item {
 
             RowLayout {
                 id: barTabs
-                visible: root.page === "modules" || root.page === "appearance"
+                visible: !!root.currentEntry.tabs
                 anchors.top: saveErrorBanner.visible ? saveErrorBanner.bottom : headerDivider.bottom
-                anchors.left: parent.left
+                anchors.left: sidebarDivider.right
                 anchors.right: parent.right
                 anchors.margins: 18
                 anchors.topMargin: 12
                 spacing: 8
                 Repeater {
-                    model: [{ page: "modules", label: "Widgets" }, { page: "appearance", label: "Colors" }]
+                    model: root.currentEntry.tabs
+                        ? root.currentEntry.pages.map((page, i) => ({ page: page, label: root.currentEntry.tabs[i] }))
+                        : []
                     delegate: Rectangle {
                         required property var modelData
+                        required property int index
                         readonly property bool selected: root.page === modelData.page
+                        readonly property bool highlighted: root.tabFocused && index === root.keyboardTabIndex
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlHeight
-                        color: Theme.controlBackground(selected, false, tabHover.hovered)
+                        color: Theme.controlBackground(selected, highlighted, tabHover.hovered)
                         border.width: 1
-                        border.color: Theme.controlBorder(selected, false, tabHover.hovered, Theme.fg)
+                        border.color: Theme.controlBorder(selected, highlighted, tabHover.hovered, Theme.fg)
                         Text {
                             anchors.centerIn: parent
-                            text: parent.modelData.label
+                            text: (parent.highlighted ? "› " : "") + parent.modelData.label
                             color: Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
                         HoverHandler { id: tabHover }
-                        TapHandler { onTapped: root.openPage(modelData.page) }
+                        TapHandler {
+                            onTapped: {
+                                root.openPage(modelData.page)
+                                root.sidebarFocused = false
+                                root.tabFocused = true
+                                root.keyboardTabIndex = index
+                            }
+                        }
                     }
                 }
             }
@@ -2080,109 +2227,10 @@ Item {
                 anchors.top: barTabs.visible ? barTabs.bottom : saveErrorBanner.visible
                     ? saveErrorBanner.bottom : headerDivider.bottom
                 anchors.bottom: parent.bottom
-                anchors.left: parent.left
+                anchors.left: sidebarDivider.right
                 anchors.right: parent.right
                 anchors.margins: 18
                 anchors.topMargin: 12
-
-                Loader {
-                    id: homePage
-                    anchors.fill: parent
-                    active: settingsWindow.visible && root.page === "home"
-                    onLoaded: {
-                        item.flick.forceLayout()
-                        item.flick.contentY = 0
-                    }
-
-                    sourceComponent: Component {
-                        Item {
-                            readonly property alias flick: categoryList
-                            readonly property alias rows: categoryRepeater
-                            readonly property alias navigationHint: categoryHint
-                            anchors.fill: parent
-
-                            SettingsLabel {
-                                id: categoryHint
-                                anchors.top: parent.top
-                                text: "Choose a category · ↑↓ / Enter"
-                                color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                            }
-                            ScrollableColumn {
-                                id: categoryList
-                                anchors.top: categoryHint.bottom
-                                anchors.topMargin: 8
-                                anchors.bottom: parent.bottom
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                spacing: 8
-                                Repeater {
-                                    id: categoryRepeater
-                                    model: [
-                                        { "key": "modules", "label": "Bar & widgets", "description": "Widget layout, visibility, and colors" },
-                                        { "key": "theme", "label": "Appearance", "description": "Light and dark mode, wallpapers" },
-                                        { "key": "sound", "label": "Sound", "description": "Output and input device, volume" },
-                                        { "key": "network", "label": "Network", "description": "Wi-Fi, wired, VPN and Bluetooth" },
-                                        { "key": "notifications", "label": "Notifications", "description": "Do Not Disturb" },
-                                        { "key": "profile", "label": "Power profile", "description": "Power saver, balanced or performance" },
-                                        { "key": "clock", "label": "Time & date", "description": "Clock and calendar formats" },
-                                        { "key": "updates", "label": "Updates", "description": "Package update check interval" },
-                                        { "key": "power", "label": "Power menu", "description": "Automatic or custom power commands" },
-                                        { "key": "displays", "label": "Displays", "description": "Connected Niri outputs" },
-                                        { "key": "input", "label": "Input", "description": "Mouse and touchpad" },
-                                        { "key": "about", "label": "About", "description": "Mori shell information" }
-                                    ]
-                                    delegate: Rectangle {
-                                        id: categoryRow
-                                        required property var modelData
-                                        required property int index
-                                        width: parent.width
-                                        height: 62
-                                        color: root.controlBackground(false, index === root.keyboardCategoryIndex, categoryHover.hovered)
-                                        border.width: 1
-                                        border.color: root.controlBorder(false, index === root.keyboardCategoryIndex, categoryHover.hovered)
-                                        Column {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 14
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            spacing: 3
-                                            SettingsLabel {
-                                                text: (categoryRow.index === root.keyboardCategoryIndex
-                                                    ? "› " : "  ") + categoryRow.modelData.label
-                                                color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.headingFontSize
-                                            }
-                                            SettingsLabel {
-                                                text: categoryRow.modelData.description
-                                                color: Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
-                                            }
-                                        }
-                                        SettingsLabel {
-                                            anchors.right: parent.right
-                                            anchors.rightMargin: 14
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: "›"
-                                            color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 24
-                                        }
-                                        HoverHandler { id: categoryHover }
-                                        TapHandler {
-                                            onTapped: {
-                                                root.keyboardCategoryIndex = categoryRow.index
-                                                root.openPage(categoryRow.modelData.key)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
 
                 Loader {
                     id: modulesPage
@@ -2205,7 +2253,7 @@ Item {
                                 width: modulesFlick.width
                                 spacing: 8
                                 SettingsLabel {
-                                    text: "↑↓ select · Shift+↑↓ reorder · Tab colors"
+                                    text: "↑↓ select · Shift+↑↓ reorder"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
@@ -2313,7 +2361,7 @@ Item {
                                 width: appearanceFlick.width
                                 spacing: 6
                                 SettingsLabel {
-                                    text: "↑↓ widget · ←→ color · Enter apply · Tab widgets"
+                                    text: "↑↓ widget · ←→ color · Enter apply"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
@@ -2335,7 +2383,7 @@ Item {
                                             anchors.left: parent.left
                                             anchors.leftMargin: 8
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: (colorRow.index === root.keyboardColorRow ? "› " : "  ")
+                                            text: (root.contentFocused && colorRow.index === root.keyboardColorRow ? "› " : "  ")
                                                 + root.moduleLabel(colorRow.moduleKey)
                                             color: Theme.grey1
                                             font.family: Theme.fontFamily
@@ -2391,7 +2439,6 @@ Item {
 
                     sourceComponent: Component {
                         Item {
-                            readonly property alias browser: wallpaperBrowser
                             visible: root.page === "theme"
 
                             Column {
@@ -2399,12 +2446,8 @@ Item {
                                 anchors { top: parent.top; left: parent.left; right: parent.right }
                                 spacing: 6
 
-                                WidgetHeader { text: "Light & dark"; color: Theme.fg }
-
                                 SettingsLabel {
-                                    text: root.appearanceFocus === "theme"
-                                        ? "↑↓ setting · ←→ / Enter change · Shift+←→ bigger steps · Tab wallpaper"
-                                        : "Tab: back to light & dark"
+                                    text: "↑↓ setting · ←→ pick · Enter apply · Shift+←→ bigger steps"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
@@ -2416,7 +2459,7 @@ Item {
                                         id: themeRow
                                         required property var modelData
                                         required property int index
-                                        readonly property bool focusedRow: root.appearanceFocus === "theme"
+                                        readonly property bool focusedRow: root.contentFocused
                                             && index === root.keyboardThemeIndex
                                         width: parent.width
                                         height: Theme.controlHeight
@@ -2445,7 +2488,8 @@ Item {
                                                     readonly property bool selected: isChoice
                                                         ? root.themeOptionValue(themeRow.modelData.key) === modelData
                                                         : isValue
-                                                    readonly property bool focused: themeRow.focusedRow && selected
+                                                    readonly property bool focused: themeRow.focusedRow
+                                                        && (isChoice && root.keyboardPick >= 0 ? index === root.keyboardPick : selected)
                                                     width: isChoice || isValue
                                                         ? Math.max(72, themeControlLabel.implicitWidth + 20)
                                                         : Theme.controlHeight
@@ -2472,7 +2516,6 @@ Item {
                                                     TapHandler {
                                                         enabled: !themeControl.isValue
                                                         onTapped: {
-                                                            root.appearanceFocus = "theme"
                                                             root.keyboardThemeIndex = themeRow.index
                                                             if (themeControl.isChoice)
                                                                 root.setThemeChoice(themeRow.modelData.key, themeControl.modelData)
@@ -2502,21 +2545,39 @@ Item {
                                 }
                             }
 
-                            WidgetHeader {
-                                id: wallpaperHeader
-                                anchors { top: themeColumn.bottom; topMargin: 18; left: parent.left }
-                                text: "Wallpaper"
-                                color: Theme.fg
+                        }
+                    }
+                }
+
+                Loader {
+                    id: wallpaperPage
+                    anchors.fill: parent
+                    active: settingsWindow.visible && root.page === "wallpaper"
+
+                    sourceComponent: Component {
+                        Item {
+                            readonly property alias browser: wallpaperBrowser
+                            visible: root.page === "wallpaper"
+
+                            SettingsLabel {
+                                id: wallpaperHint
+                                anchors { top: parent.top; left: parent.left; right: parent.right }
+                                // Same keys as the popup's hint, in Settings' style (no colons).
+                                text: wallpaperBrowser.keyHint.replace(/: /g, " ")
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
                             }
 
                             WallpaperBrowser {
                                 id: wallpaperBrowser
-                                anchors { top: wallpaperHeader.bottom; topMargin: 8 }
+                                anchors { top: wallpaperHint.bottom; topMargin: 8 }
                                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
                                 settings: root.settings
                                 // Settings stays monochrome; module accents are for the bar.
                                 accent: Theme.fg
-                                keyboardActive: root.appearanceFocus === "wallpaper"
+                                keyboardActive: root.contentFocused
+                                showHint: false
                                 folderEditable: true
                                 onKeyboardReleased: keyboardScope.forceActiveFocus()
                             }
@@ -2538,7 +2599,7 @@ Item {
                     anchors.fill: parent
                     active: settingsWindow.visible && root.page === "notifications"
                     sourceComponent: Component {
-                        NotificationSettings { visible: root.page === "notifications"; settings: root.settings }
+                        NotificationSettings { visible: root.page === "notifications"; settings: root.settings; active: root.contentFocused }
                     }
                 }
 
@@ -2547,7 +2608,7 @@ Item {
                     anchors.fill: parent
                     active: settingsWindow.visible && root.page === "profile"
                     sourceComponent: Component {
-                        PowerProfileSettings { visible: root.page === "profile"; profiles: root.powerProfiles }
+                        PowerProfileSettings { visible: root.page === "profile"; profiles: root.powerProfiles; active: root.contentFocused }
                     }
                 }
 
@@ -2579,7 +2640,7 @@ Item {
                             spacing: 12
 
                             SettingsLabel {
-                                text: "↑↓ setting · ←→ / Enter change"
+                                text: "↑↓ setting · ←→ pick · Enter apply"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -2595,7 +2656,7 @@ Item {
                                     spacing: 6
 
                                     SettingsLabel {
-                                        text: (clockRow.index === root.keyboardClockIndex ? "› " : "  ")
+                                        text: (root.contentFocused && clockRow.index === root.keyboardClockIndex ? "› " : "  ")
                                             + clockRow.modelData.label
                                         color: Theme.grey1
                                         font.family: Theme.fontFamily
@@ -2612,7 +2673,9 @@ Item {
                                                 required property int index
                                                 readonly property bool selected: root.clockOptionValue(
                                                     clockRow.modelData.key) === modelData
-                                                readonly property bool focused: clockRow.index === root.keyboardClockIndex && selected
+                                                readonly property bool focused: root.contentFocused
+                                                    && clockRow.index === root.keyboardClockIndex
+                                                    && (root.keyboardPick >= 0 ? index === root.keyboardPick : selected)
                                                 width: Math.max(92, choiceContent.implicitWidth + 20)
                                                 height: Theme.controlHeight
                                                 color: root.controlBackground(selected, focused, choiceHover.hovered)
@@ -2669,7 +2732,7 @@ Item {
                             width: parent.width
                             spacing: 12
                             SettingsLabel {
-                                text: "←→ interval · Enter select"
+                                text: "←→ interval · Enter apply"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -2699,7 +2762,7 @@ Item {
                                             anchors.centerIn: parent
                                             spacing: 6
                                             SettingsLabel {
-                                                text: (updateChoice.focused ? "› " : "  ") + updateChoice.modelData.label
+                                                text: (root.contentFocused && updateChoice.focused ? "› " : "  ") + updateChoice.modelData.label
                                                 color: updateChoice.selected ? Theme.fg : Theme.grey1
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize
@@ -2741,10 +2804,8 @@ Item {
                             anchors.fill: parent
                             spacing: 16
 
-                            Text {
-                                width: parent.width
-                                text: "Blank commands use automatic selection. Enter a custom command with its arguments, then Apply."
-                                wrapMode: Text.WordWrap
+                            SettingsLabel {
+                                text: "↑↓ action · Enter edit · Del use automatic · Ctrl+Enter apply"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -2767,7 +2828,7 @@ Item {
                                         SettingsLabel {
                                             anchors.left: parent.left
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: (powerRow.index === root.keyboardPowerIndex ? "› " : "  ")
+                                            text: (root.contentFocused && powerRow.index === root.keyboardPowerIndex ? "› " : "  ")
                                                 + powerRow.modelData.label
                                             color: Theme.grey1
                                             font.family: Theme.fontFamily
@@ -2843,7 +2904,7 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: "↑↓ action · Enter edit · Ctrl+Enter apply\nQuote paths or arguments containing spaces. Commands that need root should use your authorized wrapper."
+                                text: "Blank commands use automatic selection. Enter a custom command with its arguments, then Apply. Quote paths or arguments containing spaces. Commands that need root should use your authorized wrapper."
                                 wrapMode: Text.WordWrap
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
@@ -2872,7 +2933,7 @@ Item {
                                 font.pixelSize: Theme.fontSize
                             }
                             SettingsLabel {
-                                text: "↑↓ select · ←→ adjust · Enter edit/toggle · Ctrl+Enter apply"
+                                text: "↑↓ select · ←→ adjust · Enter edit or toggle · Del use system layout · R reset · Ctrl+Enter apply"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
@@ -2908,7 +2969,7 @@ Item {
                                         anchors.left: parent.left
                                         anchors.leftMargin: 12
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: (inputRow.index === root.keyboardInputIndex ? "› " : "  ")
+                                        text: (root.contentFocused && inputRow.index === root.keyboardInputIndex ? "› " : "  ")
                                             + inputRow.option.label
                                         color: Theme.grey1
                                         font.family: Theme.fontFamily
@@ -3079,11 +3140,11 @@ Item {
 
                                 SettingsLabel {
                                     text: root.keyboardDisplaySection === "outputs"
-                                        ? "Arrows: output · Tab: editor · R: refresh · S: Apply"
-                                        : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
+                                        ? "Arrows output · Tab editor · R refresh · Ctrl+Enter apply"
+                                        : "↑↓ field · ←→ adjust · Enter change · Tab outputs"
                                     color: Theme.grey1
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                                    font.pixelSize: Theme.fontSize
                                 }
 
                                 Row {
@@ -3120,13 +3181,6 @@ Item {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize
                                     }
-                                }
-
-                                SettingsLabel {
-                                    text: "Drag displays to arrange them. Nearby edges snap together."
-                                    color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
 
                                 Flow {
@@ -3169,7 +3223,7 @@ Item {
                                 Rectangle {
                                     id: displayCanvas
                                     width: parent.width
-                                    height: Math.max(110, pageArea.height - 360)
+                                    height: Math.max(110, pageArea.height - 380)
                                     color: Theme.bgdim
                                     border.width: 1
                                     border.color: Theme.bg4
@@ -3487,7 +3541,7 @@ Item {
                                 }
 
                                 Text {
-                                    text: "Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
+                                    text: "Drag displays to arrange them; nearby edges snap together. Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     color: Theme.grey1
@@ -3626,7 +3680,7 @@ Item {
                                                 anchors.left: parent.left
                                                 anchors.leftMargin: 10
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                text: (aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
+                                                text: (root.contentFocused && aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
                                                 color: Theme.fg
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize

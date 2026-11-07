@@ -33,10 +33,15 @@ ShellRoot {
         actionsSupported: true
         persistenceSupported: true
     }
+    NotificationService {
+        id: notificationService
+        server: notificationServer
+        enabled: settings.notificationsEnabled
+    }
 
     Bar {
         id: bar
-        notificationServer: notificationServer
+        notificationService: notificationService
         overviewOpen: niriState.overviewOpen
         niriEvents: niriState
         settings: settings

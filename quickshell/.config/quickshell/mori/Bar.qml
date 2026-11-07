@@ -7,7 +7,7 @@ import "./theme"
 PanelWindow {
     id: barWindow
     required property var niriEvents
-    required property var notificationServer
+    required property var notificationService
     required property bool overviewOpen
     required property var settings
     required property var updateService
@@ -350,7 +350,7 @@ PanelWindow {
                 id: notificationCenter
                 settings: barWindow.settings
                 panelWindow: barWindow
-                notificationServer: barWindow.notificationServer
+                service: barWindow.notificationService
                 popupCoordinator: barWindow
                 accent: barWindow.settings.moduleColor("notifications")
             }
@@ -504,7 +504,7 @@ PanelWindow {
             sourceComponent: NotificationPopup {
                 accent: barWindow.settings.moduleColor("notifications")
                 panelWindow: barWindow
-                notificationServer: barWindow.notificationServer
+                service: barWindow.notificationService
                 suppressed: barWindow.overviewOpen || barWindow.fullscreen
                 doNotDisturb: barWindow.settings.doNotDisturb
             }

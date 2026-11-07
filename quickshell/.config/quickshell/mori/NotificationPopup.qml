@@ -1,36 +1,34 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "./theme"
 
 Item {
     id: root
     required property var panelWindow
-    required property var notificationServer
+    required property var service
     required property bool doNotDisturb
     property color accent: Theme.purple
-    property var pendingNotifications: []
     property int nextToastId: 0
     property bool suppressed: false
 
-    function addNotification(notification) {
-        // Copy values out of Quickshell's short-lived DBus wrapper before the
-        // signal handler returns. Never expose that QObject directly to a view.
-        pendingNotifications.push({
-            "toastId": nextToastId++,
-            "appName": String(notification.appName || "Notification"),
-            "desktopEntry": String(notification.desktopEntry || ""),
-            "summary": String(notification.summary || ""),
-            "body": String(notification.body || "")
-        })
-        notificationQueue.restart()
-    }
-
-    function flushNotifications() {
-        while (pendingNotifications.length > 0) {
-            const notification = pendingNotifications.shift()
-            popupNotifications.insert(0, notification)
+    function addNotification(entry) {
+        // An app replacing its notification updates that toast in place.
+        for (let i = 0; i < popupNotifications.count; ++i) {
+            const toast = popupNotifications.get(i)
+            if (toast.liveId === entry.liveId) {
+                popupNotifications.set(i, {
+                    "appName": entry.appName, "summary": entry.summary,
+                    "body": entry.body, "generation": toast.generation + 1
+                })
+                return
+            }
         }
+        if (doNotDisturb) return
+        popupNotifications.insert(0, {
+            "toastId": nextToastId++, "liveId": entry.liveId, "generation": 0,
+            "appName": entry.appName, "desktopEntry": entry.desktopEntry,
+            "summary": entry.summary, "body": entry.body
+        })
         while (popupNotifications.count > 3)
             popupNotifications.remove(popupNotifications.count - 1)
     }
@@ -44,92 +42,19 @@ Item {
         }
     }
 
-    function desktopId(value) {
-        return String(value || "").toLowerCase().replace(/\.desktop$/, "")
-    }
-
-    function launchApplication(entry) {
-        const desktopEntry = desktopId(entry)
-        if (desktopEntry.length)
-            applicationLaunch.exec(["gtk-launch", desktopEntry])
-    }
-
-    function focusApplication(entry) {
-        const desktopEntry = desktopId(entry)
-        if (!desktopEntry.length)
-            return
-        if (windowQuery.running) {
-            launchApplication(desktopEntry)
-            return
-        }
-
-        windowQuery.desktopEntry = desktopEntry
-        windowQuery.exec(["niri", "msg", "--json", "windows"])
-    }
-
-    Process {
-        id: applicationLaunch
-    }
-
-    Process {
-        id: windowFocus
-    }
-
-    Process {
-        id: windowQuery
-        property string desktopEntry: ""
-        stdout: StdioCollector { id: windowList }
-
-        onExited: exitCode => {
-            const entry = desktopEntry
-            if (exitCode !== 0) {
-                root.launchApplication(entry)
-                return
-            }
-
-            let windows = []
-            try {
-                windows = JSON.parse(windowList.text)
-            } catch (error) {
-                console.warn("Could not parse Niri window list:", error)
-            }
-
-            let match = null
-            for (let i = 0; i < windows.length; ++i) {
-                const appId = root.desktopId(windows[i].app_id)
-                if (appId === entry || appId.endsWith("." + entry)
-                        || entry.endsWith("." + appId)) {
-                    match = windows[i]
-                    break
-                }
-            }
-
-            if (match)
-                windowFocus.exec(["niri", "msg", "action", "focus-window", "--id", String(match.id)])
-            else
-                root.launchApplication(entry)
-        }
-    }
-
     ListModel {
         id: popupNotifications
     }
 
-    // Defer model mutation until after the DBus notification callback. Qt was
-    // crashing while a Repeater regenerated inside that callback.
-    Timer {
-        id: notificationQueue
-        interval: 0
-        repeat: false
-        onTriggered: root.flushNotifications()
-    }
-
     Connections {
-        target: root.notificationServer
-
-        function onNotification(notification) {
-            if (!root.doNotDisturb)
-                root.addNotification(notification)
+        target: root.service
+        function onArrived(entry) { root.addNotification(entry) }
+        // The app closed it, or one of its actions ran.
+        function onLiveClosed(liveId) {
+            for (let i = 0; i < toastRepeater.count; ++i) {
+                const toast = toastRepeater.itemAt(i)
+                if (toast && toast.liveId === liveId) toast.dismiss()
+            }
         }
     }
 
@@ -165,11 +90,14 @@ Item {
                 spacing: 8
 
                 Repeater {
+                    id: toastRepeater
                     model: popupNotifications
 
                     delegate: PopupSurface {
                         id: toast
                         required property int toastId
+                        required property int liveId
+                        required property int generation
                         required property string appName
                         required property string desktopEntry
                         required property string summary
@@ -187,11 +115,19 @@ Item {
                         }
 
                         function activate() {
-                            root.focusApplication(desktopEntry)
+                            root.service.activate(liveId, desktopEntry)
                             dismiss()
                         }
 
                         Component.onCompleted: shown = true
+                        // An updated notification gets its full time again.
+                        onGenerationChanged: if (!toastHover.hovered) removeTimer.restart()
+
+                        // Wait while the pointer is on the toast.
+                        HoverHandler {
+                            id: toastHover
+                            onHoveredChanged: hovered ? removeTimer.stop() : removeTimer.restart()
+                        }
 
                         Timer {
                             id: removeTimer
@@ -210,6 +146,7 @@ Item {
 
                         Column {
                             id: notificationText
+                            z: 1 // action buttons above the click area
                             anchors.left: parent.left
                             anchors.right: closeButton.left
                             anchors.top: parent.top
@@ -245,6 +182,12 @@ Item {
                                 wrapMode: Text.Wrap
                                 maximumLineCount: 3
                                 elide: Text.ElideRight
+                            }
+
+                            NotificationActions {
+                                service: root.service
+                                liveId: toast.liveId
+                                accent: root.accent
                             }
                         }
 

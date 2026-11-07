@@ -97,6 +97,8 @@ Incoming notification popups leave open menus in place. The count beside the bel
 
 Notification history shows each arrival's date and time using the configured clock formats.
 
+Clicking a notification runs the app's default action (for example opening that chat) and focuses its window; other actions show as buttons under the text. A notification stays open for the app until you remove it from the history, so its actions keep working there. When an app updates a notification (a download's progress, a new song), the popup updates in place and history keeps each version. Popups wait while the pointer is on them. In the history, **Up/Down** selects, **Enter** opens, **R** removes, **C** clears all and **D** toggles Do Not Disturb.
+
 The volume popup has **Playback** and **Microphone** tabs (**Tab** switches between them). The device picker expands only when switching devices; **Enter** opens it or selects a device, and **Escape** collapses it before closing the popup. **Up/Down** moves through device choices or playback apps, **Left/Right** adjusts volume, and **M** toggles mute for the focused device or app. Playback apps appear as compact name-and-slider rows.
 
 In the network popup, use **Up/Down** to select Ethernet, an active VPN, or Wi-Fi; **Enter** connects and **D** disconnects the selected connection.

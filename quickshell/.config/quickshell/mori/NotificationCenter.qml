@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import "./theme"
 
@@ -10,18 +9,19 @@ Item {
     implicitWidth: Math.max(18, indicator.implicitWidth)
     implicitHeight: indicator.implicitHeight
     required property var panelWindow
-    required property var notificationServer
     required property var popupCoordinator
     property var settings: null
     property color accent: Theme.purple
+    required property var service
     readonly property bool doNotDisturb: !!settings && settings.doNotDisturb
     function toggleDoNotDisturb() { if (settings) settings.setDoNotDisturb(!doNotDisturb) }
 
-    property var pendingNotifications: []
-    property int nextNotificationId: 0
-    readonly property int historyLimit: 500
-    readonly property int notificationCount: notificationHistory.count
+    readonly property int notificationCount: service.count
     readonly property bool popupVisible: popup.visible
+    // ↑↓ shows the selection; mouse users don't see one.
+    property bool keyboardActive: false
+    property int selectedIndex: 0
+    onNotificationCountChanged: selectedIndex = Math.max(0, Math.min(selectedIndex, notificationCount - 1))
 
     function close() {
         popup.visible = false
@@ -32,6 +32,8 @@ Item {
             close()
         else {
             popupCoordinator.showPopup(root)
+            keyboardActive = false
+            selectedIndex = 0
             popup.visible = true
         }
     }
@@ -42,139 +44,31 @@ Item {
             event.accepted = true
             return
         }
-        if (event.modifiers !== Qt.NoModifier || event.isAutoRepeat)
+        if (event.modifiers !== Qt.NoModifier && event.modifiers !== Qt.KeypadModifier)
             return
 
-        if (event.key === Qt.Key_C) {
-            notificationHistory.clear()
-            event.accepted = true
+        if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            if (notificationCount > 0) {
+                if (keyboardActive)
+                    selectedIndex = Math.max(0, Math.min(notificationCount - 1,
+                        selectedIndex + (event.key === Qt.Key_Up ? -1 : 1)))
+                keyboardActive = true
+            }
+        } else if (event.isAutoRepeat) {
+            return
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (keyboardActive && popupContent.item) popupContent.item.activateSelected()
+        } else if (event.key === Qt.Key_R) {
+            if (keyboardActive && notificationCount > 0)
+                service.remove(service.history.get(selectedIndex).notificationId)
+        } else if (event.key === Qt.Key_C) {
+            service.clear()
         } else if (event.key === Qt.Key_D) {
             toggleDoNotDisturb()
-            event.accepted = true
-        }
-    }
-
-    function desktopId(value) {
-        return String(value || "").toLowerCase().replace(/\.desktop$/, "")
-    }
-
-    function launchApplication(entry) {
-        const desktopEntry = desktopId(entry)
-        if (desktopEntry.length)
-            applicationLaunch.exec(["gtk-launch", desktopEntry])
-    }
-
-    function focusApplication(entry) {
-        const desktopEntry = desktopId(entry)
-        if (!desktopEntry.length)
-            return
-
-        // A second click while the window list is in flight still gets a
-        // useful result, without racing a shared Process instance.
-        if (windowQuery.running) {
-            launchApplication(desktopEntry)
+        } else {
             return
         }
-
-        windowQuery.desktopEntry = desktopEntry
-        windowQuery.exec(["niri", "msg", "--json", "windows"])
-    }
-
-    function addNotification(notification) {
-        // Apps may replace an existing DBus notification. Keep a value copy so
-        // the vault preserves every arrival rather than only its replacement.
-        if (pendingNotifications.length >= historyLimit)
-            pendingNotifications.shift()
-        pendingNotifications.push({
-            "notificationId": nextNotificationId++,
-            "receivedAt": Date.now(),
-            "appName": String(notification.appName || "Notification"),
-            "desktopEntry": String(notification.desktopEntry || ""),
-            "summary": String(notification.summary || ""),
-            "body": String(notification.body || "")
-        })
-        notificationQueue.restart()
-    }
-
-    function flushNotifications() {
-        while (pendingNotifications.length > 0)
-            notificationHistory.insert(0, pendingNotifications.shift())
-        if (notificationHistory.count > historyLimit)
-            notificationHistory.remove(historyLimit, notificationHistory.count - historyLimit)
-    }
-
-    function removeNotification(notificationId) {
-        for (let i = 0; i < notificationHistory.count; ++i) {
-            if (notificationHistory.get(i).notificationId === notificationId) {
-                notificationHistory.remove(i)
-                return
-            }
-        }
-    }
-
-    Process {
-        id: applicationLaunch
-    }
-
-    Process {
-        id: windowFocus
-    }
-
-    Process {
-        id: windowQuery
-        property string desktopEntry: ""
-        stdout: StdioCollector { id: windowList }
-
-        onExited: exitCode => {
-            const entry = desktopEntry
-            if (exitCode !== 0) {
-                root.launchApplication(entry)
-                return
-            }
-
-            let windows = []
-            try {
-                windows = JSON.parse(windowList.text)
-            } catch (error) {
-                console.warn("Could not parse Niri window list:", error)
-            }
-
-            let match = null
-            for (let i = 0; i < windows.length; ++i) {
-                const appId = root.desktopId(windows[i].app_id)
-                if (appId === entry || appId.endsWith("." + entry)
-                        || entry.endsWith("." + appId)) {
-                    match = windows[i]
-                    break
-                }
-            }
-
-            if (match)
-                windowFocus.exec(["niri", "msg", "action", "focus-window", "--id", String(match.id)])
-            else
-                root.launchApplication(entry)
-        }
-    }
-
-    ListModel {
-        id: notificationHistory
-    }
-
-    // Mutate the model after the DBus callback returns; doing it directly can
-    // race delegate regeneration in Qt.
-    Timer {
-        id: notificationQueue
-        interval: 0
-        repeat: false
-        onTriggered: root.flushNotifications()
-    }
-
-    Connections {
-        target: root.notificationServer
-
-        function onNotification(notification) {
-            root.addNotification(notification)
-        }
+        event.accepted = true
     }
 
     Row {
@@ -225,6 +119,11 @@ Item {
 
             sourceComponent: Component {
                 PopupSurface {
+                    function activateSelected() {
+                        const entry = historyView.itemAtIndex(root.selectedIndex)
+                        if (entry) entry.activate()
+                    }
+
                     implicitHeight: notificationList.implicitHeight + 24
                     anchors.fill: parent
                     shown: popup.visible
@@ -277,7 +176,7 @@ Item {
                                     font.pixelSize: Theme.fontSize
 
                                     TapHandler {
-                                    onTapped: notificationHistory.clear()
+                                        onTapped: root.service.clear()
                                     }
                                 }
                             }
@@ -300,10 +199,15 @@ Item {
                             spacing: 8
                             cacheBuffer: 0
                             reuseItems: true
-                            model: notificationHistory
+                            model: root.service.history
+                            currentIndex: root.selectedIndex
+                            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
 
                             delegate: Rectangle {
+                                id: historyEntry
+                                required property int index
                                 required property int notificationId
+                                required property int liveId
                                 required property string appName
                                 required property string desktopEntry
                                 required property string summary
@@ -315,6 +219,8 @@ Item {
                                 implicitHeight: notificationText.implicitHeight + 12
                                 radius: 0
                                 color: Theme.bg2
+                                border.width: root.keyboardActive && index === root.selectedIndex ? 1 : 0
+                                border.color: root.accent
 
                                 function activate() {
                                     // First click on a cut-off notification reveals the rest.
@@ -322,12 +228,13 @@ Item {
                                         expanded = true
                                         return
                                     }
-                                    root.focusApplication(desktopEntry)
-                                    root.removeNotification(notificationId)
+                                    root.service.activate(liveId, desktopEntry)
+                                    root.service.remove(notificationId)
                                 }
 
                                 Column {
                                     id: notificationText
+                                    z: 1 // action buttons above the click area
                                     anchors.left: parent.left
                                     anchors.right: closeButton.left
                                     anchors.top: parent.top
@@ -385,6 +292,12 @@ Item {
                                         maximumLineCount: expanded ? 1000 : 3
                                         elide: Text.ElideRight
                                     }
+
+                                    NotificationActions {
+                                        service: root.service
+                                        liveId: historyEntry.liveId
+                                        accent: root.accent
+                                    }
                                 }
 
                                 Text {
@@ -399,7 +312,7 @@ Item {
 
                                     TapHandler {
                                         margin: 6
-                                        onTapped: root.removeNotification(notificationId)
+                                        onTapped: root.service.remove(notificationId)
                                     }
                                 }
 
@@ -410,14 +323,14 @@ Item {
                                     anchors.bottom: parent.bottom
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: parent.activate()
+                                    onClicked: historyEntry.activate()
                                 }
                             }
                         }
 
                         KeyboardHint {
                             id: notificationHint
-                            text: "Esc: close"
+                            text: "↑↓: select · Enter: open · R: remove · C: clear · D: DND · Esc: close"
                         }
                     }
                 }

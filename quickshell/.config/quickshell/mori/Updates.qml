@@ -61,9 +61,9 @@ Row {
     }
     BarLabel {
         anchors.verticalCenter: parent.verticalCenter
-        visible: root.updateService.status === "error"
+        visible: root.updateService.status === "error" || root.updateService.rebootRequired
         text: "!"
-        color: Theme.red
+        color: root.updateService.status === "error" ? Theme.red : Theme.yellow
     }
     TapHandler { onTapped: root.toggle() }
 

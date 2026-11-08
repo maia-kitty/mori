@@ -14,6 +14,9 @@ Item {
     property bool systemTrayEnabled: true
     property bool updatesEnabled: true
     property int updateIntervalMinutes: 60
+    // upkeep source keys (its --no-<key> flags) that the bar skips.
+    property var disabledUpdateSources: []
+    readonly property var updateSourceKeys: ["system", "aur", "flatpak", "nix", "fwupd"]
     property bool networkEnabled: true
     property bool volumeEnabled: true
     property bool brightnessEnabled: true
@@ -137,6 +140,19 @@ Item {
         if ([0, 15, 60, 180].indexOf(minutes) < 0 || updateIntervalMinutes === minutes)
             return
         updateIntervalMinutes = minutes
+        noteChange()
+    }
+
+    function updateSourceEnabled(key) {
+        return disabledUpdateSources.indexOf(key) < 0
+    }
+
+    function setUpdateSourceEnabled(key, enabled) {
+        if (updateSourceKeys.indexOf(key) < 0 || updateSourceEnabled(key) === enabled)
+            return
+        disabledUpdateSources = enabled
+            ? disabledUpdateSources.filter(name => name !== key)
+            : disabledUpdateSources.concat([key])
         noteChange()
     }
 
@@ -364,6 +380,9 @@ Item {
                 const updates = parsed.updates || {}
                 if ([0, 15, 60, 180].indexOf(updates.intervalMinutes) >= 0)
                     updateIntervalMinutes = updates.intervalMinutes
+                if (Array.isArray(updates.disabledSources))
+                    disabledUpdateSources = updateSourceKeys.filter(
+                        key => updates.disabledSources.indexOf(key) >= 0)
                 if (["24h", "12h"].indexOf(clock.timeFormat) >= 0)
                     clockTimeFormat = clock.timeFormat
                 if (["yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"].indexOf(clock.dateFormat) >= 0)
@@ -417,7 +436,7 @@ Item {
                 "right": rightModuleOrder
             },
             "colors": moduleColors,
-            "updates": { "intervalMinutes": updateIntervalMinutes },
+            "updates": { "intervalMinutes": updateIntervalMinutes, "disabledSources": disabledUpdateSources },
             "power": powerCommands,
             "compact": {
                 "media": mediaCompact,

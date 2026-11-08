@@ -518,5 +518,6 @@ PanelWindow {
         settings: barWindow.settings
         networkService: barWindow.networkService
         powerProfiles: barWindow.powerProfiles
+        updateService: barWindow.updateService
     }
 }

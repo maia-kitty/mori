@@ -27,6 +27,10 @@ Item {
     // Shared services from shell.qml (via Bar.qml) behind the Network and Power profile pages.
     property var networkService: null
     property var powerProfiles: null
+    property var updateService: null
+    // Updates page rows: 0 is the interval, then one per detected source.
+    property int keyboardUpdateRow: 0
+    readonly property var updateSources: updateService ? updateService.detected : []
 
     width: 0
     height: 0
@@ -411,6 +415,7 @@ Item {
         } else if (name === "clock") {
             keyboardClockIndex = 0
         } else if (name === "updates") {
+            keyboardUpdateRow = 0
             keyboardUpdateIndex = Math.max(0, updateIntervals.findIndex(
                 choice => choice.minutes === settings.updateIntervalMinutes))
         } else if (name === "power") {
@@ -981,9 +986,18 @@ Item {
                 openAboutLink(keyboardAboutIndex)
             else return
         } else if (page === "updates") {
-            if (key === Qt.Key_Left || key === Qt.Key_Right)
+            const sourceRow = keyboardUpdateRow > 0 && updatesPage.item
+                ? updatesPage.item.rows.itemAt(keyboardUpdateRow - 1) : null
+            if (key === Qt.Key_Up || key === Qt.Key_Down)
+                keyboardUpdateRow = Math.max(0, Math.min(updateSources.length,
+                    keyboardUpdateRow + (key === Qt.Key_Up ? -1 : 1)))
+            else if ((key === Qt.Key_Left || key === Qt.Key_Right) && sourceRow)
+                sourceRow.pick(key === Qt.Key_Left ? -1 : 1)
+            else if (key === Qt.Key_Left || key === Qt.Key_Right)
                 keyboardUpdateIndex = Math.max(0, Math.min(updateIntervals.length - 1,
                     keyboardUpdateIndex + (key === Qt.Key_Left ? -1 : 1)))
+            else if ((key === Qt.Key_Return || key === Qt.Key_Enter) && sourceRow)
+                sourceRow.apply()
             else if (key === Qt.Key_Return || key === Qt.Key_Enter)
                 settings.setUpdateInterval(updateIntervals[keyboardUpdateIndex].minutes)
             else return
@@ -2731,14 +2745,15 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 12
+                            property alias rows: sourceRows
                             SettingsLabel {
-                                text: "←→ interval · Enter apply"
+                                text: "↑↓ setting · ←→ pick · Enter apply"
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
                             }
                             SettingsLabel {
-                                text: "› Check interval"
+                                text: (root.contentFocused && root.keyboardUpdateRow === 0 ? "› " : "  ") + "Check interval"
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize
@@ -2752,6 +2767,7 @@ Item {
                                         required property var modelData
                                         required property int index
                                         readonly property bool focused: index === root.keyboardUpdateIndex
+                                            && root.keyboardUpdateRow === 0
                                         readonly property bool selected: root.settings.updateIntervalMinutes === modelData.minutes
                                         width: 100
                                         height: Theme.controlHeight
@@ -2783,6 +2799,41 @@ Item {
                                 wrapMode: Text.WordWrap
                                 textFormat: Text.PlainText
                                 text: "Changes save immediately. Manual disables scheduled checks; use Check now in the Updates popup. Disabling the Updates module stops checks."
+                                color: Theme.grey1
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Math.max(10, Theme.fontSize - 2)
+                            }
+                            SettingsLabel {
+                                text: "  Sources"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize
+                            }
+                            Repeater {
+                                id: sourceRows
+                                model: root.updateSources
+                                delegate: ChoiceRow {
+                                    required property var modelData
+                                    required property int index
+                                    label: modelData.name
+                                    values: [false, true]
+                                    labels: ["Off", "On"]
+                                    value: root.settings.updateSourceEnabled(modelData.key)
+                                    focused: root.contentFocused && root.keyboardUpdateRow === index + 1
+                                    onChosen: value => root.settings.setUpdateSourceEnabled(modelData.key, value)
+                                }
+                            }
+                            Text {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                textFormat: Text.PlainText
+                                text: root.updateSources.length === 0
+                                    ? "Sources found on this computer appear here after the first check."
+                                    : "Only package managers found on this computer are listed. Off sources aren't checked or updated from the bar."
+                                      + (!root.settings.updateSourceEnabled("system")
+                                         && root.updateSources.some(source => source.key === "aur")
+                                         ? " With System off, AUR updates are still counted but not installed: Arch doesn't support partial upgrades."
+                                         : "")
                                 color: Theme.grey1
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)

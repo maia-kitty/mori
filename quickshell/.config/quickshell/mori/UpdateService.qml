@@ -12,6 +12,9 @@ Item {
     property bool launching: false
     property string errorMessage: ""
     property var report: null
+    // Every source upkeep found, including disabled ones: what Settings offers to toggle.
+    property var detected: []
+    readonly property var skipFlags: settings.disabledUpdateSources.map(key => "--no-" + key)
     readonly property int count: report ? report.total : 0
     readonly property bool incomplete: report && report.sources.some(source => source.count === null)
     readonly property bool rebootRequired: !!(report && report.reboot && report.reboot.required)
@@ -35,6 +38,9 @@ Item {
                     && Array.isArray(source.packages)
                     && (source.count === null || Number.isInteger(source.count) && source.count >= 0)))
             throw new Error("Invalid update status")
+        if (Array.isArray(value.detected) && value.detected.every(source =>
+                typeof source.key === "string" && typeof source.name === "string"))
+            detected = value.detected
         report = value
         updating = false
         errorMessage = value.status === "error" ? "Some update sources could not be checked." : ""
@@ -46,7 +52,7 @@ Item {
             return
         checking = true
         errorMessage = ""
-        checker.exec(["upkeep", "--json", "--timeout", "120"])
+        checker.exec(["upkeep", "--json", "--timeout", "120"].concat(skipFlags))
     }
 
     function launch() {
@@ -55,7 +61,7 @@ Item {
         launching = true
         updating = true
         errorMessage = ""
-        launcher.exec(["upkeep", "--launch"])
+        launcher.exec(["upkeep", "--launch"].concat(skipFlags))
     }
 
     onActiveChanged: {
@@ -63,6 +69,8 @@ Item {
         else { initialCheck.stop(); retry.stop() }
     }
     Component.onCompleted: if (active) initialCheck.restart()
+    // Recheck shortly after toggling sources; the delay batches several toggles.
+    onSkipFlagsChanged: if (active) initialCheck.restart()
 
     Timer { id: initialCheck; interval: 2000; onTriggered: root.check() }
     Timer {
@@ -101,7 +109,7 @@ Item {
             root.launching = false
             if (exitCode !== 0) {
                 root.updating = false
-                root.errorMessage = launchError.text.trim() || "Could not open the updater in Foot."
+                root.errorMessage = launchError.text.trim() || "Could not open the updater in a terminal."
             } else {
                 // The terminal is detached. Probe its lock if no completion
                 // event has arrived yet (also handles a terminal startup failure).

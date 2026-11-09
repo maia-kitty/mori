@@ -96,7 +96,8 @@ Scope {
     // Escape ends the preview (playing the unlock animation); the real lock
     // only clears the field.
     function handleEscape() {
-        if (previewing && state === "locked") unlockNow()
+        if (checking) cancelCheck("")
+        else if (previewing && state === "locked") unlockNow()
         else {
             password = ""
             failed = false
@@ -110,6 +111,15 @@ Scope {
             message = "Preview: " + action + " not run"
         } else
             Quickshell.execDetached(["mori-power", action])
+    }
+
+    // Give up on a password check that is still running (Escape, or it took too long).
+    function cancelCheck(text) {
+        pam.abort()
+        checking = false
+        password = ""
+        failed = text.length > 0
+        message = text
     }
 
     function unlockNow() {
@@ -211,12 +221,23 @@ Scope {
         onFinished: root.finish()
     }
 
+    // Long enough for a fingerprint reader to give up and ask for the password.
+    Timer {
+        interval: 30000
+        running: root.checking
+        onTriggered: root.cancelCheck("Password check timed out")
+    }
+
     PamContext {
         id: pam
-        onResponseRequiredChanged: {
+        // Every prompt gets the password (a stack may ask more than once); anything
+        // else PAM says, like a fingerprint reader's instructions, is shown.
+        onPamMessage: {
             if (responseRequired) respond(root.password)
+            else if (message) root.message = message
         }
         onCompleted: result => {
+            if (!root.checking) return // cancelled meanwhile
             root.checking = false
             if (result === PamResult.Success) {
                 root.message = ""
@@ -228,6 +249,7 @@ Scope {
             }
         }
         onError: error => {
+            if (!root.checking) return
             root.checking = false
             root.failed = true
             root.password = ""

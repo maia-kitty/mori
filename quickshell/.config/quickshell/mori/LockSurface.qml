@@ -70,7 +70,9 @@ Item {
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSize + 2
-                enabled: !root.lock.checking && !root.lock.unlocking
+                // Read-only, not disabled, while checking: it keeps the keyboard, so Escape can cancel.
+                enabled: !root.lock.unlocking
+                readOnly: root.lock.checking
                 activeFocusOnTab: true
                 // One password for every monitor.
                 text: root.lock.password

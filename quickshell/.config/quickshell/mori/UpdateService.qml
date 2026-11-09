@@ -14,6 +14,8 @@ Item {
     property var report: null
     // Every source upkeep found, including disabled ones: what Settings offers to toggle.
     property var detected: []
+    // The sources the running (or last) check skipped.
+    property string checkedKey: ""
     readonly property var skipFlags: settings.disabledUpdateSources.map(key => "--no-" + key)
     // A string only notifies when the sources really change; a reload hands over a new, equal array.
     readonly property string skipKey: skipFlags.join(" ")
@@ -53,6 +55,7 @@ Item {
         if (!active || checking || launching)
             return
         checking = true
+        checkedKey = skipKey
         errorMessage = ""
         checker.exec(["upkeep", "--json", "--timeout", "120"].concat(skipFlags))
     }
@@ -95,6 +98,8 @@ Item {
                 root.errorMessage = checkError.text.trim().slice(0, 1000)
                     || "Could not read update status. Check that upkeep is installed."
             }
+            // Sources were toggled while this check ran: check again with the new set.
+            if (root.active && root.checkedKey !== root.skipKey) initialCheck.restart()
         }
         onRunningChanged: if (!running) Qt.callLater(() => {
             if (root.checking && !checker.running) {

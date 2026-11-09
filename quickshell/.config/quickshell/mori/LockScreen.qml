@@ -45,7 +45,12 @@ Scope {
     function preview() { start(true) }
 
     function start(asPreview, recovering) {
-        if (state !== "idle") return
+        if (state !== "idle") {
+            // A real lock must not be dropped behind a preview or the unlock
+            // animation: end that first. Anything else is already locking.
+            if (asPreview || !(previewing || state === "unlocking")) return
+            finish()
+        }
         previewing = asPreview
         seed = Math.random()
         arcs = Math.random() < 0.5

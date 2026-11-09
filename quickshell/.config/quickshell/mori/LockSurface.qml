@@ -71,6 +71,7 @@ Item {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSize + 2
                 enabled: !root.lock.checking && !root.lock.unlocking
+                activeFocusOnTab: true
                 // One password for every monitor.
                 text: root.lock.password
                 onTextEdited: {
@@ -83,6 +84,9 @@ Item {
                         event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {
                         root.lock.handleEscape()
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                        nextItemInFocusChain(event.key === Qt.Key_Tab).forceActiveFocus()
                         event.accepted = true
                     }
                 }
@@ -105,6 +109,14 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
+    }
+
+    // Also the way out if the password check ever hangs.
+    PowerButtons {
+        anchors { right: parent.right; bottom: parent.bottom; margins: 24 }
+        opacity: card.opacity
+        visible: card.visible
+        onRequested: action => root.lock.power(action)
     }
 
     // Clicking a monitor brings the clock and password field there.

@@ -55,7 +55,7 @@ Zen needs its theme set to **Auto**, Discord's **Appearance** to **Sync with com
 
 ## Lock screen (mori-lock)
 
-**Mod+Alt+L** or **Lock** in the power menu (both run `mori-lock`) take a screenshot of each monitor, lock the session, and let the screenshot dissolve into fog and soft boxes in its own colors. The effect is **Kiri**, Mori's fog engine (`KiriEffect.qml`, `shaders/kiri.frag`), which the login screen uses too. The clock and password field show on the monitor you were using; click another monitor to move them. The right password plays the fog backwards and unlocks. `qs -c mori ipc call bar lockPreview` shows it without locking (Escape closes).
+**Mod+Alt+L** or **Lock** in the power menu (both run `mori-lock`) take a screenshot of each monitor, lock the session, and let the screenshot dissolve into fog and soft boxes in its own colors. The effect is **Kiri**, Mori's fog engine (`KiriEffect.qml`, `shaders/kiri.frag`), which the login screen uses too. The clock and password field show on the monitor you were using; click another monitor to move them. The right password plays the fog backwards and unlocks. `qs -c mori ipc call bar lockPreview` shows it without locking (Escape closes). In the bottom right corner are suspend, restart and power off icons: click one (or Tab to it and press Enter) and it turns red, then again within three seconds to confirm.
 
 If the bar isn't running, `mori-lock` uses Swaylock. If the session lock doesn't take within two seconds, the lock screen starts Swaylock itself; if the bar restarts while locked, it locks again at once.
 

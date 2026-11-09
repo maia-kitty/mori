@@ -103,6 +103,15 @@ Scope {
         }
     }
 
+    // Suspend, reboot or power off from the lock screen's buttons.
+    function power(action) {
+        if (previewing) {
+            failed = false
+            message = "Preview: " + action + " not run"
+        } else
+            Quickshell.execDetached(["mori-power", action])
+    }
+
     function unlockNow() {
         state = "unlocking"
         dissolve.stop()

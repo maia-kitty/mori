@@ -58,6 +58,15 @@ ShellRoot {
         if (!preview) Greetd.cancelSession()
     }
 
+    // The buttons under the login card. mori-power is copied next to this file.
+    function power(action) {
+        if (preview) {
+            failed = false
+            message = "Preview: " + action + " not run"
+        } else
+            Quickshell.execDetached([Quickshell.shellDir + "/mori-power", action])
+    }
+
     function loggedIn() {
         busy = false
         lastUser.setText(user.trim() + "\n")
@@ -174,6 +183,7 @@ ShellRoot {
             }
 
             Column {
+                id: card
                 anchors.centerIn: parent
                 spacing: 14
                 visible: window.hasCard
@@ -263,11 +273,18 @@ ShellRoot {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.message || "Tab: user / password · Enter: log in"
+                    text: root.message || "Tab: next field · Enter: log in"
                     color: root.failed ? Theme.red : Theme.grey1
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize
                 }
+            }
+
+            PowerButtons {
+                anchors { right: parent.right; bottom: parent.bottom; margins: 24 }
+                visible: card.visible
+                opacity: card.opacity
+                onRequested: action => root.power(action)
             }
 
             // Clicking a monitor brings the login card there.

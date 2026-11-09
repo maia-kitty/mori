@@ -97,7 +97,7 @@ Replace the example profile path with yours and back up any existing `userChrome
 
 ## Login screen (mori-greeter)
 
-Mori's own login screen, mori-greeter, runs on greetd and uses Kiri, the same fog engine as mori-lock: your last wallpaper under settled fog, the last user filled in (Tab to type another), and logging in clears the fog before Niri starts. It needs greetd, `jq`, and Literata in the system fonts (see SDDM below).
+Mori's own login screen, mori-greeter, runs on greetd and uses Kiri, the same fog engine as mori-lock: your last wallpaper under settled fog, the last user filled in (Tab to type another), and logging in clears the fog before Niri starts. It needs greetd, `jq`, and Literata in the system fonts (see SDDM below). Suspend, restart and power off icons sit in the bottom right corner (click or Tab + Enter, twice to confirm); they run a copy of `mori-power`.
 
 The login screen runs as the `greeter` user, which cannot read your home directory, so `mori-greeter-install` copies its files instead of using Stow:
 

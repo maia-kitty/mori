@@ -19,7 +19,9 @@ niri="$repo/niri/.config/niri/mori"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage" "${state:-}"' EXIT
 cp -r "$repo/greeter/usr/share/mori-greeter/." "$stage/"
-cp "$shell/KiriEffect.qml" "$stage/"
+cp "$shell/KiriEffect.qml" "$shell/PowerButtons.qml" "$stage/"
+# The power buttons run this copy (the greeter user has no ~/.local/bin).
+cp "$repo/bin/.local/bin/mori-power" "$stage/"
 mkdir -p "$stage/shaders"
 cp "$shell/shaders/kiri.frag.qsb" "$stage/shaders/"
 cp -r "$shell/theme" "$stage/"

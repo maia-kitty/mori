@@ -18,8 +18,6 @@ Item {
     // Server id → tracked Notification. Plain JS, so bump liveRevision when it changes.
     property var live: ({})
     property int liveRevision: 0
-    // Server id → history entries showing it; at 0 the notification is dismissed.
-    property var refs: ({})
     property var pending: []
     property var closedPending: []
     property int nextEntryId: 0
@@ -75,22 +73,30 @@ Item {
         pending = []
         closedPending = []
         for (const entry of arrivals) {
-            history.insert(0, entry)
-            refs[entry.liveId] = (refs[entry.liveId] || 0) + 1
+            // An app updating its notification (progress, a new song) changes
+            // that entry and brings it back to the top instead of adding one.
+            let index = -1
+            for (let i = 0; i < history.count && index < 0; ++i)
+                if (history.get(i).liveId === entry.liveId) index = i
+            if (index < 0)
+                history.insert(0, entry)
+            else {
+                entry.notificationId = history.get(index).notificationId
+                history.set(index, entry)
+                history.move(index, 0, 1)
+            }
             arrived(entry)
         }
         for (let i = history.count - 1; i >= historyLimit; i--)
-            unref(history.get(i).liveId)
+            release(history.get(i).liveId)
         if (history.count > historyLimit)
             history.remove(historyLimit, history.count - historyLimit)
         if (arrivals.length > 0 || closed.length > 0) liveRevision++
         for (const liveId of closed) liveClosed(liveId)
     }
 
-    function unref(liveId) {
-        refs[liveId] = (refs[liveId] || 1) - 1
-        if (refs[liveId] > 0) return
-        delete refs[liveId]
+    // Its history entry is gone: tell the app the notification is dismissed.
+    function release(liveId) {
         if (live[liveId]) live[liveId].dismiss()
     }
 
@@ -99,7 +105,7 @@ Item {
             if (history.get(i).notificationId === notificationId) {
                 const liveId = history.get(i).liveId
                 history.remove(i)
-                unref(liveId)
+                release(liveId)
                 return
             }
         }
@@ -109,7 +115,7 @@ Item {
         const liveIds = []
         for (let i = 0; i < history.count; ++i) liveIds.push(history.get(i).liveId)
         history.clear()
-        for (const liveId of liveIds) unref(liveId)
+        for (const liveId of liveIds) release(liveId)
     }
 
     // Actions other than "default", which is the click on the notification itself.

@@ -71,6 +71,8 @@ Scope {
         onFinished: {
             root.busy = false
             linger.restart()
+            // The images are loaded; don't leave the desktop's screenshots in RAM.
+            Quickshell.execDetached(["sh", "-c", "rm -f \"$0\"/mori-theme-*.ppm", root.shotDir])
         }
     }
 

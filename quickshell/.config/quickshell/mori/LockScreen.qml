@@ -49,7 +49,7 @@ Scope {
             // A real lock must not be dropped behind a preview or the unlock
             // animation: end that first. Anything else is already locking.
             if (asPreview || !(previewing || state === "unlocking")) return
-            finish()
+            finish(true)
         }
         previewing = asPreview
         seed = Math.random()
@@ -129,8 +129,11 @@ Scope {
         undissolve.start()
     }
 
-    function finish() {
+    function finish(relocking) {
         if (!previewing) marker.setText("")
+        // The screenshots show the desktop and sit in RAM; a relock is about to write new ones.
+        if (!relocking)
+            Quickshell.execDetached(["sh", "-c", "rm -f \"$0\"/mori-lock-*.ppm", shotDir])
         dissolve.stop()
         undissolve.stop()
         // `locked` follows `state` through its binding; never assign it here.

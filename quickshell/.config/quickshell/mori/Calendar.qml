@@ -15,6 +15,8 @@ Item {
     property var events: []
     property var eventDays: []
     property string errorMessage: ""
+    // Why the last vdirsyncer run failed; shown until the next sync.
+    property string syncError: ""
     property string syncMessage: ""
     property bool queryPending: false
     // When vdirsyncer last succeeded (ms); reopening soon after doesn't sync again.
@@ -155,7 +157,7 @@ Item {
             return
         }
 
-        errorMessage = ""
+        errorMessage = syncError
         const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1, 12)
         eventQuery.exec([
             "khal", "--no-color", "list", "--once",
@@ -170,6 +172,7 @@ Item {
             return
 
         syncMessage = "Syncing CalDAV…"
+        syncError = ""
         errorMessage = ""
         syncProcess.exec(["vdirsyncer", "sync"])
     }
@@ -257,8 +260,7 @@ Item {
             } else {
                 const detail = syncError.text.trim().split(/\r?\n/).pop()
                 root.syncMessage = "Using local calendar"
-                if (detail.length)
-                    root.errorMessage = detail
+                root.syncError = detail
             }
             root.queryEvents()
             root.queryMonthEvents()

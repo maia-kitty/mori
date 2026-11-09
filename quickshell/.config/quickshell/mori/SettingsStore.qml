@@ -68,7 +68,10 @@ Item {
 
     // Delegates use this to update bindings that access a setting by name.
     property int revision: 0
+    // True until the first load; stays false on later reloads so nothing restarts.
     property bool loading: true
+    // True while load() applies the file, so its setters don't save.
+    property bool reading: false
     property string saveError: ""
 
     readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || ""
@@ -78,7 +81,7 @@ Item {
 
     function noteChange() {
         revision++
-        if (!loading)
+        if (!loading && !reading)
             save()
     }
 
@@ -342,7 +345,7 @@ Item {
     }
 
     function load() {
-        loading = true
+        reading = true
         const contents = settingsFile.text()
         if (contents.trim().length > 0) {
             try {
@@ -408,6 +411,7 @@ Item {
             }
         }
 
+        reading = false
         loading = false
         revision++
     }

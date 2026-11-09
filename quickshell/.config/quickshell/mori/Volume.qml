@@ -151,18 +151,6 @@ RowLayout {
             node.audio.volume = Math.max(0, Math.min(1, value))
     }
 
-    function adjustVolume(delta) {
-        if (!root.sink || !root.sink.audio)
-            return
-
-        setVolume(root.sink, root.sink.audio.volume + delta)
-    }
-
-    function toggleMute() {
-        if (root.sink && root.sink.audio)
-            root.sink.audio.muted = !root.sink.audio.muted
-    }
-
     PwObjectTracker {
         // Track discovery independently of audio readiness. Filtering by audio
         // before tracking can prevent newly discovered nodes from becoming ready.

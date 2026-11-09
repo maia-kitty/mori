@@ -15,6 +15,8 @@ Item {
     // Every source upkeep found, including disabled ones: what Settings offers to toggle.
     property var detected: []
     readonly property var skipFlags: settings.disabledUpdateSources.map(key => "--no-" + key)
+    // A string only notifies when the sources really change; a reload hands over a new, equal array.
+    readonly property string skipKey: skipFlags.join(" ")
     readonly property int count: report ? report.total : 0
     readonly property bool incomplete: report && report.sources.some(source => source.count === null)
     readonly property bool rebootRequired: !!(report && report.reboot && report.reboot.required)
@@ -70,7 +72,7 @@ Item {
     }
     Component.onCompleted: if (active) initialCheck.restart()
     // Recheck shortly after toggling sources; the delay batches several toggles.
-    onSkipFlagsChanged: if (active) initialCheck.restart()
+    onSkipKeyChanged: if (active) initialCheck.restart()
 
     Timer { id: initialCheck; interval: 2000; onTriggered: root.check() }
     Timer {

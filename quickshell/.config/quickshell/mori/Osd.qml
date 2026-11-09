@@ -28,7 +28,17 @@ PanelWindow {
     readonly property color accent: muted ? Theme.grey1
         : settings.moduleColor(kind === "brightness" ? "brightness" : "volume")
 
-    function showVolume() { show("volume") }
+    function adjustVolume(delta) {
+        if (sink && sink.audio)
+            sink.audio.volume = Math.max(0, Math.min(1, sink.audio.volume + delta))
+        show("volume")
+    }
+
+    function toggleMute() {
+        if (sink && sink.audio)
+            sink.audio.muted = !sink.audio.muted
+        show("volume")
+    }
 
     function showBrightness(module) {
         if (!module || !module.available)
@@ -57,7 +67,8 @@ PanelWindow {
     WlrLayershell.namespace: "mori-osd"
 
     PwObjectTracker {
-        objects: root.visible && root.sink ? [root.sink] : []
+        // Always tracked: the volume keys write to it even while the OSD is hidden.
+        objects: root.sink ? [root.sink] : []
     }
 
     Timer {

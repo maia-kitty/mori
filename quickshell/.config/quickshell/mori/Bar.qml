@@ -100,22 +100,14 @@ PanelWindow {
     }
     function toggleSettings() { settingsPanel.toggle() }
     function openSettings(page) { settingsPanel.openTo(page) }
-    function volumeUp() {
-        const module = loadedModule("volume")
-        if (module) module.adjustVolume(0.03)
-    }
-    function volumeDown() {
-        const module = loadedModule("volume")
-        if (module) module.adjustVolume(-0.03)
-    }
-    function toggleMute() {
-        const module = loadedModule("volume")
-        if (module) module.toggleMute()
-    }
     function adjustBrightness(delta) {
         const module = loadedModule("brightness")
         if (module && module.available)
             module.requestBrightness(module.brightness + delta)
+        // shortcut: with the brightness module off the key still works but shows no OSD; needs a brightness service outside the bar to fix.
+        else if (!module)
+            Quickshell.execDetached(["brightnessctl", "set",
+                Math.round(Math.abs(delta) * 100) + "%" + (delta > 0 ? "+" : "-")])
         return module
     }
 

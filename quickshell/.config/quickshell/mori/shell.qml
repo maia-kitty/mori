@@ -69,9 +69,9 @@ ShellRoot {
         function toggleSettings(): void { bar.toggleSettings() }
         // Opens Settings on a page: modules, theme (Appearance), sound, network, notifications, profile, clock, updates, power, displays, input, about.
         function openSettings(page: string): void { bar.openSettings(page) }
-        function volumeUp(): void { bar.volumeUp(); osd.showVolume() }
-        function volumeDown(): void { bar.volumeDown(); osd.showVolume() }
-        function toggleMute(): void { bar.toggleMute(); osd.showVolume() }
+        function volumeUp(): void { osd.adjustVolume(0.03) }
+        function volumeDown(): void { osd.adjustVolume(-0.03) }
+        function toggleMute(): void { osd.toggleMute() }
         function brightnessUp(): void { osd.showBrightness(bar.adjustBrightness(0.05)) }
         function brightnessDown(): void { osd.showBrightness(bar.adjustBrightness(-0.05)) }
         // mori-theme hands dark/light/toggle here so the switch can crossfade.

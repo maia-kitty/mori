@@ -211,7 +211,9 @@ Item {
 
     function wpaValue(value) {
         // Commands go to wpa_cli's stdin, never into a process argument.
-        return "\"" + value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\""
+        // No escaping: wpa_supplicant takes everything between the first and
+        // last quote literally (tested with a password containing " and \).
+        return "\"" + value + "\""
     }
 
     function connectWpaNetwork(name, networkId, isOpen, password) {

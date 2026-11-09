@@ -115,7 +115,9 @@ Item {
     property string selectedDisplay: ""
     property var targetScreen: null
     property bool focusQueryResolved: false
-    property string previousOutputConfiguration: ""
+    // outputs.kdl as it was before the save being confirmed; null when there is nothing to revert
+    // (an empty string is a real state: the file was empty or missing).
+    property var previousOutputConfiguration: null
     property var previousDisplays: []
     property string displaySavePhase: "idle"
     property bool awaitingDisplayConfirmation: false
@@ -1519,7 +1521,7 @@ Item {
     function keepDisplayConfiguration() {
         displayConfirmationTimer.stop()
         awaitingDisplayConfirmation = false
-        previousOutputConfiguration = ""
+        previousOutputConfiguration = null
         previousDisplays = []
         displaySavePhase = "idle"
         displayDirty = false
@@ -1527,7 +1529,7 @@ Item {
     }
 
     function revertDisplayConfiguration(reason) {
-        if (previousOutputConfiguration.length === 0)
+        if (previousOutputConfiguration === null)
             return
         displayConfirmationTimer.stop()
         awaitingDisplayConfirmation = false
@@ -1653,7 +1655,7 @@ Item {
                 }
             } else if (root.displaySavePhase === "reverting") {
                 root.displaySavePhase = "idle"
-                root.previousOutputConfiguration = ""
+                root.previousOutputConfiguration = null
                 root.displayStatus = exitCode === 0
                     ? "Previous display settings restored"
                     : "Could not validate the restored display settings"
@@ -1772,7 +1774,7 @@ Item {
         onSaveFailed: error => {
             root.displaySavePhase = "idle"
             root.awaitingDisplayConfirmation = false
-            root.previousOutputConfiguration = ""
+            root.previousOutputConfiguration = null
             root.previousDisplays = []
             root.displayStatus = ""
             root.displayError = "Could not write outputs.kdl: "

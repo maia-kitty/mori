@@ -17,6 +17,8 @@ Item {
     property string errorMessage: ""
     property string syncMessage: ""
     property bool queryPending: false
+    // When vdirsyncer last succeeded (ms); reopening soon after doesn't sync again.
+    property double lastSync: 0
     property bool monthQueryPending: false
     property bool dayNavigation: false
     readonly property bool busy: syncProcess.running || eventQuery.running || monthQuery.running
@@ -164,7 +166,7 @@ Item {
     }
 
     function syncAndLoad() {
-        if (busy)
+        if (syncProcess.running)
             return
 
         syncMessage = "Syncing CalDAV…"
@@ -182,8 +184,11 @@ Item {
             const now = new Date()
             shownMonth = new Date(now.getFullYear(), now.getMonth(), 1, 12)
             selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)
-            syncAndLoad()
+            // Show the local calendar at once; the sync refreshes it when it's done.
+            queryEvents()
             queryMonthEvents()
+            if (Date.now() - lastSync > 5 * 60000)
+                syncAndLoad()
         }
     }
 
@@ -247,7 +252,8 @@ Item {
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
-                root.syncMessage = "Synced just now"
+                root.lastSync = Date.now()
+                root.syncMessage = "Synced " + root.formatEventTime(Qt.formatTime(new Date(), "HH:mm"))
             } else {
                 const detail = syncError.text.trim().split(/\r?\n/).pop()
                 root.syncMessage = "Using local calendar"

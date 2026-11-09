@@ -39,14 +39,7 @@ PopupSurface {
                 repeater = networkRepeater
             }
         }
-        const item = repeater ? repeater.itemAt(index) : null
-        if (item && listCol) {
-            const y = item.mapToItem(listCol.contentItem, 0, 0).y
-            if (y < listCol.contentY)
-                listCol.contentY = y
-            else if (y + item.height > listCol.contentY + listCol.height)
-                listCol.contentY = y + item.height - listCol.height
-        }
+        listCol.ensureVisible(repeater ? repeater.itemAt(index) : null)
     }
 
     function actOnSelection(disconnect) {
@@ -144,12 +137,10 @@ PopupSurface {
                     color: Theme.controlBackground(selected, highlighted, tabHover.hovered)
                     border.width: 1
                     border.color: Theme.controlBorder(selected, highlighted, tabHover.hovered, root.accent)
-                    Text {
+                    MoriText {
                         anchors.centerIn: parent
                         text: (parent.highlighted ? "› " : "") + modelData
                         color: parent.selected ? root.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                     HoverHandler { id: tabHover }
                     TapHandler {
@@ -168,8 +159,6 @@ PopupSurface {
             width: parent.width
             text: root.keyHint.replace(/: /g, " ")
             color: Theme.grey1
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
 
         BluetoothPanel {
@@ -218,12 +207,10 @@ PopupSurface {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                             spacing: 1
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: (wiredRow.selected ? "› " : "  ") + displayName
                                 color: isConnected ? root.accent : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
                             }
 
@@ -243,12 +230,11 @@ PopupSurface {
                             border.width: 1
                             border.color: Theme.red
 
-                            Text {
+                            MoriText {
                                 id: disconnectLabel
                                 anchors.centerIn: parent
                                 text: "Disconnect"
                                 color: Theme.red
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize - 2
                             }
                             TapHandler {
@@ -281,12 +267,10 @@ PopupSurface {
                 color: root.accent
             }
 
-            Text {
+            MoriText {
                 visible: root.service.vpnConnections.length === 0
                 text: "Not connected"
                 color: Theme.grey
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
 
             Repeater {
@@ -314,12 +298,10 @@ PopupSurface {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                             spacing: 1
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: (vpnRow.selected ? "› " : "  ") + vpnRow.modelData.name
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
                             }
 
@@ -338,13 +320,12 @@ PopupSurface {
                             border.width: 1
                             border.color: Theme.red
 
-                            Text {
+                            MoriText {
                                 id: disconnectLabel
                                 anchors.centerIn: parent
                                 text: root.service.disconnectingVpnUuid === vpnRow.modelData.uuid
                                     ? "Disconnecting…" : "Disconnect"
                                 color: Theme.red
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize - 2
                             }
                             TapHandler {
@@ -358,11 +339,10 @@ PopupSurface {
                 }
             }
 
-            Text {
+            MoriText {
                 visible: root.service.vpnError.length > 0
                 text: root.service.vpnError
                 color: Theme.red
-                font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSize - 2
             }
         }
@@ -378,32 +358,26 @@ PopupSurface {
                 color: root.accent
             }
 
-            Text {
+            MoriText {
                 visible: !root.service.wifiRadioEnabled
                 text: "Wi-Fi is off"
                 color: Theme.grey
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
 
-            Text {
+            MoriText {
                 visible: root.service.useWpaFallback && root.service.wpaError.length > 0
                 width: parent.width
                 text: root.service.wpaError
                 color: Theme.red
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
                 wrapMode: Text.Wrap
             }
 
-            Text {
+            MoriText {
                 visible: root.service.wifiRadioEnabled
                     && (root.service.useWpaFallback ? root.service.wpaNetworks.count : root.service.wifiNetworks.count) === 0
                     && root.service.wpaError.length === 0
                 text: "No networks found"
                 color: Theme.grey
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
 
             Repeater {
@@ -436,12 +410,10 @@ PopupSurface {
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                             spacing: 1
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: (wifiRow.selected ? "› " : "  ") + networkName + "   " + Math.round(strength * 100) + "%"
                                 color: isConnected ? root.accent : Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
                             }
 
@@ -461,12 +433,11 @@ PopupSurface {
                             border.width: 1
                             border.color: Theme.red
 
-                            Text {
+                            MoriText {
                                 id: disconnectLabel
                                 anchors.centerIn: parent
                                 text: "Disconnect"
                                 color: Theme.red
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize - 2
                             }
                             TapHandler {

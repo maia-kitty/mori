@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import "./theme"
 
 Row {
@@ -109,23 +108,19 @@ Row {
                         text: "Updates"
                         color: root.statusColor
                     }
-                    Text {
+                    MoriText {
                         width: parent.width
                         text: root.summary
                         textFormat: Text.PlainText
                         wrapMode: Text.Wrap
                         color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
-                    Text {
+                    MoriText {
                         width: parent.width
                         text: root.updateService.report && root.updateService.report.checked_at
                             ? "Last checked · " + Qt.formatDateTime(new Date(root.updateService.report.checked_at), "MMM d, HH:mm")
                             : "Check now to see available updates"
                         color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                     Rectangle { width: parent.width; height: 1; color: Theme.bg4 }
 
@@ -135,37 +130,31 @@ Row {
                         height: Math.min(280, implicitHeight)
                         spacing: 10
 
-                        Text {
+                        MoriText {
                             width: parent.width
                             visible: root.updateService.errorMessage.length > 0
                             text: root.updateService.errorMessage
                             textFormat: Text.PlainText
                             wrapMode: Text.Wrap
                             color: Theme.red
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
                         Column {
                             width: parent.width
                             visible: root.updateService.rebootRequired
                             spacing: 3
-                            Text {
+                            MoriText {
                                 text: "Reboot recommended"
                                 color: Theme.yellow
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             Repeater {
                                 model: root.updateService.rebootRequired ? root.updateService.report.reboot.reasons : []
-                                Text {
+                                MoriText {
                                     required property string modelData
                                     width: parent.width
                                     text: modelData
                                     textFormat: Text.PlainText
                                     wrapMode: Text.Wrap
                                     color: Theme.grey2
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                             }
                         }
@@ -177,7 +166,7 @@ Row {
                                 width: sourceList.width
                                 spacing: 4
 
-                                Text {
+                                MoriText {
                                     width: parent.width
                                     text: sourceRow.modelData.name + " · "
                                         + (sourceRow.modelData.status === "error" ? "Check failed"
@@ -186,22 +175,18 @@ Row {
                                     wrapMode: Text.Wrap
                                     textFormat: Text.PlainText
                                     color: sourceRow.modelData.status === "error" ? Theme.red : root.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                             }
                         }
                         Repeater {
                             model: root.updateService.report ? root.updateService.report.notes || [] : []
-                            Text {
+                            MoriText {
                                 required property string modelData
                                 width: sourceList.width
                                 text: modelData
                                 textFormat: Text.PlainText
                                 wrapMode: Text.Wrap
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                         }
                     }
@@ -221,12 +206,10 @@ Row {
                                 color: Theme.controlBackground(false, false, actionHover.hovered && available)
                                 border.width: 1
                                 border.color: Theme.controlBorder(false, false, available && actionHover.hovered, root.accent)
-                                Text {
+                                MoriText {
                                     anchors.centerIn: parent
                                     text: actionButton.modelData.label
                                     color: actionButton.available ? Theme.fg : Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 HoverHandler { id: actionHover }
                                 TapHandler {
@@ -242,26 +225,6 @@ Row {
                     }
                 }
             }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 }

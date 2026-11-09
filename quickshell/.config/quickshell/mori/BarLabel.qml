@@ -22,15 +22,13 @@ Item {
         elideWidth: root.width
     }
 
-    Text {
+    MoriText {
         id: label
         width: root.width
         // Font rectangles are relative to the baseline. Center the visible
         // glyphs, rather than the font's unused ascent/descent space.
         y: (root.height - metrics.tightBoundingRect.height) / 2
             - metrics.tightBoundingRect.y - baselineOffset
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
         color: Theme.fg
         textFormat: Text.PlainText
     }

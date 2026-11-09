@@ -21,7 +21,6 @@ Item {
         text: String.fromCodePoint(Theme.dark ? 0xf0594 : 0xf0599)
         color: root.accent
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
         TapHandler { onTapped: root.toggle() }
     }
 }

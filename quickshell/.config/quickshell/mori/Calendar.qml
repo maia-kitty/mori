@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import "./theme"
 
 Item {
@@ -237,8 +236,6 @@ Item {
                 ? (root.settings.clockShowSeconds ? "h:mm:ss AP" : "h:mm AP")
                 : (root.settings.clockShowSeconds ? "HH:mm:ss" : "HH:mm")) + " ]"
         color: root.accent
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
 
         TapHandler { onTapped: root.toggle() }
     }
@@ -352,12 +349,11 @@ Item {
                             width: parent.width
                             height: 24
 
-                            Text {
+                            MoriText {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "‹"
                                 color: root.accent
-                                font.family: Theme.fontFamily
                                 font.pixelSize: 20
                                 TapHandler { onTapped: root.changeMonth(-1) }
                             }
@@ -369,12 +365,11 @@ Item {
                                 TapHandler { onTapped: root.goToToday() }
                             }
 
-                            Text {
+                            MoriText {
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "›"
                                 color: root.accent
-                                font.family: Theme.fontFamily
                                 font.pixelSize: 20
                                 TapHandler { onTapped: root.changeMonth(1) }
                             }
@@ -389,7 +384,7 @@ Item {
                             Repeater {
                                 model: root.weekdayNames
 
-                                delegate: Text {
+                                delegate: MoriText {
                                     required property string modelData
                                     width: (parent.width - 12) / 7
                                     height: 20
@@ -397,7 +392,6 @@ Item {
                                     verticalAlignment: Text.AlignVCenter
                                     text: modelData
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize - 2
                                 }
                             }
@@ -423,13 +417,11 @@ Item {
                                     border.color: Theme.controlBorder(selected || current, keyboardFocused, dayHover.hovered, root.accent)
                                     HoverHandler { id: dayHover }
 
-                                    Text {
+                                    MoriText {
                                         anchors.centerIn: parent
                                         text: (dayCell.keyboardFocused ? "› " : "") + dayCell.value.getDate()
                                         color: dayCell.selected ? root.accent
                                              : dayCell.inMonth ? Theme.grey1 : Theme.grey
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                     }
 
                                     Rectangle {
@@ -458,45 +450,39 @@ Item {
                             width: parent.width
                             height: 22
 
-                            Text {
+                            MoriText {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: Qt.formatDate(root.selectedDate, "dddd, MMMM d")
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
 
-                            Text {
+                            MoriText {
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.busy ? "Working…" : "↻ " + root.syncMessage
                                 color: root.busy ? Theme.yellow : Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize - 2
                                 TapHandler { enabled: !root.busy; onTapped: root.syncAndLoad() }
                             }
                         }
 
-                        Text {
+                        MoriText {
                             width: parent.width
                             visible: root.errorMessage.length > 0
                             text: root.errorMessage
                             color: Theme.red
-                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize - 2
                             wrapMode: Text.Wrap
                             maximumLineCount: 2
                             elide: Text.ElideRight
                         }
 
-                        Text {
+                        MoriText {
                             width: parent.width
                             visible: !root.busy && root.events.length === 0 && root.errorMessage.length === 0
                             text: "No events"
                             color: Theme.grey
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
                         Flickable {
@@ -535,16 +521,14 @@ Item {
                                             anchors.leftMargin: 10
                                             spacing: 2
 
-                                            Text {
+                                            MoriText {
                                                 width: parent.width
                                                 text: modelData.title || "Untitled event"
                                                 color: root.accent
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 elide: Text.ElideRight
                                             }
 
-                                            Text {
+                                            MoriText {
                                                 width: parent.width
                                                 text: (modelData["start-time"]
                                                        ? root.formatEventTime(modelData["start-time"])
@@ -553,7 +537,6 @@ Item {
                                                       + (modelData.calendar ? " · " + modelData.calendar : "")
                                                       + (modelData.location ? " · " + modelData.location : "")
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.fontSize - 2
                                                 elide: Text.ElideRight
                                             }
@@ -575,36 +558,6 @@ Item {
                             : "Months: ← / → · Tab: days"
                     }
                 }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-
-            Keys.onPressed: event => root.handleKeyPressed(event)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

@@ -63,9 +63,9 @@ ShellRoot {
     IpcHandler {
         target: "bar"
 
-        function togglePowerMenu(): void { bar.togglePowerMenu() }
-        function toggleWallpaperPicker(): void { bar.toggleWallpaperPicker() }
-        function toggleNotifications(): void { bar.toggleNotifications() }
+        function togglePowerMenu(): void { bar.toggleModule("powerMenu") }
+        function toggleWallpaperPicker(): void { bar.toggleModule("wallpaper") }
+        function toggleNotifications(): void { bar.toggleModule("notifications") }
         function toggleSettings(): void { bar.toggleSettings() }
         // Opens Settings on a page: modules, theme (Appearance), sound, network, notifications, profile, clock, updates, power, displays, input, about.
         function openSettings(page: string): void { bar.openSettings(page) }

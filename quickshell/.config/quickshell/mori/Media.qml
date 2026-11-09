@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Services.Mpris
-import Quickshell.Wayland
 import "./theme"
 
 Item {
@@ -76,14 +75,7 @@ Item {
             if (!players.length) return
             keyboardPlayerIndex = Math.max(0, Math.min(players.length - 1,
                 keyboardPlayerIndex + (event.key === Qt.Key_Up ? -1 : 1)))
-            Qt.callLater(() => {
-                const row = playerRows.itemAt(keyboardPlayerIndex)
-                if (!row) return
-                const y = row.mapToItem(details.contentItem, 0, 0).y
-                if (y < details.contentY) details.contentY = y
-                else if (y + row.height > details.contentY + details.height)
-                    details.contentY = y + row.height - details.height
-            })
+            Qt.callLater(() => details.ensureVisible(playerRows.itemAt(keyboardPlayerIndex)))
             event.accepted = true
             return
         }
@@ -139,16 +131,12 @@ Item {
         BarLabel {
             text: "["
             color: root.hasPlayer ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
         BarLabel {
             // Keep the bar glyph recognisable at a glance. Playback state is
             // represented by the explicit play/pause control in the popup.
             text: "♫"
             color: root.hasPlayer ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
         BarLabel {
             id: titleText
@@ -156,15 +144,11 @@ Item {
             width: root.compactMode ? 0 : Math.min(220, titleMetrics.width)
             text: root.trackTitle
             color: root.hasPlayer ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
             elide: Text.ElideRight
         }
         BarLabel {
             text: "]"
             color: root.hasPlayer ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
     }
 
@@ -219,18 +203,16 @@ Item {
                         color: root.hasPlayer ? root.accent : Theme.grey
                         elide: Text.ElideRight
                     }
-                    Text {
+                    MoriText {
                         id: artistLabel
                         anchors.top: titleLabel.bottom
                         anchors.topMargin: 8
                         width: parent.width
                         text: root.trackArtist
                         color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
-                    Text {
+                    MoriText {
                         id: albumLabel
                         anchors.top: artistLabel.bottom
                         anchors.topMargin: 8
@@ -238,8 +220,6 @@ Item {
                         width: parent.width
                         text: root.player ? root.player.trackAlbum : ""
                         color: Theme.grey1
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
 
@@ -254,12 +234,10 @@ Item {
                         }
                     }
                 }
-                Text {
+                MoriText {
                     visible: Mpris.players.values.length > 1
                     text: "Players"
                     color: root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     topPadding: 4
                 }
                 Repeater {
@@ -276,7 +254,7 @@ Item {
                         border.color: Theme.controlBorder(modelData === root.player, index === root.keyboardPlayerIndex, playerHover.hovered, root.accent)
                         HoverHandler { id: playerHover }
 
-                        Text {
+                        MoriText {
                             anchors.left: parent.left
                             anchors.right: stateLabel.left
                             anchors.leftMargin: 8
@@ -284,19 +262,15 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: (index === root.keyboardPlayerIndex ? "› " : "  ") + (modelData.identity || modelData.dbusName)
                             color: modelData === root.player ? root.accent : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                             elide: Text.ElideRight
                         }
-                        Text {
+                        MoriText {
                             id: stateLabel
                             anchors.right: parent.right
                             anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.isPlaying ? "playing" : "idle"
                             color: modelData.isPlaying ? root.accent : Theme.grey
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
                         Rectangle {
                             anchors.left: parent.left
@@ -351,34 +325,6 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.margins: 12
                 text: "↑↓: player · Enter: select · Space: play/pause · ←→: track · Esc: close"
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

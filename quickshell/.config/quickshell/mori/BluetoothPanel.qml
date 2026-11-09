@@ -88,13 +88,11 @@ Column {
                 color: Theme.controlBackground(selected, false, controlHover.hovered && available)
                 border.width: 1
                 border.color: Theme.controlBorder(selected, false, controlHover.hovered && available, root.accent)
-                Text {
+                MoriText {
                     anchors.centerIn: parent
                     text: parent.power ? "Bluetooth " + (parent.selected ? "on" : "off")
                         : parent.selected ? "Stop scan" : "Scan"
                     color: !parent.available ? Theme.disabledText : parent.selected ? root.accent : Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
                 HoverHandler { id: controlHover }
                 TapHandler {
@@ -105,7 +103,7 @@ Column {
         }
     }
 
-    Text {
+    MoriText {
         width: parent.width
         visible: !root.adapter || !root.adapter.enabled || root.devices.length === 0
         text: !root.adapter ? "No Bluetooth adapter available"
@@ -113,8 +111,6 @@ Column {
             : !root.adapter.enabled ? "Bluetooth is off"
             : root.adapter.discovering ? "Searching for devices…" : "No devices found · Scan to discover devices"
         color: Theme.grey
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
         wrapMode: Text.Wrap
     }
 
@@ -138,12 +134,8 @@ Column {
             function ensureVisible() {
                 // The panel shares the network popup's scrollable column.
                 let scroll = root.parent
-                while (scroll && scroll.contentY === undefined) scroll = scroll.parent
-                if (!scroll) return
-                const y = mapToItem(scroll.contentItem, 0, 0).y
-                if (y < scroll.contentY) scroll.contentY = y
-                else if (y + height > scroll.contentY + scroll.height)
-                    scroll.contentY = y + height - scroll.height
+                while (scroll && !scroll.ensureVisible) scroll = scroll.parent
+                if (scroll) scroll.ensureVisible(deviceRow)
             }
 
             RowLayout {
@@ -153,16 +145,14 @@ Column {
                 Column {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
-                    Text {
+                    MoriText {
                         width: parent.width
                         text: (deviceRow.selected ? "› " : "  ")
                             + (deviceRow.modelData.name || deviceRow.modelData.address)
                         color: deviceRow.modelData.connected ? root.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
-                    Text {
+                    MoriText {
                         width: parent.width
                         text: deviceRow.modelData.blocked ? "Blocked"
                             : deviceRow.modelData.pairing ? "Pairing…"
@@ -171,17 +161,15 @@ Column {
                                 + (deviceRow.modelData.batteryAvailable
                                     ? " · " + Math.round(deviceRow.modelData.battery * 100) + "%" : "")
                         color: Theme.grey
-                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize - 2
                         elide: Text.ElideRight
                     }
                 }
-                Text {
+                MoriText {
                     text: deviceRow.busy ? "…" : deviceRow.modelData.connected ? "Disconnect"
                         : deviceRow.modelData.paired ? "Connect" : "Pair"
                     color: deviceRow.modelData.blocked || deviceRow.busy ? Theme.disabledText
                         : deviceRow.modelData.connected ? Theme.red : root.accent
-                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2
                 }
             }

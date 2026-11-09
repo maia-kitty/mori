@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import "./theme"
 
 Item {
@@ -80,7 +79,6 @@ Item {
             text: String.fromCodePoint(root.doNotDisturb ? 0xf009b : 0xf009a)
             color: root.accent
             font.family: Theme.nerdFontFamily
-            font.pixelSize: Theme.fontSize
         }
 
         BarLabel {
@@ -156,24 +154,20 @@ Item {
                                 anchors.right: parent.right
                                 spacing: 12
 
-                                Text {
+                                MoriText {
                                     text: "DND · D"
                                     color: root.doNotDisturb ? root.accent : Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
 
                                     TapHandler {
                                         onTapped: root.toggleDoNotDisturb()
                                     }
                                 }
 
-                                Text {
+                                MoriText {
                                     id: clearAll
                                     text: "Clear all  C"
                                     visible: root.notificationCount > 0
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
 
                                     TapHandler {
                                         onTapped: root.service.clear()
@@ -182,13 +176,11 @@ Item {
                             }
                         }
 
-                        Text {
+                        MoriText {
                             width: parent.width
                             visible: root.notificationCount === 0
                             text: "No notifications"
                             color: Theme.grey
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
                         ListView {
@@ -244,17 +236,15 @@ Item {
                                     RowLayout {
                                         width: parent.width
                                         spacing: 8
-                                        Text {
+                                        MoriText {
                                             Layout.fillWidth: true
                                             Layout.minimumWidth: 0
                                             text: appName
                                             color: root.accent
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                             elide: Text.ElideRight
                                         }
 
-                                        Text {
+                                        MoriText {
                                             Layout.maximumWidth: parent.width * 0.65
                                             Layout.alignment: Qt.AlignVCenter
                                             text: Qt.formatDateTime(new Date(receivedAt),
@@ -262,32 +252,27 @@ Item {
                                                 + " · " + (root.settings && root.settings.clockTimeFormat === "12h"
                                                     ? "h:mm AP" : "HH:mm"))
                                             color: Theme.grey
-                                            font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize - 2
                                             elide: Text.ElideRight
                                         }
                                     }
 
-                                    Text {
+                                    MoriText {
                                         id: summaryText
                                         width: parent.width
                                         text: summary
                                         color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                         wrapMode: expanded ? Text.Wrap : Text.NoWrap
                                         elide: Text.ElideRight
                                     }
 
-                                    Text {
+                                    MoriText {
                                         id: bodyText
                                         width: parent.width
                                         visible: body.length > 0
                                         text: body
                                         textFormat: Text.PlainText
                                         color: Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                         wrapMode: Text.Wrap
                                         maximumLineCount: expanded ? 1000 : 3
                                         elide: Text.ElideRight
@@ -300,14 +285,13 @@ Item {
                                     }
                                 }
 
-                                Text {
+                                MoriText {
                                     id: closeButton
                                     anchors.top: parent.top
                                     anchors.right: parent.right
                                     anchors.margins: 6
                                     text: "×"
                                     color: root.accent
-                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize + 5
 
                                     TapHandler {
@@ -334,36 +318,6 @@ Item {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-
-            Keys.onPressed: event => root.handleKeyPressed(event)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

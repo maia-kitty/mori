@@ -44,9 +44,11 @@ PanelWindow {
     }
 
     function showPopup(owner) {
-        if (activePopup && activePopup !== owner)
-            activePopup.close()
+        // Switch first: closing the previous popup then leaves the dismiss layer up.
+        const previous = activePopup
         activePopup = owner
+        if (previous && previous !== owner)
+            previous.close()
     }
 
     function hidePopup(owner) {
@@ -86,16 +88,8 @@ PanelWindow {
         return null
     }
 
-    function togglePowerMenu() {
-        const module = loadedModule("powerMenu")
-        if (module) module.toggle()
-    }
-    function toggleWallpaperPicker() {
-        const module = loadedModule("wallpaper")
-        if (module) module.toggle()
-    }
-    function toggleNotifications() {
-        const module = loadedModule("notifications")
+    function toggleModule(name) {
+        const module = loadedModule(name)
         if (module) module.toggle()
     }
     function toggleSettings() { settingsPanel.toggle() }
@@ -399,6 +393,19 @@ PanelWindow {
         }
     }
 
+    // One bar slot: loaded only while its module is enabled.
+    Component {
+        id: moduleSlot
+        Loader {
+            required property string modelData
+            height: Theme.barContentHeight
+            readonly property string moduleKey: modelData
+            active: barWindow.settings.moduleEnabled(moduleKey)
+            visible: active
+            sourceComponent: barWindow.componentForModule(moduleKey)
+        }
+    }
+
     Item {
         id: barContent
         anchors.fill: parent
@@ -427,14 +434,7 @@ PanelWindow {
                 id: leftModuleRepeater
                 model: barWindow.settings.leftModuleOrder
 
-                delegate: Loader {
-                    required property string modelData
-                    height: Theme.barContentHeight
-                    readonly property string moduleKey: modelData
-                    active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
-                    sourceComponent: barWindow.componentForModule(moduleKey)
-                }
+                delegate: moduleSlot
             }
         }
 
@@ -453,14 +453,7 @@ PanelWindow {
                 id: centerModuleRepeater
                 model: barWindow.settings.centerModuleOrder
 
-                delegate: Loader {
-                    required property string modelData
-                    height: Theme.barContentHeight
-                    readonly property string moduleKey: modelData
-                    active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
-                    sourceComponent: barWindow.componentForModule(moduleKey)
-                }
+                delegate: moduleSlot
             }
         }
 
@@ -479,14 +472,7 @@ PanelWindow {
                 id: rightModuleRepeater
                 model: barWindow.settings.rightModuleOrder
 
-                delegate: Loader {
-                    required property string modelData
-                    height: Theme.barContentHeight
-                    readonly property string moduleKey: modelData
-                    active: barWindow.settings.moduleEnabled(moduleKey)
-                    visible: active
-                    sourceComponent: barWindow.componentForModule(moduleKey)
-                }
+                delegate: moduleSlot
             }
 
         }
@@ -500,6 +486,36 @@ PanelWindow {
                 suppressed: barWindow.overviewOpen || barWindow.fullscreen
                 doNotDisturb: barWindow.settings.doNotDisturb
             }
+        }
+    }
+
+    // The click-away and keyboard layer for whichever module popup is open
+    // (Settings has its own window). It starts below the bar, so the bar stays
+    // clickable and a click there switches straight to another widget.
+    PanelWindow {
+        id: dismissLayer
+        readonly property var popup: barWindow.activePopup !== settingsPanel ? barWindow.activePopup : null
+        screen: barWindow.screen
+        visible: popup !== null
+        anchors { top: true; bottom: true; left: true; right: true }
+        margins.top: barWindow.height
+        exclusionMode: ExclusionMode.Ignore
+        color: "transparent"
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
+
+        Item {
+            id: keyCapture
+            anchors.fill: parent
+            focus: dismissLayer.visible
+            Keys.onPressed: event => { if (dismissLayer.popup) dismissLayer.popup.handleKeyPressed(event) }
+            // Only the power menu's hold-to-run cares about releases.
+            Keys.onReleased: event => {
+                if (dismissLayer.popup && dismissLayer.popup.handleKeyReleased)
+                    dismissLayer.popup.handleKeyReleased(event)
+            }
+            MouseArea { anchors.fill: parent; onClicked: if (dismissLayer.popup) dismissLayer.popup.close() }
         }
     }
 

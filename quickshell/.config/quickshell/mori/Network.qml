@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import "./theme"
 
 // Bar widget: network icon and name, and a popup with NetworkPanel. State and
@@ -43,7 +42,6 @@ RowLayout {
         text: root.service.icon
         color: root.service.wiredConnected || (root.service.wifiRadioEnabled && root.service.hasWifiConnection) ? root.accent : Theme.grey
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     BarLabel {
@@ -51,7 +49,6 @@ RowLayout {
         text: String.fromCodePoint(0xf033e)
         color: root.accent
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     BarLabel {
@@ -59,8 +56,6 @@ RowLayout {
               : !root.service.wifiRadioEnabled ? "off"
               : root.service.hasWifiConnection ? root.service.currentWifiName : "N/A"
         color: root.accent
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
         elide: Text.ElideRight
         Layout.maximumWidth: 90
         visible: !root.compactMode
@@ -105,28 +100,4 @@ RowLayout {
             }
         }
     }
-
-    // Dismiss clicks below the bar without blocking the network pill itself.
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea { anchors.fill: parent; onClicked: root.close() }
-        }
-    }
-
 }

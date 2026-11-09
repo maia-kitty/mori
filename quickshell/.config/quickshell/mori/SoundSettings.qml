@@ -97,12 +97,10 @@ Item {
                     onSelected: node => root.select(node)
                 }
 
-                Text {
+                MoriText {
                     visible: root.devices(section.modelData).length === 0
                     text: section.modelData ? "No microphone available" : "No output available"
                     color: Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
 
                 AudioDeviceControl {
@@ -123,7 +121,5 @@ Item {
         anchors { top: parent.top; left: parent.left; right: parent.right }
         text: "↑↓ device or volume · ←→ volume · Enter use device · M mute"
         color: Theme.grey1
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
     }
 }

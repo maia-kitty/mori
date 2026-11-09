@@ -16,12 +16,10 @@ Flow {
     Repeater {
         model: root.actions
 
-        Text {
+        MoriText {
             required property var modelData
             text: modelData ? modelData.text : ""
             color: root.accent
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
 
             MouseArea {
                 anchors.fill: parent

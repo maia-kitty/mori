@@ -263,8 +263,8 @@ Item {
         // The backend fills its constant object model asynchronously, which
         // does not invalidate JavaScript expressions based on `.values`.
         const devices = Networking.devices.values.slice()
-        wiredConnected = false
-        wiredName = ""
+        let nextWiredConnected = false
+        let nextWiredName = ""
         const nextWifiDevice = devices.find(device => device.type === DeviceType.Wifi) || null
         if (wifiDevice !== nextWifiDevice) {
             if (wifiDevice)
@@ -286,9 +286,9 @@ Item {
                 "displayName": String(name || "Ethernet"),
                 "isConnected": !!device.connected
             })
-            if (device.connected && !wiredConnected) {
-                wiredConnected = true
-                wiredName = String(name || device.name || "Ethernet")
+            if (device.connected && !nextWiredConnected) {
+                nextWiredConnected = true
+                nextWiredName = String(name || device.name || "Ethernet")
             }
         }
         syncNetworkList(wiredDevices, wiredEntries)
@@ -301,8 +301,8 @@ Item {
             return right.signalStrength - left.signalStrength
         })
 
-        wifiConnected = false
-        wifiName = ""
+        let nextWifiConnected = false
+        let nextWifiName = ""
         const wifiEntries = []
         for (const network of networks) {
             wifiEntries.push({
@@ -313,12 +313,16 @@ Item {
                 "isKnown": !!network.known,
                 "isConnected": !!network.connected
             })
-            if (network.connected && !wifiConnected) {
-                wifiConnected = true
-                wifiName = String(network.name || "Wi-Fi")
+            if (network.connected && !nextWifiConnected) {
+                nextWifiConnected = true
+                nextWifiName = String(network.name || "Wi-Fi")
             }
         }
         syncNetworkList(wifiNetworks, wifiEntries)
+        wiredConnected = nextWiredConnected
+        wiredName = nextWiredName
+        wifiConnected = nextWifiConnected
+        wifiName = nextWifiName
     }
 
     function syncNetworkList(model, entries) {

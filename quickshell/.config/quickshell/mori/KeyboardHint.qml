@@ -13,11 +13,10 @@ Column {
         color: Theme.bg4
     }
 
-    Text {
+    MoriText {
         id: hintText
         width: parent.width
         color: Theme.grey1
-        font.family: Theme.fontFamily
         font.pixelSize: Math.max(10, Theme.fontSize - 2)
         textFormat: Text.PlainText
         wrapMode: Text.WordWrap

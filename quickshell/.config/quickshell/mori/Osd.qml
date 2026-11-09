@@ -128,15 +128,13 @@ PanelWindow {
                 }
             }
 
-            Text {
+            MoriText {
                 id: percent
                 anchors.verticalCenter: parent.verticalCenter
                 width: 44
                 horizontalAlignment: Text.AlignRight
                 text: root.muted ? "Muted" : Math.round(root.level * 100) + "%"
                 color: root.muted ? Theme.grey1 : Theme.fg
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
         }
     }

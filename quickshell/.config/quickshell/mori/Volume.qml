@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import Quickshell.Services.Pipewire
 import "./theme"
 
@@ -99,10 +98,7 @@ RowLayout {
             for (let i = 0; i < repeater.count; i++) {
                 const item = repeater.itemAt(i)
                 if (!item || item.modelData !== keyboardNode) continue
-                const y = item.mapToItem(deviceList.contentItem, 0, 0).y
-                if (y < deviceList.contentY) deviceList.contentY = y
-                else if (y + item.height > deviceList.contentY + deviceList.height)
-                    deviceList.contentY = y + item.height - deviceList.height
+                deviceList.ensureVisible(item)
                 return
             }
         })
@@ -161,7 +157,6 @@ RowLayout {
         text: root.muted ? String.fromCodePoint(0xf0581) : String.fromCodePoint(0xf057e)
         color: root.barColor
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
 
         TapHandler {
             enabled: root.compactMode || (root.sink && root.sink.audio)
@@ -220,8 +215,6 @@ RowLayout {
         visible: !root.compactMode
         text: devicePopup.visible ? "▴" : "▾"
         color: root.barColor
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
 
         TapHandler {
             onTapped: root.togglePopup()
@@ -292,12 +285,10 @@ RowLayout {
                                     color: Theme.controlBackground(selected, false, tabHover.hovered)
                                     border.width: 1
                                     border.color: Theme.controlBorder(selected, false, tabHover.hovered, root.accent)
-                                    Text {
+                                    MoriText {
                                         anchors.centerIn: parent
                                         text: modelData
                                         color: parent.selected ? root.accent : Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                     }
                                     HoverHandler { id: tabHover }
                                     TapHandler { onTapped: root.setView(index === 1) }
@@ -319,22 +310,18 @@ RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: 8
                                 anchors.rightMargin: 8
-                                Text {
+                                MoriText {
                                     Layout.fillWidth: true
                                     Layout.minimumWidth: 0
                                     text: root.currentDevice
                                         ? root.currentDevice.description || root.currentDevice.nickname || root.currentDevice.name
                                         : devicePicker.available ? "Choose a device" : root.microphoneView ? "No microphone available" : "No output available"
                                     color: root.currentDevice ? root.accent : Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                     elide: Text.ElideRight
                                 }
-                                Text {
+                                MoriText {
                                     text: root.devicePickerOpen ? "▴" : "▾"
                                     color: devicePicker.available ? Theme.fg : Theme.disabledText
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                             }
                             HoverHandler { id: pickerHover }
@@ -389,15 +376,13 @@ RowLayout {
                                         width: appLoader.width
                                         height: Theme.controlHeight
                                         spacing: 10
-                                        Text {
+                                        MoriText {
                                             Layout.preferredWidth: 125
                                             Layout.minimumWidth: 0
                                             text: (appLoader.modelData === root.keyboardNode ? "› " : "  ")
                                                 + (appLoader.modelData.properties["application.name"]
                                                     || appLoader.modelData.description || appLoader.modelData.name)
                                             color: appLoader.modelData.audio.muted ? Theme.grey1 : Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                             elide: Text.ElideRight
                                         }
                                         AudioSlider {
@@ -410,13 +395,11 @@ RowLayout {
                                                 root.setVolume(appLoader.modelData, value)
                                             }
                                         }
-                                        Text {
+                                        MoriText {
                                             Layout.preferredWidth: 38
                                             horizontalAlignment: Text.AlignRight
                                             text: Math.round(appLoader.modelData.audio.volume * 100) + "%"
                                             color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                     }
                                 }
@@ -436,29 +419,6 @@ RowLayout {
                     }
                 }
             }
-        }
-    }
-
-    // The shield starts below the bar so outside clicks dismiss the panel
-    // without blocking the volume controls.
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: devicePopup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 }

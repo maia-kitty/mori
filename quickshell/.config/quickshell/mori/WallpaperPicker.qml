@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import "./theme"
 
 // Bar module: wallpaper icon and popup. The chooser itself is
@@ -18,7 +17,7 @@ Item {
     function handleKeyPressed(event) {
         if (event.key === Qt.Key_Escape)
             close()
-        else if (!browser.handleKey(event))
+        else if (!browser.item || !browser.item.handleKey(event))
             return
         event.accepted = true
     }
@@ -28,7 +27,6 @@ Item {
         } else {
             popupCoordinator.showPopup(root)
             popup.visible = true
-            browser.reset()
         }
     }
 
@@ -38,7 +36,6 @@ Item {
         text: String.fromCodePoint(0xf03e)
         color: root.accent
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
         TapHandler { onTapped: root.toggle() }
     }
 
@@ -74,41 +71,16 @@ Item {
                 color: root.accent
             }
 
-            WallpaperBrowser {
+            Loader {
                 id: browser
                 anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
                 anchors { topMargin: 8; leftMargin: 12; rightMargin: 12; bottomMargin: 12 }
-                settings: root.settings
-                accent: root.accent
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
+                active: popup.visible
+                sourceComponent: WallpaperBrowser {
+                    settings: root.settings
+                    accent: root.accent
+                    Component.onCompleted: reset()
+                }
             }
         }
     }

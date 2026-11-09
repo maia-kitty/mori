@@ -25,8 +25,6 @@ Column {
     SettingsLabel {
         text: "←→ pick · Enter apply · D toggle"
         color: Theme.grey1
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     ChoiceRow {
@@ -39,12 +37,11 @@ Column {
         onChosen: value => root.settings.setDoNotDisturb(value)
     }
 
-    Text {
+    MoriText {
         width: parent.width
         textFormat: Text.PlainText
         text: "While on, notifications don't pop up; they still go to the notification centre."
         color: Theme.grey1
-        font.family: Theme.fontFamily
         font.pixelSize: Math.max(10, Theme.fontSize - 2)
         wrapMode: Text.WordWrap
     }

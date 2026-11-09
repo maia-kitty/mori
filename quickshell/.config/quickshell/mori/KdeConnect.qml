@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import org.kde.kdeconnect as Connect
 import "./theme"
 
@@ -121,21 +120,16 @@ Item {
         BarLabel {
             text: "["
             color: root.connected ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
         BarLabel {
             text: String.fromCodePoint(0xf011c)
             color: root.connected ? root.accent : Theme.grey
             font.family: Theme.nerdFontFamily
-            font.pixelSize: Theme.fontSize
         }
         BarLabel {
             text: root.connected ? root.batteryText : "offline"
             color: !root.connected ? Theme.grey
                 : root.batteryKnown && root.battery.charge <= 20 ? Theme.red : root.accent
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
         Row {
             visible: root.connected
@@ -144,13 +138,10 @@ Item {
                 text: String.fromCodePoint(0xf009a)
                 color: root.accent
                 font.family: Theme.nerdFontFamily
-                font.pixelSize: Theme.fontSize
             }
             BarLabel {
                 text: root.notificationText
                 color: root.accent
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
         }
         Row {
@@ -172,8 +163,6 @@ Item {
         BarLabel {
             text: "]"
             color: root.connected ? root.accent : Theme.grey
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
     }
     TapHandler { onTapped: root.toggle() }
@@ -217,7 +206,7 @@ Item {
                     elide: Text.ElideRight
                     color: root.accent
                 }
-                Text {
+                MoriText {
                     width: parent.width
                     text: !root.device ? "No paired phone. Pair one in KDE Connect."
                         : !root.connected ? "Phone disconnected"
@@ -226,8 +215,6 @@ Item {
                           + "\nCellular: " + (root.strength >= 0 ? root.network.cellularNetworkType + " · " + root.strength + "/4" : "unavailable")
                     wrapMode: Text.WordWrap
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     lineHeight: 1.5
                 }
                 Rectangle {
@@ -237,12 +224,10 @@ Item {
                     color: Theme.controlBackground(false, false, canSend && sendMouse.containsMouse)
                     border.width: 1
                     border.color: Theme.controlBorder(false, false, canSend && sendMouse.containsMouse, root.accent)
-                    Text {
+                    MoriText {
                         anchors.centerIn: parent
                         text: clipboardSend.running ? "Sending…" : "Send clipboard  S"
                         color: parent.canSend ? root.accent : Theme.disabledText
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                     MouseArea {
                         id: sendMouse
@@ -253,47 +238,17 @@ Item {
                         onClicked: root.sendClipboard()
                     }
                 }
-                Text {
+                MoriText {
                     visible: text.length > 0
                     width: parent.width
                     text: root.feedback
                     wrapMode: Text.WordWrap
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
 
                 KeyboardHint {
                     text: "Esc: close"
                 }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

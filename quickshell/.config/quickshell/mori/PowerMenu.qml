@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import "./theme"
 
 Item {
@@ -164,7 +163,6 @@ Item {
         text: String.fromCodePoint(0xf0425)
         color: root.accent
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
 
         TapHandler {
             onTapped: root.toggle()
@@ -253,25 +251,21 @@ Item {
                             color: modelData.label === "Power off" ? Theme.bgred : Theme.bg4
                         }
 
-                        Text {
+                        MoriText {
                             anchors.left: parent.left
                             anchors.leftMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: (index === root.selectedActionIndex ? "› " : "  ")
                                 + modelData.label
                             color: modelData.label === "Power off" ? root.accent : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
-                        Text {
+                        MoriText {
                             anchors.right: parent.right
                             anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.shortcut
                             color: modelData.label === "Power off" ? root.accent : Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
                         Timer {
@@ -314,50 +308,18 @@ Item {
                     }
                 }
 
-                Text {
+                MoriText {
                     width: parent.width
                     visible: root.resolving || root.errorMessage.length > 0
                     text: root.resolving ? "Checking power actions…" : root.errorMessage
                     wrapMode: Text.WrapAnywhere
                     color: Theme.grey1
-                    font.family: Theme.fontFamily
                     font.pixelSize: Math.max(10, Theme.fontSize - 1)
                 }
 
                 KeyboardHint {
                     text: "↑↓: select\nHold Enter or shortcut: run\nEsc: close"
                 }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: menu.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            Keys.onReleased: event => root.handleKeyReleased(event)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

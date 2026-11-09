@@ -49,13 +49,11 @@ Item {
             onMoved: root.volumeRequested(value)
         }
 
-        Text {
+        MoriText {
             Layout.preferredWidth: 38
             horizontalAlignment: Text.AlignRight
             text: root.available ? Math.round(root.modelData.audio.volume * 100) + "%" : "—"
             color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
         }
     }
 }

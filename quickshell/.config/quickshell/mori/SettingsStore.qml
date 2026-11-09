@@ -43,12 +43,18 @@ Item {
     // Hides notification popups; notifications still reach the notification centre.
     property bool doNotDisturb: false
     property string wallpaperFolder: Quickshell.env("HOME") + "/Pictures/Wallpapers"
-    property var leftModuleOrder: ["calendar", "media", "kdeConnect"]
-    property var centerModuleOrder: ["workspaces"]
-    property var rightModuleOrder: [
+    readonly property var defaultLeftOrder: ["calendar", "media", "kdeConnect"]
+    readonly property var defaultCenterOrder: ["workspaces"]
+    readonly property var defaultRightOrder: [
         "systemTray", "updates", "network", "volume", "brightness", "wallpaper", "theme", "notifications",
         "battery", "powerMenu"
     ]
+    // Every module key; each has a `<key>Enabled` property above.
+    readonly property var moduleNames: defaultLeftOrder.concat(defaultCenterOrder, defaultRightOrder)
+    readonly property var compactNames: ["media", "network", "volume", "brightness"]
+    property var leftModuleOrder: defaultLeftOrder
+    property var centerModuleOrder: defaultCenterOrder
+    property var rightModuleOrder: defaultRightOrder
     property var moduleColors: ({
         "calendar": "fg",
         "media": "aqua",
@@ -80,8 +86,10 @@ Item {
         : Quickshell.env("HOME") + "/.config"
 
     function noteChange() {
+        // load() bumps revision once when it's done.
+        if (reading) return
         revision++
-        if (!loading && !reading)
+        if (!loading)
             save()
     }
 
@@ -98,44 +106,12 @@ Item {
     }
 
     function moduleEnabled(name) {
-        switch (name) {
-        case "calendar": return calendarEnabled
-        case "media": return mediaEnabled
-        case "kdeConnect": return kdeConnectEnabled
-        case "systemTray": return systemTrayEnabled
-        case "updates": return updatesEnabled
-        case "network": return networkEnabled
-        case "volume": return volumeEnabled
-        case "brightness": return brightnessEnabled
-        case "wallpaper": return wallpaperEnabled
-        case "notifications": return notificationsEnabled
-        case "powerMenu": return powerMenuEnabled
-        case "battery": return batteryEnabled
-        case "workspaces": return workspacesEnabled
-        case "theme": return themeEnabled
-        default: return false
-        }
+        return moduleNames.indexOf(name) >= 0 && root[name + "Enabled"]
     }
 
     function setModuleEnabled(name, enabled) {
-        switch (name) {
-        case "calendar": calendarEnabled = enabled; break
-        case "media": mediaEnabled = enabled; break
-        case "kdeConnect": kdeConnectEnabled = enabled; break
-        case "systemTray": systemTrayEnabled = enabled; break
-        case "updates": updatesEnabled = enabled; break
-        case "network": networkEnabled = enabled; break
-        case "volume": volumeEnabled = enabled; break
-        case "brightness": brightnessEnabled = enabled; break
-        case "wallpaper": wallpaperEnabled = enabled; break
-        case "notifications": notificationsEnabled = enabled; break
-        case "powerMenu": powerMenuEnabled = enabled; break
-        case "battery": batteryEnabled = enabled; break
-        case "workspaces": workspacesEnabled = enabled; break
-        case "theme": themeEnabled = enabled; break
-        default: return
-        }
-
+        if (moduleNames.indexOf(name) < 0) return
+        root[name + "Enabled"] = enabled
         noteChange()
     }
 
@@ -160,23 +136,12 @@ Item {
     }
 
     function compactMode(name) {
-        switch (name) {
-        case "media": return mediaCompact
-        case "network": return networkCompact
-        case "volume": return volumeCompact
-        case "brightness": return brightnessCompact
-        default: return false
-        }
+        return compactNames.indexOf(name) >= 0 && root[name + "Compact"]
     }
 
     function setCompactMode(name, compact) {
-        switch (name) {
-        case "media": mediaCompact = compact; break
-        case "network": networkCompact = compact; break
-        case "volume": volumeCompact = compact; break
-        case "brightness": brightnessCompact = compact; break
-        default: return
-        }
+        if (compactNames.indexOf(name) < 0) return
+        root[name + "Compact"] = compact
         noteChange()
     }
 
@@ -303,13 +268,10 @@ Item {
     }
 
     function normalizedOrders(leftCandidate, centerCandidate, rightCandidate) {
-        const defaultLeft = ["calendar", "media", "kdeConnect"]
-        const defaultCenter = ["workspaces"]
-        const defaultRight = [
-            "systemTray", "updates", "network", "volume", "brightness", "wallpaper",
-            "theme", "notifications", "battery", "powerMenu"
-        ]
-        const allowed = defaultLeft.concat(defaultCenter, defaultRight)
+        const defaultLeft = defaultLeftOrder
+        const defaultCenter = defaultCenterOrder
+        const defaultRight = defaultRightOrder
+        const allowed = moduleNames
         const left = []
         const center = []
         const right = []
@@ -374,7 +336,7 @@ Item {
                 moduleColors = updatedColors
 
                 const compact = parsed.compact || {}
-                for (const name of ["media", "network", "volume", "brightness"]) {
+                for (const name of compactNames) {
                     if (typeof compact[name] === "boolean")
                         setCompactMode(name, compact[name])
                 }
@@ -416,24 +378,16 @@ Item {
         revision++
     }
 
+    // { name: root[name + suffix] } for the saved file.
+    function valuesOf(names, suffix) {
+        const values = {}
+        for (const name of names) values[name] = root[name + suffix]
+        return values
+    }
+
     function save() {
         const contents = {
-            "modules": {
-                "calendar": calendarEnabled,
-                "media": mediaEnabled,
-                "kdeConnect": kdeConnectEnabled,
-                "systemTray": systemTrayEnabled,
-                "updates": updatesEnabled,
-                "network": networkEnabled,
-                "volume": volumeEnabled,
-                "brightness": brightnessEnabled,
-                "wallpaper": wallpaperEnabled,
-                "notifications": notificationsEnabled,
-                "battery": batteryEnabled,
-                "workspaces": workspacesEnabled,
-                "theme": themeEnabled,
-                "powerMenu": powerMenuEnabled
-            },
+            "modules": valuesOf(moduleNames, "Enabled"),
             "order": {
                 "left": leftModuleOrder,
                 "center": centerModuleOrder,
@@ -442,12 +396,7 @@ Item {
             "colors": moduleColors,
             "updates": { "intervalMinutes": updateIntervalMinutes, "disabledSources": disabledUpdateSources },
             "power": powerCommands,
-            "compact": {
-                "media": mediaCompact,
-                "network": networkCompact,
-                "volume": volumeCompact,
-                "brightness": brightnessCompact
-            },
+            "compact": valuesOf(compactNames, "Compact"),
             "clock": {
                 "timeFormat": clockTimeFormat,
                 "dateFormat": clockDateFormat,

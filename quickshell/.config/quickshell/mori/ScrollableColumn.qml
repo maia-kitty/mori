@@ -14,6 +14,14 @@ Flickable {
 
     function forceLayout() { contentColumn.forceLayout() }
 
+    // Scroll just far enough to show `item` (something inside this column).
+    function ensureVisible(item) {
+        if (!item) return
+        const y = item.mapToItem(contentItem, 0, 0).y
+        if (y < contentY) contentY = y
+        else if (y + item.height > contentY + height) contentY = y + item.height - height
+    }
+
     Column {
         id: contentColumn
         width: root.width

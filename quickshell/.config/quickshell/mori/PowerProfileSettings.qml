@@ -25,8 +25,6 @@ Column {
     SettingsLabel {
         text: "←→ pick · Enter apply"
         color: Theme.grey1
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     ChoiceRow {
@@ -41,13 +39,12 @@ Column {
         onChosen: value => root.profiles.select(value)
     }
 
-    Text {
+    MoriText {
         width: parent.width
         textFormat: Text.PlainText
         visible: !root.profiles.available
         text: "Needs power-profiles-daemon (powerprofilesctl), which isn't available."
         color: Theme.grey1
-        font.family: Theme.fontFamily
         font.pixelSize: Math.max(10, Theme.fontSize - 2)
         wrapMode: Text.WordWrap
     }

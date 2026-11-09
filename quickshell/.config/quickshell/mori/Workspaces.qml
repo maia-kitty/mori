@@ -9,31 +9,18 @@ Item {
     required property var niriEvents
     required property var panelWindow
     property color accent: Theme.fg
-    property var workspaces: []
-    property var visibleWorkspaces: []
+    // This bar's output only, in order.
+    readonly property var workspaces: {
+        const outputName = panelWindow.screen ? panelWindow.screen.name : ""
+        return niriEvents.workspaces.filter(workspace => workspace.output === outputName)
+            .sort((left, right) => left.idx - right.idx)
+    }
+    readonly property var visibleWorkspaces: limitedWorkspaces(workspaces)
 
     implicitWidth: workspaceRow.implicitWidth
     implicitHeight: workspaceRow.implicitHeight
     width: implicitWidth
     height: implicitHeight
-
-    function refresh() {
-        if (!workspaceQuery.running)
-            workspaceQuery.exec(["niri", "msg", "--json", "workspaces"])
-    }
-
-    function parseWorkspaces(text) {
-        try {
-            const outputName = panelWindow.screen ? panelWindow.screen.name : ""
-            const parsed = JSON.parse(text)
-            const filtered = parsed.filter(workspace => workspace.output === outputName)
-            filtered.sort((left, right) => left.idx - right.idx)
-            workspaces = filtered
-            visibleWorkspaces = limitedWorkspaces(filtered)
-        } catch (error) {
-            console.warn("Could not read Niri workspaces:", error)
-        }
-    }
 
     function limitedWorkspaces(items) {
         if (items.length <= 5)
@@ -67,36 +54,7 @@ Item {
             "niri", "msg", "action", "focus-workspace", String(workspace.idx)])
     }
 
-    Component.onCompleted: refresh()
-
-    Connections {
-        target: root.panelWindow
-        ignoreUnknownSignals: true
-        function onScreenChanged() { root.refresh() }
-    }
-
-    Process {
-        id: workspaceQuery
-        stdout: StdioCollector {
-            onStreamFinished: root.parseWorkspaces(this.text)
-        }
-    }
-
-    Process {
-        id: focusWorkspaceProcess
-        onExited: exitCode => root.refresh()
-    }
-
-    Connections {
-        target: root.niriEvents
-        function onWorkspacesChanged() { workspaceRefresh.restart() }
-    }
-
-    Timer {
-        id: workspaceRefresh
-        interval: 40
-        onTriggered: root.refresh()
-    }
+    Process { id: focusWorkspaceProcess }
 
     Row {
         id: workspaceRow
@@ -123,8 +81,6 @@ Item {
                         : workspaceBox.modelData.name || workspaceBox.modelData.idx
                     color: !workspaceBox.modelData.overflow
                         && workspaceBox.modelData.is_active ? Theme.bg : root.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     font.weight: !workspaceBox.modelData.overflow
                         && workspaceBox.modelData.is_active
                         ? Font.DemiBold : Font.Normal

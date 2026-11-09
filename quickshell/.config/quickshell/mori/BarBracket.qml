@@ -6,8 +6,6 @@ BarLabel {
     property var action: null
     property real hitMargin: 6
 
-    font.family: Theme.fontFamily
-    font.pixelSize: Theme.fontSize
 
     TapHandler {
         enabled: root.action !== null

@@ -1831,7 +1831,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "≡"
                     color: Theme.fg
-                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize + 2
                     DragHandler {
                         id: dragHandler
@@ -1852,8 +1851,6 @@ Item {
                     text: (root.contentFocused && root.keyboardModule === moduleRow.moduleKey ? "› " : "  ")
                         + root.moduleLabel(moduleRow.moduleKey)
                     color: moduleRow.moduleEnabled ? Theme.fg : Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     TapHandler {
                         onTapped: {
                             root.keyboardModule = moduleRow.moduleKey
@@ -1884,7 +1881,6 @@ Item {
                         SettingsLabel {
                             text: "Compact"
                             color: moduleRow.moduleCompact ? Theme.fg : Theme.grey1
-                            font.family: Theme.fontFamily
                             font.pixelSize: Math.max(10, Theme.fontSize - 1)
                         }
                     }
@@ -1998,7 +1994,6 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: "Settings"
                         color: Theme.fg
-                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.headingFontSize + 2
                         font.weight: Font.DemiBold
                     }
@@ -2031,8 +2026,6 @@ Item {
                                 text: (navItem.highlighted ? "› " : "  ")
                                     + navItem.modelData.label
                                 color: navItem.selected ? Theme.fg : Theme.grey2
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             HoverHandler { id: navHover }
                             TapHandler {
@@ -2066,7 +2059,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.pageTitle()
                     color: Theme.fg
-                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize + 2
                     font.weight: Font.DemiBold
                 }
@@ -2085,7 +2077,6 @@ Item {
                         anchors.centerIn: parent
                         text: "×"
                         color: Theme.fg
-                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize + 2
                     }
                     HoverHandler { id: closeHover }
@@ -2115,8 +2106,6 @@ Item {
                     anchors.centerIn: parent
                     text: "Apply"
                     color: applyButton.ready ? Theme.fg : Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
                 TapHandler {
                     enabled: applyButton.ready
@@ -2135,7 +2124,6 @@ Item {
                 text: root.page === "input" ? root.inputStatus
                     : root.page === "power" ? root.powerStatus : root.displayStatus
                 color: Theme.grey1
-                font.family: Theme.fontFamily
                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
             }
 
@@ -2165,7 +2153,7 @@ Item {
                 border.width: 1
                 border.color: Theme.red
 
-                Text {
+                MoriText {
                     id: saveErrorText
                     anchors.left: parent.left
                     anchors.leftMargin: 8
@@ -2174,8 +2162,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Settings not saved: " + root.settings.saveError
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     wrapMode: Text.Wrap
                 }
 
@@ -2186,8 +2172,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Retry (Ctrl+S)"
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     font.weight: Font.DemiBold
                     TapHandler { onTapped: root.settings.save() }
                 }
@@ -2216,12 +2200,10 @@ Item {
                         color: Theme.controlBackground(selected, highlighted, tabHover.hovered)
                         border.width: 1
                         border.color: Theme.controlBorder(selected, highlighted, tabHover.hovered, Theme.fg)
-                        Text {
+                        MoriText {
                             anchors.centerIn: parent
                             text: (parent.highlighted ? "› " : "") + parent.modelData.label
                             color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
                         HoverHandler { id: tabHover }
                         TapHandler {
@@ -2269,14 +2251,10 @@ Item {
                                 SettingsLabel {
                                     text: "↑↓ select · Shift+↑↓ reorder"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 SettingsLabel {
                                     text: "Shift+←→ change section · Enter toggle · C compact · drag ≡"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 Repeater {
                                     id: anchorRepeater
@@ -2318,8 +2296,6 @@ Item {
                                                     : anchorBox.anchorKey === "center" ? "Center"
                                                     : "Right"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 font.weight: Font.DemiBold
                                                 DropArea {
                                                     anchors.fill: parent
@@ -2377,8 +2353,6 @@ Item {
                                 SettingsLabel {
                                     text: "↑↓ widget · ←→ color · Enter apply"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 Repeater {
                                     id: colorRows
@@ -2400,8 +2374,6 @@ Item {
                                             text: (root.contentFocused && colorRow.index === root.keyboardColorRow ? "› " : "  ")
                                                 + root.moduleLabel(colorRow.moduleKey)
                                             color: Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                         Row {
                                             anchors.right: parent.right
@@ -2463,8 +2435,6 @@ Item {
                                 SettingsLabel {
                                     text: "↑↓ setting · ←→ pick · Enter apply · Shift+←→ bigger steps"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
 
                                 Repeater {
@@ -2483,8 +2453,6 @@ Item {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: (themeRow.focusedRow ? "› " : "  ") + themeRow.modelData.label
                                             color: Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
 
                                         Row {
@@ -2523,8 +2491,6 @@ Item {
                                                                 : (themeControl.modelData < 0 ? "−" : "+")
                                                         color: themeControl.selected || !themeControl.isChoice
                                                             ? Theme.fg : Theme.grey1
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: Theme.fontSize
                                                     }
                                                     HoverHandler { id: themeControlHover }
                                                     TapHandler {
@@ -2543,7 +2509,7 @@ Item {
                                     }
                                 }
 
-                                Text {
+                                MoriText {
                                     width: parent.width
                                     textFormat: Text.PlainText
                                     text: root.themeSchedulePreview()
@@ -2553,7 +2519,6 @@ Item {
                                             ? " · a manual switch lasts until the next change" : "")
                                     visible: root.settings.themeSchedule !== "off"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
                                     font.pixelSize: Math.max(10, Theme.fontSize - 2)
                                     wrapMode: Text.WordWrap
                                 }
@@ -2579,8 +2544,6 @@ Item {
                                 // Same keys as the popup's hint, in Settings' style (no colons).
                                 text: wallpaperBrowser.keyHint.replace(/: /g, " ")
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
 
                             WallpaperBrowser {
@@ -2656,8 +2619,6 @@ Item {
                             SettingsLabel {
                                 text: "↑↓ setting · ←→ pick · Enter apply"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
 
                             Repeater {
@@ -2673,8 +2634,6 @@ Item {
                                         text: (root.contentFocused && clockRow.index === root.keyboardClockIndex ? "› " : "  ")
                                             + clockRow.modelData.label
                                         color: Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                     }
 
                                     Row {
@@ -2703,8 +2662,6 @@ Item {
                                                     SettingsLabel {
                                                         text: clockRow.modelData.labels[clockChoice.index]
                                                         color: clockChoice.selected ? Theme.fg : Theme.grey1
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: Theme.fontSize
                                                     }
                                                 }
                                                 HoverHandler { id: choiceHover }
@@ -2724,13 +2681,10 @@ Item {
                             SettingsLabel {
                                 text: "Preview: " + root.clockPreview()
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             SettingsLabel {
                                 text: "Time format also applies to calendar events."
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
                         }
@@ -2749,14 +2703,10 @@ Item {
                             SettingsLabel {
                                 text: "↑↓ setting · ←→ pick · Enter apply"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             SettingsLabel {
                                 text: (root.contentFocused && root.keyboardUpdateRow === 0 ? "› " : "  ") + "Check interval"
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             Row {
                                 spacing: 8
@@ -2780,8 +2730,6 @@ Item {
                                             SettingsLabel {
                                                 text: (root.contentFocused && updateChoice.focused ? "› " : "  ") + updateChoice.modelData.label
                                                 color: updateChoice.selected ? Theme.fg : Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                         }
                                         HoverHandler { id: updateHover }
@@ -2794,20 +2742,17 @@ Item {
                                     }
                                 }
                             }
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 wrapMode: Text.WordWrap
                                 textFormat: Text.PlainText
                                 text: "Changes save immediately. Manual disables scheduled checks; use Check now in the Updates popup. Disabling the Updates module stops checks."
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
                             SettingsLabel {
                                 text: "  Sources"
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             Repeater {
                                 id: sourceRows
@@ -2823,7 +2768,7 @@ Item {
                                     onChosen: value => root.settings.setUpdateSourceEnabled(modelData.key, value)
                                 }
                             }
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 wrapMode: Text.WordWrap
                                 textFormat: Text.PlainText
@@ -2835,7 +2780,6 @@ Item {
                                          ? " With System off, AUR updates are still counted but not installed: Arch doesn't support partial upgrades."
                                          : "")
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
                         }
@@ -2858,8 +2802,6 @@ Item {
                             SettingsLabel {
                                 text: "↑↓ action · Enter edit · Del use automatic · Ctrl+Enter apply"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
 
                             Repeater {
@@ -2882,8 +2824,6 @@ Item {
                                             text: (root.contentFocused && powerRow.index === root.keyboardPowerIndex ? "› " : "  ")
                                                 + powerRow.modelData.label
                                             color: Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                         SettingsLabel {
                                             anchors.right: parent.right
@@ -2891,8 +2831,6 @@ Item {
                                             text: "Use automatic"
                                             color: (root.powerDrafts[powerRow.modelData.key] || "").length
                                                 ? Theme.fg : Theme.grey1
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                             TapHandler {
                                                 onTapped: {
                                                     root.keyboardPowerIndex = powerRow.index
@@ -2941,24 +2879,22 @@ Item {
                                         }
                                     }
 
-                                    Text {
+                                    MoriText {
                                         width: parent.width
                                         visible: (root.powerErrors[powerRow.modelData.key] || "").length > 0
                                         text: root.powerErrors[powerRow.modelData.key] || ""
                                         wrapMode: Text.WordWrap
                                         color: Theme.red
-                                        font.family: Theme.fontFamily
                                         font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                     }
                                 }
                             }
 
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: "Blank commands use automatic selection. Enter a custom command with its arguments, then Apply. Quote paths or arguments containing spaces. Commands that need root should use your authorized wrapper."
                                 wrapMode: Text.WordWrap
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 1)
                             }
                         }
@@ -2980,19 +2916,15 @@ Item {
                             SettingsLabel {
                                 text: "Niri input · leave keyboard layout empty for the system default"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             SettingsLabel {
                                 text: "↑↓ select · ←→ adjust · Enter edit or toggle · Del use system layout · R reset · Ctrl+Enter apply"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
                             SettingsLabel {
                                 text: "Sensitivity is Niri acceleration speed: −1 slower, +1 faster."
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
 
@@ -3023,8 +2955,6 @@ Item {
                                         text: (root.contentFocused && inputRow.index === root.keyboardInputIndex ? "› " : "  ")
                                             + inputRow.option.label
                                         color: Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                     }
 
                                     TextField {
@@ -3078,7 +3008,6 @@ Item {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: "Use system"
                                         color: Theme.fg
-                                        font.family: Theme.fontFamily
                                         font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                         TapHandler {
                                             onTapped: {
@@ -3130,8 +3059,6 @@ Item {
                                             horizontalAlignment: Text.AlignRight
                                             text: Number(inputRow.currentValue).toFixed(2)
                                             color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                     }
 
@@ -3160,14 +3087,12 @@ Item {
                                 }
                             }
 
-                            Text {
+                            MoriText {
                                 visible: root.inputError.length > 0 || root.inputStatus.length > 0
                                 width: parent.width
                                 wrapMode: Text.WordWrap
                                 text: root.inputError.length > 0 ? root.inputError : root.inputStatus
                                 color: root.inputError.length > 0 ? Theme.red : Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                         }
                     }
@@ -3194,8 +3119,6 @@ Item {
                                         ? "Arrows output · Tab editor · R refresh · Ctrl+Enter apply"
                                         : "↑↓ field · ←→ adjust · Enter change · Tab outputs"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
 
                                 Row {
@@ -3212,8 +3135,6 @@ Item {
                                             anchors.centerIn: parent
                                             text: displayQuery.running ? "Refreshing…" : "Refresh"
                                             color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                         HoverHandler { id: refreshHover }
                                         TapHandler {
@@ -3229,8 +3150,6 @@ Item {
                                         text: root.displayError.length > 0
                                             ? root.displayError : root.displayStatus
                                         color: root.displayError.length > 0 ? Theme.red : Theme.grey1
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
                                     }
                                 }
 
@@ -3259,8 +3178,6 @@ Item {
                                                     + (displaySelector.modelData.enabled ? "" : " · off")
                                                 color: root.selectedDisplay === displaySelector.modelData.connector
                                                     ? Theme.fg : Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             HoverHandler { id: displaySelectorHover }
                                             TapHandler {
@@ -3315,8 +3232,6 @@ Item {
                                                     text: displayTile.modelData.connector
                                                     color: root.selectedDisplay === displayTile.modelData.connector
                                                         ? Theme.fg : Theme.grey1
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: Theme.fontSize
                                                     font.weight: Font.DemiBold
                                                 }
                                                 SettingsLabel {
@@ -3327,7 +3242,6 @@ Item {
                                                         + Math.round(displayTile.modelData.y)
                                                         + (displayTile.modelData.enabled ? "" : "  ·  OFF")
                                                     color: Theme.grey1
-                                                    font.family: Theme.fontFamily
                                                     font.pixelSize: Math.max(9, Theme.fontSize - 2)
                                                 }
                                             }
@@ -3400,8 +3314,6 @@ Item {
                                             text: displayEditor.output && displayEditor.output.enabled
                                                 ? "Disable" : "Enable"
                                             color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                         }
                                         HoverHandler { id: displayEnabledHover }
                                         TapHandler {
@@ -3427,8 +3339,6 @@ Item {
                                                     + displayEditor.output.connector + ")"
                                                 : "No display selected"
                                             color: Theme.fg
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize
                                             font.weight: Font.DemiBold
                                         }
 
@@ -3440,13 +3350,10 @@ Item {
                                                     && root.keyboardDisplayField === 1
                                                     ? "› Resolution" : "  Resolution"
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             SettingsLabel {
                                                 text: "‹"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedResolution(-1) }
                                             }
@@ -3457,14 +3364,11 @@ Item {
                                                         + displayEditor.output.modeHeight
                                                     : "—"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 horizontalAlignment: Text.AlignHCenter
                                             }
                                             SettingsLabel {
                                                 text: "›"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedResolution(1) }
                                             }
@@ -3478,13 +3382,10 @@ Item {
                                                     && root.keyboardDisplayField === 2
                                                     ? "› Refresh" : "  Refresh"
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             SettingsLabel {
                                                 text: "‹"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedRefreshRate(-1) }
                                             }
@@ -3495,14 +3396,11 @@ Item {
                                                         .toFixed(2) + " Hz"
                                                     : "—"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 horizontalAlignment: Text.AlignHCenter
                                             }
                                             SettingsLabel {
                                                 text: "›"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedRefreshRate(1) }
                                             }
@@ -3516,13 +3414,10 @@ Item {
                                                     && root.keyboardDisplayField === 3
                                                     ? "› Scale" : "  Scale"
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             SettingsLabel {
                                                 text: "−"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.adjustSelectedScale(-0.25) }
                                             }
@@ -3531,14 +3426,11 @@ Item {
                                                 text: displayEditor.output
                                                     ? displayEditor.output.scale.toFixed(2) + "×" : "—"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 horizontalAlignment: Text.AlignHCenter
                                             }
                                             SettingsLabel {
                                                 text: "+"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.adjustSelectedScale(0.25) }
                                             }
@@ -3552,13 +3444,10 @@ Item {
                                                     && root.keyboardDisplayField === 4
                                                     ? "› Transform" : "  Transform"
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             SettingsLabel {
                                                 text: "‹"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedTransform(-1) }
                                             }
@@ -3567,14 +3456,11 @@ Item {
                                                 text: displayEditor.output
                                                     ? displayEditor.output.transform : "—"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                                 horizontalAlignment: Text.AlignHCenter
                                             }
                                             SettingsLabel {
                                                 text: "›"
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Theme.headingFontSize
                                                 TapHandler { onTapped: root.cycleSelectedTransform(1) }
                                             }
@@ -3585,18 +3471,16 @@ Item {
                                                 ? "Position  " + Math.round(displayEditor.output.x) + ", "
                                                     + Math.round(displayEditor.output.y) : ""
                                             color: Theme.grey1
-                                            font.family: Theme.fontFamily
                                             font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                         }
                                     }
                                 }
 
-                                Text {
+                                MoriText {
                                     text: "Drag displays to arrange them; nearby edges snap together. Apply writes display state, position, mode, scale, and transform, then asks you to keep or revert. Other output settings and comments are preserved."
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
                                     font.pixelSize: Math.max(10, Theme.fontSize - 1)
                                 }
                             }
@@ -3623,8 +3507,6 @@ Item {
                         text: "Keep display settings?  "
                             + root.displayConfirmationSeconds + "s"
                         color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
 
                     Row {
@@ -3644,8 +3526,6 @@ Item {
                                 anchors.centerIn: parent
                                 text: (root.keyboardConfirmationIndex === 0 ? "› " : "  ") + "Keep"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             HoverHandler { id: keepHover }
                             TapHandler { onTapped: root.keepDisplayConfiguration() }
@@ -3662,8 +3542,6 @@ Item {
                                 anchors.centerIn: parent
                                 text: (root.keyboardConfirmationIndex === 1 ? "› " : "  ") + "Revert"
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             HoverHandler { id: revertHover }
                             TapHandler {
@@ -3689,28 +3567,21 @@ Item {
                                 SettingsLabel {
                                     text: "Mori 森"
                                     color: Theme.fg
-                                    font.family: Theme.fontFamily
                                     font.pixelSize: Theme.headingFontSize + 4
                                 }
-                                Text {
+                                MoriText {
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     text: "A personal Quickshell configuration built around Niri and the Everforest palette."
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 SettingsLabel {
                                     text: "Settings are saved to ~/.config/quickshell/mori-settings.json"
                                     color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 SettingsLabel {
                                     text: "Built with · ↑↓ / Enter opens in your browser"
                                     color: Theme.grey1
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
                                 }
                                 Column {
                                     width: parent.width
@@ -3733,8 +3604,6 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: (root.contentFocused && aboutLink.focused ? "› " : "  ") + aboutLink.modelData.label
                                                 color: Theme.fg
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: Theme.fontSize
                                             }
                                             SettingsLabel {
                                                 anchors.right: parent.right
@@ -3742,7 +3611,6 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: aboutLink.modelData.detail
                                                 color: Theme.grey1
-                                                font.family: Theme.fontFamily
                                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                                             }
                                             HoverHandler { id: aboutHover; cursorShape: Qt.PointingHandCursor }
@@ -3789,8 +3657,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.moduleLabel(root.draggingModule)
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
                 SettingsLabel {
                     anchors.right: parent.right
@@ -3798,7 +3664,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "≡"
                     color: Theme.fg
-                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.headingFontSize + 2
                 }
             }

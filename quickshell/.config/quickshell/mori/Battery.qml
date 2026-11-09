@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
-import Quickshell.Wayland
 import "./theme"
 
 Row {
@@ -126,15 +125,12 @@ Row {
         text: root.batteryIcon()
         color: root.accent
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     BarLabel {
         anchors.verticalCenter: parent.verticalCenter
         text: root.charge + "%"
         color: root.accent
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     TapHandler { onTapped: root.toggle() }
@@ -178,12 +174,10 @@ Row {
                     color: root.accent
                 }
 
-                Text {
+                MoriText {
                     text: root.charge + "% · "
                         + (root.charging ? "Charging" : UPower.onBattery ? "On battery" : "Plugged in")
                     color: Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
 
                 Rectangle {
@@ -214,7 +208,7 @@ Row {
                         border.color: available ? Theme.controlBorder(selected,
                             index === root.keyboardProfileIndex, profileHover.hovered, root.accent) : Theme.bg4
 
-                        Text {
+                        MoriText {
                             anchors.left: parent.left
                             anchors.leftMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
@@ -223,11 +217,9 @@ Row {
                             color: profileRow.available
                                 ? profileRow.selected ? root.accent : Theme.fg
                                 : Theme.disabledText
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
-                        Text {
+                        MoriText {
                             anchors.right: parent.right
                             anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
@@ -237,8 +229,6 @@ Row {
                                 : profileRow.modelData.shortcut + " · Unavailable"
                             color: profileRow.available && profileRow.selected
                                 ? root.accent : Theme.grey1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
                         }
 
                         HoverHandler { id: profileHover }
@@ -255,36 +245,6 @@ Row {
                 KeyboardHint {
                     text: root.profilesAvailable ? "↑↓: profile · Enter: select · Esc: close" : "Esc: close"
                 }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: popup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-        onVisibleChanged: {
-            if (visible)
-                Qt.callLater(() => keyCapture.forceActiveFocus())
-        }
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-
-            Keys.onPressed: event => root.handleKeyPressed(event)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.close()
             }
         }
     }

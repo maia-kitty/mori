@@ -153,32 +153,26 @@ Item {
                             anchors.margins: 6
                             spacing: 2
 
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: toast.appName
                                 color: root.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 text: toast.summary
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 elide: Text.ElideRight
                             }
 
-                            Text {
+                            MoriText {
                                 width: parent.width
                                 visible: toast.body.length > 0
                                 text: toast.body
                                 textFormat: Text.PlainText
                                 color: Theme.grey1
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                                 wrapMode: Text.Wrap
                                 maximumLineCount: 3
                                 elide: Text.ElideRight
@@ -191,14 +185,13 @@ Item {
                             }
                         }
 
-                        Text {
+                        MoriText {
                             id: closeButton
                             anchors.top: parent.top
                             anchors.right: parent.right
                             anchors.margins: 6
                             text: "×"
                             color: root.accent
-                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize + 5
 
                             TapHandler {

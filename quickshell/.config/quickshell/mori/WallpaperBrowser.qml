@@ -282,14 +282,12 @@ Item {
             width: parent.width
             height: Theme.controlHeight
 
-            Text {
+            MoriText {
                 id: folderLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Folder"
                 color: Theme.grey1
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
 
             Rectangle {
@@ -327,15 +325,13 @@ Item {
             height: folderActions.implicitHeight
             spacing: 12
 
-            Text {
+            MoriText {
                 width: parent.width - folderActions.implicitWidth - parent.spacing
                 anchors.verticalCenter: parent.verticalCenter
                 // The Folder field above already shows the top level.
                 text: root.folderEditable && root.inRootFolder ? "" : root.localPath(files.folder)
                 elide: Text.ElideLeft
                 color: Theme.grey1
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
 
             Row {
@@ -349,13 +345,11 @@ Item {
                     color: Theme.controlBackground(false, false, available && upHover.hovered)
                     border.width: 1
                     border.color: Theme.controlBorder(false, false, available && upHover.hovered, root.accent)
-                    Text {
+                    MoriText {
                         id: upText
                         anchors.centerIn: parent
                         text: "↑ Up"
                         color: parent.available ? root.accent : Theme.disabledText
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                     HoverHandler { id: upHover }
                     TapHandler {
@@ -383,13 +377,11 @@ Item {
                     border.width: 1
                     border.color: Theme.controlBorder(selected, focused, screenHover.hovered, root.accent)
 
-                    Text {
+                    MoriText {
                         id: screenName
                         anchors.centerIn: parent
                         text: (parent.focused ? "› " : "  ") + modelData.name
                         color: parent.selected ? root.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
 
                     HoverHandler { id: screenHover }
@@ -411,14 +403,12 @@ Item {
                     border.width: 1
                     border.color: Theme.controlBorder(selected, false, modeHover.hovered, root.accent)
 
-                    Text {
+                    MoriText {
                         id: modeName
                         anchors.centerIn: parent
                         text: (modelData === "dark" ? "Dark" : "Light")
                             + (modelData === root.currentMode ? " (now)" : "")
                         color: parent.selected ? root.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
 
                     HoverHandler { id: modeHover }
@@ -472,13 +462,11 @@ Item {
                     color: root.accent
                     font.pixelSize: 28
                 }
-                Text {
+                MoriText {
                     anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 5 }
                     text: (tile.focused ? "› " : "  ") + tile.fileName
                     elide: Text.ElideRight
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
                 HoverHandler { id: hover }
                 TapHandler {
@@ -493,13 +481,11 @@ Item {
                 }
             }
 
-            Text {
+            MoriText {
                 anchors.centerIn: parent
                 visible: files.count === 0
                 text: "No wallpapers in this folder"
                 color: Theme.grey1
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
             }
         }
 

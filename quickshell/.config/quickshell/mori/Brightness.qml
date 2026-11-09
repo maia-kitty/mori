@@ -3,7 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import "./theme"
 
 RowLayout {
@@ -18,14 +17,16 @@ RowLayout {
     property real brightness: 0
     property real requestedBrightness: 0
     property string errorMessage: ""
+    // brightnessctl isn't installed: stop asking (restart the shell after installing it).
+    property bool missing: false
 
     function refresh() {
-        if (!brightnessQuery.running && !brightnessSet.running
+        if (!missing && !brightnessQuery.running && !brightnessSet.running
                 && !brightnessApply.running && !slider.pressed
                 && !popupSlider.pressed)
             brightnessQuery.exec([
                 "sh", "-c",
-                "command -v brightnessctl >/dev/null 2>&1 && exec brightnessctl -m"
+                "command -v brightnessctl >/dev/null 2>&1 || exit 127; exec brightnessctl -m"
             ])
     }
 
@@ -81,6 +82,8 @@ RowLayout {
         onExited: exitCode => {
             if (exitCode !== 0)
                 root.available = false
+            if (exitCode === 127)
+                root.missing = true
         }
     }
 
@@ -116,7 +119,7 @@ RowLayout {
     Timer {
         interval: brightnessPopup.visible ? 2000 : root.available ? 10000 : 30000
         repeat: true
-        running: true
+        running: !root.missing
         onTriggered: root.refresh()
     }
 
@@ -125,7 +128,6 @@ RowLayout {
         color: root.errorMessage.length > 0 ? Theme.red
             : root.available ? root.accent : Theme.grey1
         font.family: Theme.nerdFontFamily
-        font.pixelSize: Theme.fontSize
 
         TapHandler {
             enabled: root.compactMode && root.available
@@ -216,13 +218,11 @@ RowLayout {
                         text: "Brightness"
                         color: root.accent
                     }
-                    Text {
+                    MoriText {
                         width: parent.width - x
                         horizontalAlignment: Text.AlignRight
                         text: Math.round(root.brightness * 100) + "%"
                         color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                     }
                 }
 
@@ -261,13 +261,11 @@ RowLayout {
                     }
                 }
 
-                Text {
+                MoriText {
                     width: parent.width
                     visible: root.errorMessage.length > 0
                     text: root.errorMessage
                     color: Theme.red
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                     wrapMode: Text.WordWrap
                 }
 
@@ -275,27 +273,6 @@ RowLayout {
                     text: "←→: brightness · Esc: close"
                 }
             }
-        }
-    }
-
-    PanelWindow {
-        id: dismissLayer
-        screen: root.panelWindow.screen
-        visible: brightnessPopup.visible
-        anchors { top: true; bottom: true; left: true; right: true }
-        margins.top: root.panelWindow.height
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Top
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-        onVisibleChanged: if (visible) Qt.callLater(() => keyCapture.forceActiveFocus())
-
-        Item {
-            id: keyCapture
-            anchors.fill: parent
-            focus: dismissLayer.visible
-            Keys.onPressed: event => root.handleKeyPressed(event)
-            MouseArea { anchors.fill: parent; onClicked: root.close() }
         }
     }
 }

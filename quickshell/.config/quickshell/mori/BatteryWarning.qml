@@ -81,12 +81,10 @@ Item {
                     color: root.warningLevel === 2 ? Theme.red : Theme.yellow
                 }
 
-                Text {
+                MoriText {
                     text: root.warningCharge + "% remaining"
                         + (root.warningLevel === 2 ? " · Plug in your charger" : "")
                     color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
             }
 

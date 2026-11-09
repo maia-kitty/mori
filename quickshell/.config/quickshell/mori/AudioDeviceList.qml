@@ -37,7 +37,7 @@ Column {
                     color: Theme.controlBackground(selected, focused, deviceHover.hovered)
                     border.width: 1
                     border.color: Theme.controlBorder(selected, focused, deviceHover.hovered, root.accent)
-                    Text {
+                    MoriText {
                         anchors.fill: parent
                         leftPadding: 8
                         rightPadding: 8
@@ -45,8 +45,6 @@ Column {
                         text: (parent.selected ? "✓  " : "   ")
                             + (nodeLoader.modelData.description || nodeLoader.modelData.nickname || nodeLoader.modelData.name)
                         color: parent.selected ? root.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
                     HoverHandler { id: deviceHover }

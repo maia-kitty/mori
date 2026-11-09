@@ -26,8 +26,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: (root.focused ? "› " : "  ") + root.label
         color: Theme.grey1
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
     }
 
     Row {
@@ -52,8 +50,6 @@ Item {
                     anchors.centerIn: parent
                     text: root.labels[choice.index] || String(choice.modelData)
                     color: !root.available ? Theme.disabledText : choice.selected ? Theme.fg : Theme.grey1
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
                 HoverHandler { id: choiceHover }
                 TapHandler {

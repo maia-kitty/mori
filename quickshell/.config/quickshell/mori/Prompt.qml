@@ -116,15 +116,13 @@ Scope {
                     color: Theme.fg
                 }
 
-                Text {
+                MoriText {
                     width: parent.width
                     visible: text.length > 0
                     text: root.request ? root.request.text || "" : ""
                     textFormat: Text.PlainText
                     wrapMode: Text.Wrap
                     color: Theme.grey2
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
                 }
 
                 Rectangle {
@@ -174,14 +172,12 @@ Scope {
                             color: Theme.controlBackground(modelData, false, buttonHover.hovered)
                             border.width: 1
                             border.color: Theme.controlBorder(modelData, false, buttonHover.hovered)
-                            Text {
+                            MoriText {
                                 id: buttonLabel
                                 anchors.centerIn: parent
                                 text: button.modelData
                                     ? (root.request && root.request.accept) || "OK" : "Cancel"
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
                             }
                             HoverHandler { id: buttonHover }
                             TapHandler {

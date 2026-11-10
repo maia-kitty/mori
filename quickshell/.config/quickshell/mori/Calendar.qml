@@ -158,12 +158,11 @@ Item {
         }
 
         errorMessage = syncError
-        const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 1, 12)
         eventQuery.exec([
             "khal", "--no-color", "list", "--once",
             "--json", "title", "--json", "start-time", "--json", "end-time",
             "--json", "calendar", "--json", "calendar-color", "--json", "location",
-            dateKey(selectedDate), dateKey(end)
+            dateKey(selectedDate), "1d"
         ])
     }
 
@@ -251,14 +250,14 @@ Item {
     Process {
         id: syncProcess
 
-        stderr: StdioCollector { id: syncError }
+        stderr: StdioCollector { id: syncStderr }
 
         onExited: function(exitCode) {
             if (exitCode === 0) {
                 root.lastSync = Date.now()
                 root.syncMessage = "Synced " + root.formatEventTime(Qt.formatTime(new Date(), "HH:mm"))
             } else {
-                const detail = syncError.text.trim().split(/\r?\n/).pop()
+                const detail = syncStderr.text.trim().split(/\r?\n/).pop()
                 root.syncMessage = "Using local calendar"
                 root.syncError = detail
             }

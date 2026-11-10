@@ -1,5 +1,6 @@
 # Mori's login screen: greetd runs a small Niri (as the greeter user) that
-# shows /usr/share/mori-greeter/shell.qml. Installed by mori-greeter-install.
+# shows /usr/share/mori-greeter/shell.qml. Installed by mori-greeter-install,
+# which fills in this system's terminal and greeter user.
 [terminal]
 vt = 1
 

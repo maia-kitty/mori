@@ -73,6 +73,8 @@ qs --no-duplicate -c mori
 
 Add that command to your session startup if you want automatic launch without the service. Open **Settings** with **Mod+Period** to adjust the shell.
 
+`mori-session` does all of this for you on any distribution: run it from a TTY (or let the login screen below run it) and it starts `niri-session` on systemd, or a D-Bus session with Niri and the bar elsewhere, after loading your login shell's environment.
+
 ## Updating the dotfiles
 
 Review incoming changes, pull from the checkout, and relink packages when new files are added:
@@ -99,12 +101,13 @@ Replace the example profile path with yours and back up any existing `userChrome
 
 Mori's own login screen, mori-greeter, runs on greetd and uses Kiri, the same fog engine as mori-lock: your last wallpaper under settled fog, the last user filled in (Tab to type another), and logging in clears the fog before Niri starts. It needs greetd, `jq`, and Literata in the system fonts (see SDDM below). Suspend, restart and power off icons sit in the bottom right corner (click or Tab + Enter, twice to confirm); they run a copy of `mori-power`.
 
-The login screen runs as the `greeter` user, which cannot read your home directory, so `mori-greeter-install` copies its files instead of using Stow:
+The login screen runs as greetd's own user (`greeter`, or `_greeter` on Void), which cannot read your home directory, so `mori-greeter-install` copies its files instead of using Stow. It finds that user, keeps the terminal your distribution's greetd config uses, copies Literata to `/usr/local/share/fonts`, and tells you how to enable the service on your init system. Logging in runs a copy of `mori-session`:
 
 ```bash
 mori-greeter-install --preview   # try it in your session: any password but "wrong" works, Escape quits
 mori-greeter-install             # copy to /usr/share/mori-greeter and /etc/greetd (asks for sudo)
-sudo systemctl disable sddm && sudo systemctl enable greetd
+sudo systemctl disable sddm && sudo systemctl enable greetd    # systemd
+sudo rm /var/service/sddm; sudo ln -s /etc/sv/greetd /var/service/   # runit (Void)
 ```
 
 Run `mori-greeter-install` again after pulling changes to the login screen. Mori keeps `/var/lib/mori-greeter` up to date with your light/dark mode, clock format, and wallpapers. To go back, swap the two services: `sudo systemctl disable greetd && sudo systemctl enable sddm`.

@@ -1,0 +1,33 @@
+#!/bin/sh
+# Start the Mori desktop: from the login screen (mori-greeter runs a copy of
+# this) or by hand from a TTY. Works with and without systemd:
+#   systemd   niri-session; the bar is mori-quickshell.service
+#   otherwise a D-Bus session around Niri, which starts the bar itself
+# It first re-runs itself through your login shell, so the session gets the
+# same environment (locale, PATH…) as a TTY login, whatever that shell is.
+
+if [ -n "${WAYLAND_DISPLAY:-}" ] && [ "${1:-}" != --inner ]; then
+    echo "mori-session: already inside a graphical session" >&2
+    exit 1
+fi
+
+if [ "${1:-}" != --inner ]; then
+    shell="${SHELL:-$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)}"
+    [ -x "${shell:-}" ] || shell=/bin/sh
+    exec "$shell" -l -c "exec '$0' --inner"
+fi
+
+# The bar and Niri's shortcuts use the helpers in ~/.local/bin.
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH"; export PATH ;; esac
+
+if [ -d /run/systemd/system ] && command -v niri-session >/dev/null 2>&1; then
+    exec niri-session
+fi
+
+for app in niri qs; do
+    command -v "$app" >/dev/null 2>&1 || { echo "mori-session: $app is not installed" >&2; exit 1; }
+done
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+    exec dbus-run-session -- niri --session -- qs --no-duplicate -c mori
+fi
+exec niri --session -- qs --no-duplicate -c mori

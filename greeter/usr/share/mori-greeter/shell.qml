@@ -147,7 +147,9 @@ ShellRoot {
         easing.type: Easing.InOutCubic
         onFinished: {
             if (root.preview) Qt.quit()
-            else Greetd.launch(["niri-session"], [], true)
+            // mori-session (copied next to this file) picks niri-session or a plain
+            // D-Bus session, so the same login screen works with and without systemd.
+            else Greetd.launch([Quickshell.shellDir + "/mori-session"], ["XDG_SESSION_TYPE=wayland"], true)
         }
     }
 

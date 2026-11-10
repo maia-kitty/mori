@@ -22,6 +22,8 @@ cp -r "$repo/greeter/usr/share/mori-greeter/." "$stage/"
 cp "$shell/KiriEffect.qml" "$shell/PowerButtons.qml" "$stage/"
 # The power buttons run this copy (the greeter user has no ~/.local/bin).
 cp "$repo/bin/.local/bin/mori-power" "$stage/"
+# What a login starts; it works out the distribution's session itself.
+cp "$repo/bin/.local/bin/mori-session" "$stage/"
 mkdir -p "$stage/shaders"
 cp "$shell/shaders/kiri.frag.qsb" "$stage/shaders/"
 cp -r "$shell/theme" "$stage/"
@@ -36,23 +38,51 @@ if [ "${1:-}" = --preview ]; then
 fi
 
 command -v greetd >/dev/null || { echo "greetd is not installed" >&2; exit 1; }
-id greeter >/dev/null 2>&1 || { echo "the greeter user does not exist (install greetd)" >&2; exit 1; }
+# The greetd package's own user: "greeter" on most distributions, "_greeter" on Void.
+greeter=""
+for name in greeter _greeter; do
+    if id "$name" >/dev/null 2>&1; then greeter="$name"; break; fi
+done
+[ -n "$greeter" ] || { echo "no greeter user found (install greetd)" >&2; exit 1; }
+group="$(id -gn "$greeter")"
+# Keep the terminal the distribution's greetd config uses (1 on Arch, 7 on Void
+# where a getty owns tty1). Without a config: 7 if runit runs a getty on tty1, else 1.
+vt="$(sed -n 's/^[[:space:]]*vt[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' /etc/greetd/config.toml 2>/dev/null | head -n 1 || true)"
+if [ -z "$vt" ]; then
+    if [ -e /var/service/agetty-tty1 ]; then vt=7; else vt=1; fi
+fi
 
 sudo rm -rf /usr/share/mori-greeter
 sudo install -d -m 755 /usr/share/mori-greeter
 sudo cp -r "$stage/." /usr/share/mori-greeter/
 sudo chmod -R a+rX,go-w /usr/share/mori-greeter
 
-# Owned by you (mori-greeter-sync writes here), group greeter so the login
-# screen can remember the last user.
-sudo install -d -o "$USER" -g greeter -m 2775 /var/lib/mori-greeter
+# The greeter user can't read ~/.local/share/fonts either.
+sudo install -d -m 755 /usr/local/share/fonts/literata
+sudo cp "$repo"/fonts/.local/share/fonts/literata/* /usr/local/share/fonts/literata/
+sudo chmod -R a+rX /usr/local/share/fonts/literata
+sudo fc-cache -f /usr/local/share/fonts/literata >/dev/null 2>&1 || true
+
+# Owned by you (mori-greeter-sync writes here), group of the greeter user so
+# the login screen can remember the last user.
+sudo install -d -o "$USER" -g "$group" -m 2775 /var/lib/mori-greeter
 [ -e /var/lib/mori-greeter/last-user ] || install -m 664 /dev/null /var/lib/mori-greeter/last-user
 [ -s /var/lib/mori-greeter/last-user ] || printf '%s\n' "$USER" > /var/lib/mori-greeter/last-user
 
 if [ -e /etc/greetd/config.toml ] || [ -L /etc/greetd/config.toml ]; then
     sudo mv /etc/greetd/config.toml "/etc/greetd/config.toml.before-mori-$(date +%Y%m%d-%H%M%S)"
 fi
-sudo install -m 644 "$repo/greeter/etc/greetd/config.toml" /etc/greetd/config.toml
+sudo install -d -m 755 /etc/greetd
+sed -e "s/^vt = .*/vt = $vt/" -e "s/^user = .*/user = \"$greeter\"/" "$repo/greeter/etc/greetd/config.toml" \
+    | sudo install -m 644 /dev/stdin /etc/greetd/config.toml
 
 mori-greeter-sync
-echo "Installed. To switch from SDDM: sudo systemctl disable sddm && sudo systemctl enable greetd"
+echo "Installed for greeter user '$greeter' on vt $vt."
+if [ -d /run/systemd/system ]; then
+    echo "To switch from SDDM: sudo systemctl disable sddm && sudo systemctl enable greetd"
+elif [ -d /etc/sv/greetd ]; then
+    echo "To use it (runit): sudo ln -s /etc/sv/greetd /var/service/"
+    echo "and remove another login manager's link first, e.g. sudo rm /var/service/sddm"
+else
+    echo "Enable the greetd service with your init system, and disable any other login manager."
+fi

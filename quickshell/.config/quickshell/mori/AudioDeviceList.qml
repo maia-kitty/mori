@@ -3,7 +3,7 @@ import Quickshell.Services.Pipewire
 import "./theme"
 
 // Output or input devices to choose from, shared by the volume popup and
-// Settings → Sound. The default device has a check mark.
+// Settings → Sound. The default device is outlined, like other choices.
 Column {
     id: root
 
@@ -42,8 +42,7 @@ Column {
                         leftPadding: 8
                         rightPadding: 8
                         verticalAlignment: Text.AlignVCenter
-                        text: (parent.selected ? "✓  " : "   ")
-                            + (nodeLoader.modelData.description || nodeLoader.modelData.nickname || nodeLoader.modelData.name)
+                        text: nodeLoader.modelData.description || nodeLoader.modelData.nickname || nodeLoader.modelData.name
                         color: parent.selected ? root.accent : Theme.fg
                         elide: Text.ElideRight
                     }

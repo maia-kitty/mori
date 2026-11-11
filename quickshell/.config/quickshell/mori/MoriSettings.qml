@@ -1050,16 +1050,21 @@ Item {
                 keyboardDisplaySection = keyboardDisplaySection === "outputs"
                     ? "editor" : "outputs"
             else if (keyboardDisplaySection === "outputs") {
-                if (key !== Qt.Key_Left && key !== Qt.Key_Right
-                        && key !== Qt.Key_Up && key !== Qt.Key_Down) return
-                if (displays.length > 0) {
-                    const index = Math.max(0,
-                        displays.findIndex(output => output.connector === selectedDisplay))
-                    const offset = key === Qt.Key_Left || key === Qt.Key_Up ? -1 : 1
-                    selectedDisplay = displays[Math.max(0,
-                        Math.min(displays.length - 1, index + offset))].connector
-                }
-            } else if (key === Qt.Key_Up || key === Qt.Key_Down)
+                // One list: the monitor row, then the selected monitor's fields below it.
+                if (key === Qt.Key_Down) {
+                    keyboardDisplaySection = "editor"
+                    keyboardDisplayField = 0
+                } else if (key === Qt.Key_Left || key === Qt.Key_Right) {
+                    if (displays.length > 0) {
+                        const index = Math.max(0,
+                            displays.findIndex(output => output.connector === selectedDisplay))
+                        selectedDisplay = displays[Math.max(0, Math.min(displays.length - 1,
+                            index + (key === Qt.Key_Left ? -1 : 1)))].connector
+                    }
+                } else if (key !== Qt.Key_Up) return
+            } else if (key === Qt.Key_Up && keyboardDisplayField === 0)
+                keyboardDisplaySection = "outputs"
+            else if (key === Qt.Key_Up || key === Qt.Key_Down)
                 keyboardDisplayField = Math.max(0, Math.min(4,
                     keyboardDisplayField + (key === Qt.Key_Up ? -1 : 1)))
             else if (key === Qt.Key_Left || key === Qt.Key_Right
@@ -3129,8 +3134,8 @@ Item {
 
                                 SettingsLabel {
                                     keys: root.keyboardDisplaySection === "outputs"
-                                        ? "Arrows: output · Tab: editor · R: refresh · Ctrl+Enter: apply"
-                                        : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
+                                        ? "←→: monitor · ↓: its settings · R: refresh · Ctrl+Enter: apply"
+                                        : "↑↓: setting · ←→: adjust · R: refresh · Ctrl+Enter: apply"
                                     color: Theme.grey1
                                 }
 

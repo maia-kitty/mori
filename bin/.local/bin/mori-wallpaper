@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Wallpapers through awww (fades, one daemon) or swaybg (static, one process per monitor).
+# Usage: mori-wallpaper start                     start the saved backend (Niri runs this at login)
+#        mori-wallpaper backend [awww|swaybg]     print or switch the backend
+#        mori-wallpaper query                     print "<output>\t<image>" per monitor
+#        mori-wallpaper set <output> <image>
+#
+# The backend is saved in ~/.local/state/mori/wallpaper-backend (awww when missing).
+
+set -uo pipefail
+
+state="$HOME/.local/state/mori"
+backend="$(cat "$state/wallpaper-backend" 2>/dev/null)"
+[ "$backend" = swaybg ] || backend=awww
+mode="$(cat "$state/mode" 2>/dev/null)"
+[ "$mode" = light ] || mode=dark
+
+query() { # <backend>
+    if [ "$1" = awww ]; then
+        awww query 2>/dev/null \
+            | sed -n 's/^: \([^:]*\): .*currently displaying: image: \(.*\)$/\1\t\2/p'
+    else
+        # swaybg can't be asked; it shows this mode's saved list.
+        cat "$state/wallpapers-$mode" 2>/dev/null
+    fi
+}
+
+set_wallpaper() { # <backend> <output> <image>
+    if [ "$1" = awww ]; then
+        awww img --outputs "$2" --transition-type fade --transition-duration 0.8 "$3"
+    else
+        local old
+        old="$(pgrep -f "^swaybg -o $2 -i ")"
+        setsid -f swaybg -o "$2" -i "$3" -m fill >/dev/null 2>&1
+        # The old one goes after the new one has drawn, so nothing flashes.
+        [ -n "$old" ] && { (sleep 0.5; kill $old) >/dev/null 2>&1 & }
+    fi
+}
+
+apply() { # <backend>, list on stdin
+    while IFS=$'\t' read -r output image; do
+        [ -f "$image" ] && set_wallpaper "$1" "$output" "$image"
+    done
+}
+
+case "${1:-}" in
+    start)
+        # awww-daemon restores its last wallpapers itself.
+        [ "$backend" = awww ] && exec awww-daemon --quiet
+        query swaybg | apply swaybg ;;
+    query) query "$backend" ;;
+    set)
+        [ $# -eq 3 ] || { echo "usage: mori-wallpaper set <output> <image>" >&2; exit 2; }
+        set_wallpaper "$backend" "$2" "$3" ;;
+    backend)
+        new="${2:-}"
+        [ -z "$new" ] && { echo "$backend"; exit 0; }
+        [ "$new" = awww ] || [ "$new" = swaybg ] || { echo "usage: mori-wallpaper backend [awww|swaybg]" >&2; exit 2; }
+        command -v "$new" >/dev/null 2>&1 || { echo "mori-wallpaper: $new is not installed" >&2; exit 1; }
+        [ "$new" = "$backend" ] && exit 0
+        shown="$(query "$backend")"
+        mkdir -p "$state"
+        if [ "$new" = swaybg ]; then
+            [ -n "$shown" ] && printf '%s\n' "$shown" > "$state/wallpapers-$mode"
+            shown="$(query swaybg)"
+        else
+            setsid -f awww-daemon --quiet >/dev/null 2>&1
+            for _ in $(seq 30); do awww query >/dev/null 2>&1 && break; sleep 0.1; done
+        fi
+        printf '%s\n' "$new" > "$state/wallpaper-backend"
+        apply "$new" <<< "$shown"
+        # The old backend stays until the new one has drawn.
+        sleep 1
+        if [ "$new" = swaybg ]; then pkill -x awww-daemon; else pkill -x swaybg; fi ;;
+    *) echo "usage: mori-wallpaper start | backend [awww|swaybg] | query | set <output> <image>" >&2; exit 2 ;;
+esac
+exit 0

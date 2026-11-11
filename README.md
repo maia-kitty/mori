@@ -13,6 +13,7 @@ Install GNU Stow and the dependencies for the components you want.
 | Niri / Quickshell | Compositor / desktop shell |
 | Foot / Fuzzel / Swaylock | Terminal / launcher / lock screen |
 | awww | Wallpapers |
+| swaybg | Optional: static wallpaper backend (**Settings → Appearance**) |
 | PipeWire + WirePlumber | Audio |
 | NetworkManager, or iw + wpa_supplicant | Wi-Fi |
 | brightnessctl / power-profiles-daemon | Backlight / power profiles |

@@ -6,7 +6,7 @@
 # Quickshell watches ~/.local/state/mori/mode. Foot, Fuzzel and Niri include
 # files written here. Zen, Equibop, libadwaita and Electron apps follow the
 # portal color-scheme, which comes from gsettings. Each mode remembers its own
-# wallpaper per output (awww).
+# wallpaper per output (mori-wallpaper).
 
 set -uo pipefail
 
@@ -45,13 +45,12 @@ mkdir -p "$state"
 
 # Wallpapers: save this mode's wallpaper per output, restore the other mode's.
 # The first switch keeps the current wallpaper; pick one and it is remembered.
-if [ "$mode" != "$current" ] && have awww; then
-    awww query 2>/dev/null \
-        | sed -n 's/^: \([^:]*\): .*currently displaying: image: \(.*\)$/\1\t\2/p' > "$state/wallpapers-$current"
+if [ "$mode" != "$current" ] && have mori-wallpaper; then
+    shown="$(mori-wallpaper query)"
+    [ -n "$shown" ] && printf '%s\n' "$shown" > "$state/wallpapers-$current"
     if [ -s "$state/wallpapers-$mode" ]; then
         while IFS=$'\t' read -r output image; do
-            [ -f "$image" ] && awww img --outputs "$output" --transition-type fade \
-                --transition-duration 0.8 "$image"
+            [ -f "$image" ] && mori-wallpaper set "$output" "$image"
         done < "$state/wallpapers-$mode"
     fi
 fi
@@ -128,7 +127,7 @@ fi
 kew_state="$HOME/.local/state/kew/kewstaterc"
 [ -f "$kew_state" ] && sed -i -E "s/^theme=mori(-light)?$/theme=$kew_theme/" "$kew_state"
 
-# The login screen shows the last mode and wallpapers (after awww settles).
+# The login screen shows the last mode and wallpapers (after the wallpaper settles).
 have mori-greeter-sync && setsid -f sh -c 'sleep 1; exec mori-greeter-sync' >/dev/null 2>&1
 
 exit 0

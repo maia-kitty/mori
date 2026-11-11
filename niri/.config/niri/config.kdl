@@ -25,6 +25,7 @@ layout {
 
 layer-rule {
     match namespace="^awww-daemon$"
+    match namespace="^wallpaper$" // swaybg
     place-within-backdrop true
 }
 
@@ -34,7 +35,7 @@ overview {
     }
 }
 
-spawn-at-startup "awww-daemon" "--quiet"
+spawn-at-startup "mori-wallpaper" "start"
 // Re-creates the light/dark include files that Foot and Fuzzel require.
 spawn-at-startup "mori-theme" "init"
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"

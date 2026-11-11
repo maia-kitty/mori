@@ -6,7 +6,7 @@ import "./theme"
 
 // Wallpaper chooser shared by the bar's wallpaper popup and Settings →
 // Wallpaper: folder browser, monitor and dark/light choice, thumbnail grid.
-// The current mode's choice is applied with awww right away; both modes are
+// The current mode's choice is applied with mori-wallpaper (awww or swaybg) right away; both modes are
 // saved in ~/.local/state/mori/wallpapers-<mode>, which mori-theme restores.
 Item {
     id: root
@@ -38,17 +38,23 @@ Item {
         darkFile.reload()
         lightFile.reload()
         if (!wallpaperQuery.running)
-            wallpaperQuery.exec(["awww", "query"])
+            wallpaperQuery.exec(["mori-wallpaper", "query"])
     }
 
-    // Settings shows an editable wallpaper folder path; the bar popup doesn't.
+    readonly property string backend: backendFile.text().trim() === "swaybg" ? "swaybg" : "awww"
+    function setBackend(name) {
+        if (name !== backend && !backendSetter.running)
+            backendSetter.exec(["mori-wallpaper", "backend", name])
+    }
+
+    // Settings shows an editable wallpaper folder path and the backend; the bar popup doesn't.
     property bool folderEditable: false
     readonly property bool editingFolder: folderField.activeFocus
     // Settings shows the keys above the page instead of the hint at the bottom.
     property bool showHint: true
     readonly property string keyHint: keyboardMode === "screens"
-        ? "←/→: monitor · M: dark/light · ↑: parent · ↓: folder · Tab: wallpapers"
-            + (folderEditable ? " · F: folder path" : "")
+        ? "←→: monitor · M: dark/light · ↑: parent · ↓: folder · Tab: wallpapers"
+            + (folderEditable ? " · F: folder path · B: backend" : "")
         : "Arrows: navigate · Enter: select · M: dark/light · Tab: monitors"
     // Emitted when the path field gives the keyboard back to the host.
     signal keyboardReleased()
@@ -122,6 +128,8 @@ Item {
                 keyboardIndex = 0
         } else if (key === Qt.Key_F && folderEditable) {
             editFolder()
+        } else if (key === Qt.Key_B && folderEditable) {
+            setBackend(backend === "awww" ? "swaybg" : "awww")
         } else if (key === Qt.Key_M) {
             mode = mode === "dark" ? "light" : "dark"
         } else if (keyboardMode === "screens" && key === Qt.Key_Up) {
@@ -178,13 +186,7 @@ Item {
             const current = Object.assign({}, live)
             current[selectedScreen.name] = path
             live = current
-            wallpaperSetter.exec([
-                "awww", "img",
-                "--outputs", selectedScreen.name,
-                "--transition-type", "fade",
-                "--transition-duration", "0.8",
-                path
-            ])
+            wallpaperSetter.exec(["mori-wallpaper", "set", selectedScreen.name, path])
             // The login screen shows the same wallpaper.
             Quickshell.execDetached(["sh", "-c", "sleep 1; exec mori-greeter-sync"])
         }
@@ -199,12 +201,11 @@ Item {
         all[forMode] = parsed
         saved = all
     }
-    function parseAwwwQuery(output) {
+    function parseLive(output) {
         const current = {}
-        for (const line of output.split(/\r?\n/)) {
-            const match = line.match(/^: ([^:]+): .*currently displaying: image: (.+)$/)
-            if (match)
-                current[match[1]] = match[2]
+        for (const line of output.split("\n")) {
+            const tab = line.indexOf("\t")
+            if (tab > 0) current[line.slice(0, tab)] = line.slice(tab + 1)
         }
         live = current
     }
@@ -266,10 +267,23 @@ Item {
 
     Process { id: wallpaperSetter }
 
+    FileView {
+        id: backendFile
+        path: root.stateDir + "/wallpaper-backend"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+    }
+    Process {
+        id: backendSetter
+        // The file may not have existed to watch; a failed switch (not installed) leaves it alone.
+        onExited: backendFile.reload()
+    }
+
     Process {
         id: wallpaperQuery
         stdout: StdioCollector {
-            onStreamFinished: root.parseAwwwQuery(this.text)
+            onStreamFinished: root.parseLive(this.text)
         }
     }
 
@@ -413,6 +427,32 @@ Item {
 
                     HoverHandler { id: modeHover }
                     TapHandler { onTapped: root.mode = modelData }
+                }
+            }
+
+            Item { visible: root.folderEditable; width: 12; height: Theme.controlHeight }
+
+            Repeater {
+                model: root.folderEditable ? ["awww", "swaybg"] : []
+
+                delegate: Rectangle {
+                    required property string modelData
+                    readonly property bool selected: root.backend === modelData
+                    height: Theme.controlHeight
+                    width: backendName.implicitWidth + 16
+                    color: Theme.controlBackground(selected, false, backendHover.hovered)
+                    border.width: 1
+                    border.color: Theme.controlBorder(selected, false, backendHover.hovered, root.accent)
+
+                    MoriText {
+                        id: backendName
+                        anchors.centerIn: parent
+                        text: modelData
+                        color: parent.selected ? root.accent : Theme.fg
+                    }
+
+                    HoverHandler { id: backendHover }
+                    TapHandler { onTapped: root.setBackend(modelData) }
                 }
             }
         }

@@ -16,7 +16,7 @@ write mode "$(mori-theme get 2>/dev/null || echo dark)"
 settings="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/mori-settings.json"
 write clock "$(jq -r '.clock.timeFormat // "24h"' "$settings" 2>/dev/null || echo 24h)"
 
-command -v awww >/dev/null 2>&1 || exit 0
+command -v mori-wallpaper >/dev/null 2>&1 || exit 0
 index=""
 while IFS=$'\t' read -r output image; do
     [ -f "$image" ] || continue
@@ -24,6 +24,6 @@ while IFS=$'\t' read -r output image; do
     name="wallpaper-$output.${ext,,}"
     cp -f -- "$image" "$dir/$name.tmp" && mv -f "$dir/$name.tmp" "$dir/$name" || continue
     index+="$output"$'\t'"$name"$'\n'
-done < <(awww query 2>/dev/null | sed -n 's/^: \([^:]*\): .*currently displaying: image: \(.*\)$/\1\t\2/p')
+done < <(mori-wallpaper query)
 [ -n "$index" ] && printf '%s' "$index" > "$dir/wallpapers"
 exit 0

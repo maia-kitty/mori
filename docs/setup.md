@@ -50,7 +50,7 @@ Foot and Fuzzel include files that `mori-theme` writes to `~/.local/state/mori/`
 
 ## 4. Start the desktop
 
-Start a Niri session through your login manager or your usual session launcher. Its config starts `awww-daemon` and clipboard history automatically.
+Start a Niri session through your login manager or your usual session launcher. Its config starts the wallpaper backend (`mori-wallpaper start`) and clipboard history automatically.
 
 For the bar on systemd:
 

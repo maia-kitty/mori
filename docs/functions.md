@@ -88,7 +88,7 @@ The bar uses the main monitor only, with one widget layout. `qs -c mori ipc call
 | Battery | Battery status and power profiles |
 | Media | Media player controls |
 | Calendar | Calendar view, with optional khal events and vdirsyncer sync |
-| Wallpapers | Per-output wallpaper selection through awww, with a separate wallpaper for dark and light mode, browsing inside the wallpaper folder (set it in **Settings → Appearance**) |
+| Wallpapers | Per-output wallpaper selection through awww or swaybg (switch in **Settings → Appearance**, `B`), with a separate wallpaper for dark and light mode, browsing inside the wallpaper folder (set it in **Settings → Appearance**) |
 | Light/dark mode | Sun or moon icon for the current mode; click to switch (see [light and dark mode](#light-and-dark-mode)) |
 | Notifications | Notification popups, a stored-notification count, and the newest 500 history entries for the current shell session |
 | KDE Connect | Paired phone status and clipboard sending; shows “Unavailable” when its QML module is missing |

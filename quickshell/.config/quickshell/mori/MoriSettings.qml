@@ -388,6 +388,11 @@ Item {
         if (keyboardLayoutDraft !== keyboardLayout && !stageKeyboardLayout())
             return
         if (!inputDirty) return
+        // FileView writes nothing (and reports no save) when the text is unchanged.
+        if (inputContents === inputFile.text()) {
+            inputDirty = false
+            return
+        }
         inputApplyPending = true
         inputWritePending = true
         inputStatus = "Applying input settings…"
@@ -1499,12 +1504,19 @@ Item {
             return
         keyboardConfirmationIndex = 0
         let contents = outputsFile.text()
-        previousOutputConfiguration = contents
-        previousDisplays = JSON.parse(JSON.stringify(displays))
         for (const output of displays)
             contents = updateOutputConfiguration(contents, output)
         if (contents.length > 0 && !contents.endsWith("\n"))
             contents += "\n"
+        // FileView writes nothing (and reports no save) when the text is unchanged;
+        // waiting for it kept Settings from ever closing.
+        if (contents === outputsFile.text()) {
+            displayDirty = false
+            displayStatus = "Nothing to change"
+            return
+        }
+        previousOutputConfiguration = outputsFile.text()
+        previousDisplays = JSON.parse(JSON.stringify(displays))
         const currentScreenName = settingsWindow.screen ? settingsWindow.screen.name : ""
         const currentOutput = displays.find(output => output.connector === currentScreenName)
         if (currentOutput && !currentOutput.enabled) {

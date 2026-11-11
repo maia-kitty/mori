@@ -153,11 +153,11 @@ PopupSurface {
             }
         }
 
-        // In Settings the keys sit under the tabs, like its other pages, in its style (no colons).
+        // In Settings the keys sit under the tabs, like its other pages.
         SettingsLabel {
             visible: root.embedded
             width: parent.width
-            text: root.keyHint.replace(/: /g, " ")
+            keys: root.keyHint
             color: Theme.grey1
         }
 

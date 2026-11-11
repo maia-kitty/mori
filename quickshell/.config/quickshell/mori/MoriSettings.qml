@@ -2263,11 +2263,11 @@ Item {
                                 width: modulesFlick.width
                                 spacing: 8
                                 SettingsLabel {
-                                    text: "↑↓ select · Shift+↑↓ reorder"
+                                    keys: "↑↓: select · Shift+↑↓: reorder"
                                     color: Theme.grey1
                                 }
                                 SettingsLabel {
-                                    text: "Shift+←→ change section · Enter toggle · C compact · drag ≡"
+                                    keys: "Shift+←→: change section · Enter: toggle · C: compact · ≡: drag"
                                     color: Theme.grey1
                                 }
                                 Repeater {
@@ -2365,7 +2365,7 @@ Item {
                                 width: appearanceFlick.width
                                 spacing: 6
                                 SettingsLabel {
-                                    text: "↑↓ widget · ←→ color · Enter apply"
+                                    keys: "↑↓: widget · ←→: color · Enter: apply"
                                     color: Theme.grey1
                                 }
                                 Repeater {
@@ -2447,7 +2447,7 @@ Item {
                                 spacing: 6
 
                                 SettingsLabel {
-                                    text: "↑↓ setting · ←→ pick · Enter apply · Shift+←→ bigger steps"
+                                    keys: "↑↓: setting · ←→: pick · Enter: apply · Shift+←→: bigger steps"
                                     color: Theme.grey1
                                 }
 
@@ -2555,8 +2555,7 @@ Item {
                             SettingsLabel {
                                 id: wallpaperHint
                                 anchors { top: parent.top; left: parent.left; right: parent.right }
-                                // Same keys as the popup's hint, in Settings' style (no colons).
-                                text: wallpaperBrowser.keyHint.replace(/: /g, " ")
+                                keys: wallpaperBrowser.keyHint
                                 color: Theme.grey1
                             }
 
@@ -2631,7 +2630,7 @@ Item {
                             spacing: 12
 
                             SettingsLabel {
-                                text: "↑↓ setting · ←→ pick · Enter apply"
+                                keys: "↑↓: setting · ←→: pick · Enter: apply"
                                 color: Theme.grey1
                             }
 
@@ -2715,7 +2714,7 @@ Item {
                             spacing: 12
                             property alias rows: sourceRows
                             SettingsLabel {
-                                text: "↑↓ setting · ←→ pick · Enter apply"
+                                keys: "↑↓: setting · ←→: pick · Enter: apply"
                                 color: Theme.grey1
                             }
                             SettingsLabel {
@@ -2814,7 +2813,7 @@ Item {
                             spacing: 16
 
                             SettingsLabel {
-                                text: "↑↓ action · Enter edit · Del use automatic · Ctrl+Enter apply"
+                                keys: "↑↓: action · Enter: edit · Del: use automatic · Ctrl+Enter: apply"
                                 color: Theme.grey1
                             }
 
@@ -2932,7 +2931,7 @@ Item {
                                 color: Theme.grey1
                             }
                             SettingsLabel {
-                                text: "↑↓ select · ←→ adjust · Enter edit or toggle · Del use system layout · R reset · Ctrl+Enter apply"
+                                keys: "↑↓: select · ←→: adjust · Enter: edit or toggle · Del: use system layout · R: reset · Ctrl+Enter: apply"
                                 color: Theme.grey1
                                 font.pixelSize: Math.max(10, Theme.fontSize - 2)
                             }
@@ -3129,9 +3128,9 @@ Item {
                                 spacing: 10
 
                                 SettingsLabel {
-                                    text: root.keyboardDisplaySection === "outputs"
-                                        ? "Arrows output · Tab editor · R refresh · Ctrl+Enter apply"
-                                        : "↑↓ field · ←→ adjust · Enter change · Tab outputs"
+                                    keys: root.keyboardDisplaySection === "outputs"
+                                        ? "Arrows: output · Tab: editor · R: refresh · Ctrl+Enter: apply"
+                                        : "↑↓: field · ←→: adjust · Enter: change · Tab: outputs"
                                     color: Theme.grey1
                                 }
 
@@ -3594,7 +3593,7 @@ Item {
                                     color: Theme.fg
                                 }
                                 SettingsLabel {
-                                    text: "Built with · ↑↓ / Enter opens in your browser"
+                                    keys: "Built with · ↑↓ / Enter: opens in your browser"
                                     color: Theme.grey1
                                 }
                                 Column {

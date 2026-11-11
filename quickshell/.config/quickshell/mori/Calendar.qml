@@ -561,8 +561,8 @@ Item {
                         anchors.bottom: parent.bottom
                         anchors.margins: 12
                         text: root.dayNavigation
-                            ? "Days: arrows move date · Tab: months"
-                            : "Months: ← / → · Tab: days"
+                            ? "Arrows: day · Tab: months · Esc: close"
+                            : "←→: month · Tab: days · Esc: close"
                     }
                 }
             }

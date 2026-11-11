@@ -23,7 +23,7 @@ Column {
     Component.onCompleted: root.profiles.probe()
 
     SettingsLabel {
-        text: "←→ pick · Enter apply"
+        keys: "←→: pick · Enter: apply"
         color: Theme.grey1
     }
 

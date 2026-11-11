@@ -23,7 +23,7 @@ Column {
     }
 
     SettingsLabel {
-        text: "←→ pick · Enter apply · D toggle"
+        keys: "←→: pick · Enter: apply · D: toggle"
         color: Theme.grey1
     }
 

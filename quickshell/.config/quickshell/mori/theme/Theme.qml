@@ -16,6 +16,27 @@ Singleton {
         onFileChanged: reload()
     }
 
+    // "Key: action · Key: action" as styled text: the keys in the text colour,
+    // the rest in the label's own (grey) colour. On each line the arrow keys
+    // come first, then the other keys.
+    function keyHint(text) {
+        const escape = part => part.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        const arrow = part => /[←→↑↓]|Arrows/.test(part.key)
+        return text.split("\n").map(line => {
+            let parts = line.split(" · ").map(part => {
+                const colon = part.indexOf(": ")
+                return colon < 0 ? { "action": part }
+                    : { "key": part.slice(0, colon), "action": part.slice(colon + 2) }
+            })
+            // A line with plain words in it keeps its order.
+            if (parts.every(part => part.key))
+                parts = parts.filter(arrow).concat(parts.filter(part => !arrow(part)))
+            return parts.map(part => (part.key
+                ? '<font color="' + fg + '">' + escape(part.key) + '</font> ' : "")
+                + escape(part.action)).join(" · ")
+        }).join("<br>")
+    }
+
     readonly property color fg: dark ? "#d3c6aa" : "#5c6a72"
     readonly property color red: dark ? "#e67e80" : "#f85552"
     readonly property color yellow: dark ? "#dbbc7f" : "#dfa000"

@@ -119,7 +119,7 @@ Item {
     SettingsLabel {
         id: hint
         anchors { top: parent.top; left: parent.left; right: parent.right }
-        text: "↑↓ device or volume · ←→ volume · Enter use device · M mute"
+        keys: "↑↓: device or volume · ←→: volume · Enter: use device · M: mute"
         color: Theme.grey1
     }
 }

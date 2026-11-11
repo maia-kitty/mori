@@ -2,7 +2,7 @@ import QtQuick
 import "./theme"
 
 Column {
-    property alias text: hintText.text
+    property string text
 
     width: parent ? parent.width : 0
     spacing: 10
@@ -18,7 +18,8 @@ Column {
         width: parent.width
         color: Theme.grey1
         font.pixelSize: Math.max(10, Theme.fontSize - 2)
-        textFormat: Text.PlainText
+        text: Theme.keyHint(parent.text)
+        textFormat: Text.StyledText
         wrapMode: Text.WordWrap
     }
 }
